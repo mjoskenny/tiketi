@@ -162,7 +162,6 @@ export default function App() {
     event: Event
     quantities: Record<string, number>
     subtotal: number
-    fee: number
     total: number
   } | null>(null)
   const [ticketData, setTicketData] = useState<{

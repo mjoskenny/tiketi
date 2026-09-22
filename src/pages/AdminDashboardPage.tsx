@@ -231,7 +231,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
   const [eventRows, setEventRows] = useState<Array<{ event: string; organizer: string; capacity: string; status: string }>>([])
   const [ticketRows, setTicketRows] = useState<Array<{ event: string; sold: string; available: string; utilization: string }>>([])
   const [orderRows, setOrderRows] = useState<Array<{ customer: string; event: string; amount: string; status: string }>>([])
-  const [paymentRows, setPaymentRows] = useState<Array<{ reference: string; customer: string; method: string; amount: string }>>([])
+  const [paymentRows, setPaymentRows] = useState<Array<{ reference: string; customer: string; method: string; amount: string; platformFee: string; organizerProceeds: string }>>([])
   const [payoutRows, setPayoutRows] = useState<Array<{ organizer: string; expected: string; status: string; window: string }>>([])
   const [agentRows, setAgentRows] = useState<Array<{ agent: string; sales: string; revenue: string; commission: string; commissionRate: number }>>([])
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings>(DEFAULT_PLATFORM_SETTINGS)
@@ -429,7 +429,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
           const sale = Array.isArray(commission.agent_sales) ? commission.agent_sales[0] : commission.agent_sales
           if (sale?.order_id) commissionAmountByOrder.set(sale.order_id, (commissionAmountByOrder.get(sale.order_id) ?? 0) + (Number(commission.amount) || 0))
         })
-        const netTicketRevenueForOrder = (order: { id: string; subtotal?: number | null; order_items?: Array<{ total_price?: number | null }> | null }) => Math.max(0, ticketValueForOrder(order) - (refundAmountByOrder.get(order.id) ?? 0) - (commissionAmountByOrder.get(order.id) ?? 0))
+        const netTicketRevenueForOrder = (order: { id: string; subtotal?: number | null; service_fee?: number | null; order_items?: Array<{ total_price?: number | null }> | null }) => Math.max(0, ticketValueForOrder(order) - serviceFeeForOrder(order) - (refundAmountByOrder.get(order.id) ?? 0) - (commissionAmountByOrder.get(order.id) ?? 0))
         const processedRefundCountForOrders = (orderIds: Set<string>) => new Set((allRefunds as Array<{ order_id: string; ticket_id?: string | null; status?: string | null }>)
           .filter(refund => refund.status === 'processed' && orderIds.has(refund.order_id))
           .map(refund => refund.ticket_id)
@@ -527,11 +527,13 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
           status: order.status ?? 'pending',
         }))
 
-        const paymentRowsData = (orders as Array<{ id?: string | null; profiles?: { full_name?: string | null }; payment_method?: string | null; total?: number | null; status?: string | null }>).filter(order => order.status === 'confirmed' || order.status === 'pending').slice(0, 6).map(order => ({
+        const paymentRowsData = (orders as Array<{ id?: string | null; profiles?: { full_name?: string | null }; payment_method?: string | null; subtotal?: number | null; service_fee?: number | null; total?: number | null; status?: string | null }>).filter(order => order.status === 'confirmed' || order.status === 'pending').slice(0, 6).map(order => ({
           reference: `TXN-${String(order.id ?? '').slice(0, 6).toUpperCase()}`,
           customer: order.profiles?.full_name ?? 'Customer',
           method: order.payment_method ? order.payment_method.replace('_', ' ') : 'Card',
           amount: formatMoneyShort(order.total ?? 0),
+          platformFee: formatMoneyShort(serviceFeeForOrder(order)),
+          organizerProceeds: formatMoneyShort(Math.max(0, (Number(order.subtotal) || 0) - serviceFeeForOrder(order))),
         }))
 
         const payoutRowsData = (transactions as Array<{ organizers?: { name?: string | null }; amount?: number | null; status?: string | null; created_at?: string | null; type?: string | null }>).filter(transaction => transaction.type === 'payout').slice(0, 6).map(transaction => ({
@@ -821,7 +823,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
         case 'orders':
           return orderRows.filter(row => `${row.customer} ${row.event}`.toLowerCase().includes(searchTerm.toLowerCase())).map(row => [row.customer, row.event, row.amount, row.status])
         case 'payments':
-          return paymentRows.filter(row => `${row.reference} ${row.customer}`.toLowerCase().includes(searchTerm.toLowerCase())).map(row => [row.reference, row.customer, row.method, row.amount])
+          return paymentRows.filter(row => `${row.reference} ${row.customer}`.toLowerCase().includes(searchTerm.toLowerCase())).map(row => [row.reference, row.customer, row.method, row.amount, row.platformFee, row.organizerProceeds])
         case 'payouts':
           return payoutRows.filter(row => `${row.organizer} ${row.status}`.toLowerCase().includes(searchTerm.toLowerCase())).map(row => [row.organizer, row.expected, row.status, row.window])
         case 'agents':
@@ -840,7 +842,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
         case 'events': return ['Event', 'Organizer', 'Capacity', 'Status']
         case 'tickets': return ['Event', 'Sold', 'Available', 'Utilization']
         case 'orders': return ['Customer', 'Event', 'Amount', 'Status']
-        case 'payments': return ['Reference', 'Customer', 'Method', 'Amount']
+        case 'payments': return ['Reference', 'Customer', 'Method', 'Customer paid', 'Platform fee', 'Organizer proceeds']
         case 'payouts': return ['Organizer', 'Expected', 'Status', 'Window']
         case 'agents': return ['Agent', 'Sales', 'Revenue', 'Commission']
         default: return []
@@ -862,7 +864,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
   const overviewRevenueTotal = weekTrend.reduce((sum, value) => sum + value, 0)
   const overviewRevenueMax = Math.max(...weekTrend, 1)
   const overviewHealthSummary = platformStats.grossTicketValue > 0
-    ? `Organizer net revenue is ${formatMoneyShort(platformStats.grossTicketValue)} after processed refunds and agent commissions, with ${formatMoneyShort(platformStats.platformRevenue)} in service fees.`
+    ? `Organizer net revenue is ${formatMoneyShort(platformStats.grossTicketValue)} after platform fees, processed refunds, and agent commissions. Platform fees total ${formatMoneyShort(platformStats.platformRevenue)}.`
     : 'Platform has no confirmed ticket sales yet. Live sales metrics will appear here once orders are created.'
   const overviewHealthTone = platformStats.grossTicketValue > 0 ? { background: 'rgba(34,197,94,0.12)', color: '#8ae6a3' } : { background: 'rgba(251,191,36,0.12)', color: '#f9d97d' }
 
@@ -1014,7 +1016,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
     const eventsTable = applySearchAndSort(eventRows.map(row => ({ ...row, nameValue: row.event, valueKey: row.capacity.replace(/,/g, '') })), 'nameValue', 'valueKey').map(row => [row.event, row.organizer, row.capacity, row.status])
     const ticketsTable = applySearchAndSort(ticketRows.map(row => ({ ...row, nameValue: row.event, valueKey: Number(row.sold.replace(/,/g, '')) })), 'nameValue', 'valueKey').map(row => [row.event, row.sold, row.available, row.utilization])
     const orderTable = applySearchAndSort(orderRows.map(row => ({ ...row, nameValue: row.customer, valueKey: toComparableNumber(row.amount) })), 'nameValue', 'valueKey').map(row => [row.customer, row.event, row.amount, row.status])
-    const paymentTable = applySearchAndSort(paymentRows.map(row => ({ ...row, nameValue: row.reference, valueKey: toComparableNumber(row.amount) })), 'nameValue', 'valueKey').map(row => [row.reference, row.customer, row.method, row.amount])
+    const paymentTable = applySearchAndSort(paymentRows.map(row => ({ ...row, nameValue: row.reference, valueKey: toComparableNumber(row.amount) })), 'nameValue', 'valueKey').map(row => [row.reference, row.customer, row.method, row.amount, row.platformFee, row.organizerProceeds])
     const payoutTable = applySearchAndSort(payoutRows.map(row => ({ ...row, nameValue: row.organizer, valueKey: toComparableNumber(row.expected) })), 'nameValue', 'valueKey').map(row => [row.organizer, row.expected, row.status, row.window])
     const agentTable = applySearchAndSort(agentRows.map(row => ({ ...row, nameValue: row.agent, valueKey: toComparableNumber(row.revenue) })), 'nameValue', 'valueKey').map(row => [row.agent, row.sales, row.revenue, row.commission])
 
@@ -1192,12 +1194,13 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
                   <button onClick={exportCurrentSection} className="rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-wide" style={{ background: 'var(--primary)', color: '#000' }}>Export CSV</button>
                 </div>
               </div>
-              <TableCard title="Payments" subtitle="Transactions" columns={['Reference', 'Customer', 'Method', 'Amount']} rows={paymentTable.length ? paymentTable : [['No matching payments', '—', '—', 'BIF 0']]} />
+              <TableCard title="Payments" subtitle="Customer payments and organizer fee deductions" columns={['Reference', 'Customer', 'Method', 'Customer paid', 'Platform fee', 'Organizer proceeds']} rows={paymentTable.length ? paymentTable : [['No matching payments', '—', '—', 'BIF 0', 'BIF 0', 'BIF 0']]} />
             </div>
             {renderSimpleList('Settlement status', [
               { label: 'Successful payments', value: healthMetrics.payments.successful.toLocaleString() },
               { label: 'Failed payments', value: healthMetrics.payments.failed.toLocaleString() },
               { label: 'Pending reconciliation', value: healthMetrics.payments.pending.toLocaleString() },
+              { label: 'Organizer-funded service fees', value: formatMoneyShort(platformStats.platformRevenue) },
             ], 'Finance')}
           </div>
         )
@@ -1305,7 +1308,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--muted-foreground)' }}>Checkout controls</p>
                   <h3 className="mt-1 text-lg font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Sales and payment rules</h3>
                   <div className="mt-5 space-y-3">
-                    <label className="block rounded-xl border p-4 text-sm font-bold" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.025)' }}>Service fee (%)<span className="mt-1 block text-xs font-normal leading-5" style={{ color: 'var(--muted-foreground)' }}>Applied server-side to every new customer order.</span><input type="number" min="0" max="100" step="0.01" value={platformSettings.service_fee_percent} onChange={event => updatePlatformSetting('service_fee_percent', Number(event.target.value))} className="mt-3 w-full rounded-lg border px-3 py-2 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
+                    <label className="block rounded-xl border p-4 text-sm font-bold" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.025)' }}>Organizer service fee (%)<span className="mt-1 block text-xs font-normal leading-5" style={{ color: 'var(--muted-foreground)' }}>Deducted server-side from organizer proceeds on each new order. Customers pay the ticket price only.</span><input type="number" min="0" max="100" step="0.01" value={platformSettings.service_fee_percent} onChange={event => updatePlatformSetting('service_fee_percent', Number(event.target.value))} className="mt-3 w-full rounded-lg border px-3 py-2 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
                     <ToggleSetting label="Ticket sales" description="Allow customers to create new checkout orders." checked={platformSettings.ticket_sales_enabled} onChange={value => updatePlatformSetting('ticket_sales_enabled', value)} />
                     <ToggleSetting label="Mobile Money" description="Make Mobile Money available in checkout and test payment confirmation." checked={platformSettings.mobile_money_enabled} onChange={value => updatePlatformSetting('mobile_money_enabled', value)} />
                     <ToggleSetting label="Card payments" description="Make card payments available in checkout and test payment confirmation." checked={platformSettings.card_payments_enabled} onChange={value => updatePlatformSetting('card_payments_enabled', value)} />

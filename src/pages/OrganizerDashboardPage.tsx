@@ -462,9 +462,8 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     return createdAt >= rangeStart && createdAt <= rangeEnd
   })
 
-  // Revenue is ticket value only. Customer service fees belong to the platform,
-  // while processed ticket refunds and non-reversed agent commissions reduce the
-  // organizer's net revenue.
+  // Customers pay the ticket value. Platform fees, processed ticket refunds,
+  // and non-reversed agent commissions are deducted from organizer proceeds.
   const ticketsById = new Map(checkinTickets.map(ticket => [ticket.id, ticket]))
   const ordersById = new Map(orders.map(order => [order.id, order]))
   const processedRefunds = refundRequests.filter(request => request.status === 'processed')
@@ -482,10 +481,12 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     if (sale?.order_id) commissionAmountByOrder.set(sale.order_id, (commissionAmountByOrder.get(sale.order_id) ?? 0) + (Number(commission.amount) || 0))
   })
   const ticketSalesForOrder = (order: Order) => Number(order.subtotal) || order.order_items?.reduce((sum, item) => sum + (Number(item.total_price) || 0), 0) || 0
-  const netTicketRevenueForOrder = (order: Order) => Math.max(0, ticketSalesForOrder(order) - (refundAmountByOrder.get(order.id) ?? 0) - (commissionAmountByOrder.get(order.id) ?? 0))
+  const platformFeeForOrder = (order: Order) => Math.max(0, Number(order.service_fee) || 0)
+  const netTicketRevenueForOrder = (order: Order) => Math.max(0, ticketSalesForOrder(order) - platformFeeForOrder(order) - (refundAmountByOrder.get(order.id) ?? 0) - (commissionAmountByOrder.get(order.id) ?? 0))
   const confirmedOrders = filteredOrders.filter(order => order.status === 'confirmed')
   const netRevenueOrders = confirmedOrders.filter(order => netTicketRevenueForOrder(order) > 0)
   const totalRevenue = netRevenueOrders.reduce((sum, order) => sum + netTicketRevenueForOrder(order), 0)
+  const totalPlatformFees = confirmedOrders.reduce((sum, order) => sum + platformFeeForOrder(order), 0)
   const refundedTicketCount = new Set(processedRefunds
     .filter(request => confirmedOrders.some(order => order.id === request.order_id))
     .map(request => request.ticket_id)
@@ -774,7 +775,9 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                 <div><p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Event</p><p className="mt-1 font-bold">{(selectedOrder as any).events?.title ?? 'Event'}</p></div>
                 <div><p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Source</p><p className="mt-1 font-bold">{agentSale ? `Agent · ${agentSale.profiles?.full_name ?? 'Sales agent'}` : 'Customer checkout'}</p></div>
                 <div><p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Payment</p><p className="mt-1 font-bold capitalize">{agentSale?.payment_mode ?? selectedOrder.payment_method?.replace('_', ' ') ?? 'Pending'}</p></div>
-                <div><p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Total</p><p className="mt-1 font-bold" style={{ color: 'var(--primary)' }}>{formatPrice(selectedOrder.total)}</p></div>
+                <div><p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Customer paid</p><p className="mt-1 font-bold" style={{ color: 'var(--primary)' }}>{formatPrice(selectedOrder.total)}</p></div>
+                <div><p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Platform fee</p><p className="mt-1 font-bold" style={{ color: '#fca5a5' }}>-{formatPrice(platformFeeForOrder(selectedOrder))}</p></div>
+                <div><p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Organizer net</p><p className="mt-1 font-bold" style={{ color: 'var(--primary)' }}>{formatPrice(netTicketRevenueForOrder(selectedOrder))}</p></div>
                 <div><p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Status</p><div className="mt-1"><Badge label={selectedOrder.status} color={STATUS_COLORS[selectedOrder.status] ?? '#888'} /></div></div>
               </div>
               <div className="mt-5 rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.025)' }}>
@@ -985,9 +988,10 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                     <button onClick={requestVerification} disabled={verificationStatus !== 'unverified'} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: verificationStatus === 'unverified' ? 'var(--primary)' : 'var(--muted)', color: verificationStatus === 'unverified' ? '#000' : 'var(--muted-foreground)' }}>{verificationStatus === 'verified' ? 'Verified' : verificationStatus === 'pending' ? 'Pending review' : 'Request verification'}</button>
                   </div>
                   {/* KPI grid */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                     <StatCard Icon={TicketIcon} label="Tickets Sold" value={totalTicketsSold.toLocaleString()} />
                     <StatCard Icon={DollarSignIcon} label="Net Ticket Revenue" value={formatPrice(totalRevenue)} />
+                    <StatCard Icon={DollarSignIcon} label="Platform Fees" value={formatPrice(totalPlatformFees)} sub="Deducted from sales" color="#fca5a5" />
                     <StatCard Icon={CalendarIcon} label="Published Events" value={publishedEvents.toString()} />
                     <StatCard Icon={UsersIcon} label="Customers" value={customers.length.toString()}
                       sub={`Avg order: ${avgOrderValue > 0 ? formatPrice(avgOrderValue) : '—'}`} />
@@ -1217,7 +1221,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                     <table className="w-full text-sm">
                       <thead>
                         <tr style={{ background: 'var(--muted)' }}>
-                          {['Order ID', 'Customer', 'Event', 'Tickets / tiers', 'Source', 'Method', 'Total', 'Status', 'Date', 'Actions'].map(h => (
+                          {['Order ID', 'Customer', 'Event', 'Tickets / tiers', 'Source', 'Method', 'Customer paid', 'Status', 'Date', 'Actions'].map(h => (
                             <th key={h} className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--muted-foreground)' }}>{h}</th>
                           ))}
                         </tr>
@@ -1537,8 +1541,8 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                             <tr key={t.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
                               <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--muted-foreground)' }}>{t.id.slice(0, 8)}…</td>
                               <td className="px-4 py-3"><Badge label={t.type} color={STATUS_COLORS[t.type] ?? '#888'} /></td>
-                              <td className="px-4 py-3 text-xs font-bold" style={{ color: t.type === 'refund' ? '#ef4444' : 'var(--primary)' }}>
-                                {t.type === 'refund' ? '-' : '+'}{formatPrice(t.amount)}
+                              <td className="px-4 py-3 text-xs font-bold" style={{ color: t.type === 'refund' || t.type === 'fee' ? '#ef4444' : 'var(--primary)' }}>
+                                {t.type === 'refund' || t.type === 'fee' ? '-' : '+'}{formatPrice(t.amount)}
                               </td>
                               <td className="px-4 py-3 text-xs">{t.currency}</td>
                               <td className="px-4 py-3"><Badge label={t.status} color={STATUS_COLORS[t.status === 'completed' ? 'completed_t' : t.status === 'failed' ? 'failed' : 'pending_t'] ?? '#888'} /></td>

@@ -9,13 +9,11 @@ import { isFavoriteEvent, toggleFavoriteEvent } from '../lib/favorites'
 type Props = { event: Event; navigate: (p: string, extra?: unknown) => void; onRequireAuth?: (title: string, message: string, mode?: 'customer' | 'organizer') => void }
 
 type CheckoutSettings = {
-  service_fee_percent: number
   ticket_sales_enabled: boolean
   checkout_notice: string | null
 }
 
 const DEFAULT_CHECKOUT_SETTINGS: CheckoutSettings = {
-  service_fee_percent: 5,
   ticket_sales_enabled: true,
   checkout_notice: null,
 }
@@ -74,7 +72,6 @@ export default function EventDetailPage({ event, navigate, onRequireAuth }: Prop
       const settings = Array.isArray(data) ? data[0] : data
       if (!isMounted || !settings) return
       setCheckoutSettings({
-        service_fee_percent: Number(settings.service_fee_percent ?? DEFAULT_CHECKOUT_SETTINGS.service_fee_percent),
         ticket_sales_enabled: settings.ticket_sales_enabled ?? true,
         checkout_notice: settings.checkout_notice ?? null,
       })
@@ -158,8 +155,7 @@ export default function EventDetailPage({ event, navigate, onRequireAuth }: Prop
 
   const totalTickets = Object.values(quantities).reduce((sum, quantity) => sum + quantity, 0)
   const subtotal = useMemo(() => tiers.reduce((sum, tier) => sum + (quantities[tier.id] || 0) * tier.price, 0), [quantities, tiers])
-  const fee = Math.round(subtotal * (checkoutSettings.service_fee_percent / 100))
-  const total = subtotal + fee
+  const total = subtotal
   const organizerName = event.organizers?.profiles?.full_name?.trim() || event.organizers?.name || 'Tiketi events'
   const organizerUsername = event.organizers?.profiles?.username?.trim().replace(/^@/, '') || null
   const organizerAvatar = event.organizers?.profiles?.profile_image ?? event.organizers?.profiles?.avatar_url ?? event.organizers?.logo_url ?? null
@@ -197,7 +193,7 @@ export default function EventDetailPage({ event, navigate, onRequireAuth }: Prop
       window.alert(checkoutSettings.checkout_notice || 'Ticket sales are currently paused. Please try again later.')
       return
     }
-    navigate('checkout', { event, quantities: Object.fromEntries(tiers.filter(tier => quantities[tier.id] > 0).map(tier => [tier.name, quantities[tier.id]])), subtotal, fee, total })
+    navigate('checkout', { event, quantities: Object.fromEntries(tiers.filter(tier => quantities[tier.id] > 0).map(tier => [tier.name, quantities[tier.id]])), subtotal, total })
   }
 
   return (
@@ -221,7 +217,7 @@ export default function EventDetailPage({ event, navigate, onRequireAuth }: Prop
 
       <section className="sinc-event-body">
         <div className="sinc-event-description"><h2>About this event</h2><p>{event.description || 'Join us for an unforgettable experience.'}</p></div>
-        <section className="sinc-ticket-section"><div className="sinc-ticket-heading"><h2>Get tickets</h2></div><div className="sinc-ticket-content"><p>Choose your ticket type to continue</p><div className="sinc-ticket-list">{tiers.length === 0 && <div className="sinc-empty-tickets">Tickets will be available soon.</div>}{tiers.map(tier => { const remaining = Math.max(0, tier.quantity - tier.sold); const soldOut = remaining === 0; const tierType = tier.ticket_type === 'non_consumable' ? 'Non-consumable' : 'Consumable'; const expiry = tier.expires_at ? `Expires ${new Date(`${tier.expires_at}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : null; return <div className={`sinc-ticket-row ${soldOut || ended ? 'is-sold-out' : ''}`} key={tier.id}><div className="sinc-ticket-copy"><strong>{tier.name}</strong><span>{tier.price === 0 ? 'Free' : formatPrice(tier.price)}</span><small>{[tier.description, tier.extra_info, tierType, (tier.group_size ?? 1) > 1 ? `${tier.group_size} tickets per purchase` : null, expiry].filter(Boolean).join(' · ')}</small></div>{ended ? <span className="sinc-ended-row-label">EVENT ENDED</span> : soldOut ? <span className="sinc-sold-stamp">SOLD OUT</span> : <div className="sinc-ticket-quantity"><button onClick={() => changeQuantity(tier, -1)} aria-label={`Remove ${tier.name}`}><MinusIcon size={14} /></button><b>{quantities[tier.id] || 0}</b><button onClick={() => changeQuantity(tier, 1)} aria-label={`Add ${tier.name}`}><PlusIcon size={14} /></button></div>}</div> })}</div><p className="sinc-contact-note">{ended ? 'This event has ended and tickets are no longer available.' : <>Questions about tickets? <span>Contact the organizer.</span></>}</p>{subtotal > 0 && <div className="sinc-total-row"><span>Total <small>{totalTickets} ticket{totalTickets === 1 ? '' : 's'} + service fee</small></span><strong>{formatPrice(total)}</strong></div>}<button className="sinc-continue-button" onClick={checkout} disabled={ended || !totalTickets}>{ended ? 'Event ended' : 'Continue'}</button></div></section>
+        <section className="sinc-ticket-section"><div className="sinc-ticket-heading"><h2>Get tickets</h2></div><div className="sinc-ticket-content"><p>Choose your ticket type to continue</p><div className="sinc-ticket-list">{tiers.length === 0 && <div className="sinc-empty-tickets">Tickets will be available soon.</div>}{tiers.map(tier => { const remaining = Math.max(0, tier.quantity - tier.sold); const soldOut = remaining === 0; const tierType = tier.ticket_type === 'non_consumable' ? 'Non-consumable' : 'Consumable'; const expiry = tier.expires_at ? `Expires ${new Date(`${tier.expires_at}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : null; return <div className={`sinc-ticket-row ${soldOut || ended ? 'is-sold-out' : ''}`} key={tier.id}><div className="sinc-ticket-copy"><strong>{tier.name}</strong><span>{tier.price === 0 ? 'Free' : formatPrice(tier.price)}</span><small>{[tier.description, tier.extra_info, tierType, (tier.group_size ?? 1) > 1 ? `${tier.group_size} tickets per purchase` : null, expiry].filter(Boolean).join(' · ')}</small></div>{ended ? <span className="sinc-ended-row-label">EVENT ENDED</span> : soldOut ? <span className="sinc-sold-stamp">SOLD OUT</span> : <div className="sinc-ticket-quantity"><button onClick={() => changeQuantity(tier, -1)} aria-label={`Remove ${tier.name}`}><MinusIcon size={14} /></button><b>{quantities[tier.id] || 0}</b><button onClick={() => changeQuantity(tier, 1)} aria-label={`Add ${tier.name}`}><PlusIcon size={14} /></button></div>}</div> })}</div><p className="sinc-contact-note">{ended ? 'This event has ended and tickets are no longer available.' : <>Questions about tickets? <span>Contact the organizer.</span></>}</p>{subtotal > 0 && <div className="sinc-total-row"><span>Total <small>{totalTickets} ticket{totalTickets === 1 ? '' : 's'} · no customer service fee</small></span><strong>{formatPrice(total)}</strong></div>}<button className="sinc-continue-button" onClick={checkout} disabled={ended || !totalTickets}>{ended ? 'Event ended' : 'Continue'}</button></div></section>
 
         <section className="sinc-location-section"><div className="sinc-section-title"><h2>Location</h2><a href={venueMapUrl} target="_blank" rel="noreferrer">View on map</a></div><p>{event.venue}</p><div className="sinc-map"><iframe title={`${event.venue} map`} src={`https://www.google.com/maps?q=${encodeURIComponent(venueMapQuery)}&output=embed`} loading="lazy" referrerPolicy="no-referrer-when-downgrade" /></div></section>
 

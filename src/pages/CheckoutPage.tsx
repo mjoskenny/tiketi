@@ -8,14 +8,12 @@ type CheckoutData = {
   event: Event
   quantities: Record<string, number>
   subtotal: number
-  fee: number
   total: number
 }
 
 type Props = { data: CheckoutData; navigate: (p: string, extra?: unknown) => void }
 type HolderEntry = { id: string; tierId: string; tierName: string; name: string }
 type CheckoutSettings = {
-  service_fee_percent: number
   ticket_sales_enabled: boolean
   mobile_money_enabled: boolean
   card_payments_enabled: boolean
@@ -23,7 +21,6 @@ type CheckoutSettings = {
 }
 
 const DEFAULT_CHECKOUT_SETTINGS: CheckoutSettings = {
-  service_fee_percent: 5,
   ticket_sales_enabled: true,
   mobile_money_enabled: true,
   card_payments_enabled: true,
@@ -61,8 +58,7 @@ export default function CheckoutPage({ data, navigate }: Props) {
 
   const { event, quantities, subtotal } = data
   const tiers: TicketTier[] = (event.ticket_tiers ?? []).filter(t => (quantities[t.name] ?? quantities[t.id] ?? 0) > 0)
-  const fee = Math.round(subtotal * (checkoutSettings.service_fee_percent / 100))
-  const total = subtotal + fee
+  const total = subtotal
 
   useEffect(() => {
     let isMounted = true
@@ -71,7 +67,6 @@ export default function CheckoutPage({ data, navigate }: Props) {
       const settings = Array.isArray(settingsData) ? settingsData[0] : settingsData
       if (!isMounted || !settings) return
       setCheckoutSettings({
-        service_fee_percent: Number(settings.service_fee_percent ?? DEFAULT_CHECKOUT_SETTINGS.service_fee_percent),
         ticket_sales_enabled: settings.ticket_sales_enabled ?? true,
         mobile_money_enabled: settings.mobile_money_enabled ?? true,
         card_payments_enabled: settings.card_payments_enabled ?? true,
@@ -395,7 +390,7 @@ export default function CheckoutPage({ data, navigate }: Props) {
                   <span>Subtotal</span><span>{fmtPrice(subtotal)}</span>
                 </div>
                 <div className="flex justify-between" style={{ color: 'var(--muted-foreground)' }}>
-                  <span>Service fee ({checkoutSettings.service_fee_percent}%)</span><span>{fmtPrice(fee)}</span>
+                  <span>Service fee</span><span>No fee for customers</span>
                 </div>
                 <div className="flex justify-between font-bold text-base pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
                   <span>Total</span>
