@@ -174,7 +174,7 @@ export default function CheckoutPage({ data, navigate }: Props) {
       return
     }
 
-    const { error: confirmationError } = await supabase.rpc('complete_test_ticket_order', {
+    const { data: confirmedTickets, error: confirmationError } = await supabase.rpc('complete_test_ticket_order', {
       p_order_id: orderId,
       p_payment_method: payMethod === 'mobilemoney' ? 'mobile_money' : 'card',
     })
@@ -187,7 +187,23 @@ export default function CheckoutPage({ data, navigate }: Props) {
 
     setLoading(false)
     window.sessionStorage.removeItem(`tiketi-checkout:${event.id}`)
-    navigate('my-tickets')
+    const tickets = Array.isArray(confirmedTickets) ? confirmedTickets : []
+    const firstTicket = tickets[0]
+    const firstTier = tiers.find(tier => tier.id === firstTicket?.ticket_tier_id) ?? tiers[0]
+    navigate('ticket', {
+      event,
+      info: { ...info, name: firstTicket?.holder_name ?? info.name },
+      tickets,
+      ticket: firstTicket?.qr_code ?? null,
+      ticketStatus: 'valid',
+      ticketType: firstTier?.name ?? 'REGULAR',
+      ticketKind: firstTier?.ticket_type,
+      ticketPrice: firstTier?.price ?? 0,
+      purchasedAt: firstTicket?.created_at,
+      ticketExtraInfo: firstTier?.extra_info ?? '',
+      ticketExpiry: firstTier?.expires_at ?? '',
+      ticketGroupSize: firstTier?.group_size ?? 1,
+    })
   }
 
   const stepDone = (n: number) => step > n
