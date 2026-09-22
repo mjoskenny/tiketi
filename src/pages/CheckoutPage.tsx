@@ -174,47 +174,20 @@ export default function CheckoutPage({ data, navigate }: Props) {
       return
     }
 
-    const sessionPayload = {
-      orderId,
-      amount: total,
-      currency: 'BIF',
-      method: payMethod === 'mobilemoney' ? 'mobile_money' : 'card',
-      customer: {
-        name: info.name,
-        email: info.email,
-        phone: payMethod === 'mobilemoney' ? mobileMoneyPhone : info.phone,
-      },
-      returnUrl: `${window.location.origin}/ticket/${event.id}?paid=1`,
-      webhookUrl: `${window.location.origin}/api/payments/webhook`,
-    }
+    const { error: confirmationError } = await supabase.rpc('complete_test_ticket_order', {
+      p_order_id: orderId,
+      p_payment_method: payMethod === 'mobilemoney' ? 'mobile_money' : 'card',
+    })
 
-    const paymentFunctionName = 'make-server-4880c4b3'
-    let paymentSession: { checkoutUrl?: string; reference?: string; provider?: string } | null = null
-    let initError: Error | null = null
-
-    try {
-      const { data, error } = await supabase.functions.invoke(paymentFunctionName, {
-        method: 'POST',
-        body: sessionPayload,
-      })
-      if (error) {
-        initError = new Error(error.message)
-      } else if (data && typeof data === 'object' && 'checkoutUrl' in data && typeof (data as { checkoutUrl?: string }).checkoutUrl === 'string') {
-        paymentSession = data as { checkoutUrl?: string; reference?: string; provider?: string }
-      }
-    } catch (caughtError) {
-      initError = caughtError instanceof Error ? caughtError : new Error('Unable to initialize payment')
-    }
-
-    if (!paymentSession?.checkoutUrl) {
-      setError(initError?.message ?? 'Payment provider is not configured yet. Set the provider credentials before going live.')
+    if (confirmationError) {
+      setError(`Test payment could not be confirmed: ${confirmationError.message}`)
       setLoading(false)
       return
     }
 
     setLoading(false)
     window.sessionStorage.removeItem(`tiketi-checkout:${event.id}`)
-    window.location.assign(paymentSession.checkoutUrl)
+    navigate('my-tickets')
   }
 
   const stepDone = (n: number) => step > n
@@ -355,9 +328,13 @@ export default function CheckoutPage({ data, navigate }: Props) {
                     <input type="tel" placeholder="+257 79 000 000" value={mobileMoneyPhone} onChange={e => setMobileMoneyPhone(e.target.value)}
                       className="w-full px-4 py-3 rounded-lg text-sm outline-none"
                       style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--foreground)' }} />
-                    <p className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>You will receive a payment prompt on this number.</p>
+                    <p className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>Test mode: no prompt or real payment will be sent.</p>
                   </div>
                 )}
+
+                <p className="mb-6 rounded-xl px-4 py-3 text-xs" style={{ background: 'rgba(200,169,110,0.08)', border: '1px solid rgba(200,169,110,0.2)', color: 'var(--accent)' }}>
+                  Test payment mode is active. Confirming this checkout creates a confirmed order and valid tickets without charging a real payment method.
+                </p>
 
                 <div className="flex items-center justify-center gap-6 mb-6">
                   {[
@@ -380,7 +357,7 @@ export default function CheckoutPage({ data, navigate }: Props) {
                   <button onClick={handlePay} disabled={loading}
                     className="flex-1 py-4 rounded-xl font-bold text-sm transition-all"
                     style={{ background: 'var(--primary)', color: 'var(--primary-foreground)', opacity: loading ? 0.7 : 1 }}>
-                    {loading ? 'Processing…' : `Pay ${fmtPrice(total)}`}
+                    {loading ? 'Confirming…' : `Confirm test payment ${fmtPrice(total)}`}
                   </button>
                 </div>
               </div>
