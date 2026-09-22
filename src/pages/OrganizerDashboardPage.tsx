@@ -521,7 +521,6 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const confirmedOrders = filteredOrders.filter(order => order.status === 'confirmed')
   const netRevenueOrders = confirmedOrders.filter(order => netTicketRevenueForOrder(order) > 0)
   const totalRevenue = netRevenueOrders.reduce((sum, order) => sum + netTicketRevenueForOrder(order), 0)
-  const totalPlatformFees = confirmedOrders.reduce((sum, order) => sum + platformFeeForOrder(order), 0)
   // The withdrawal balance deliberately uses the ledger instead of the order
   // table. This makes completed fees, refunds, and paid/held withdrawals part
   // of the same calculation that is enforced by request_organizer_withdrawal.
@@ -539,7 +538,6 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     .filter((ticketId): ticketId is string => Boolean(ticketId))).size
   const totalTicketsSold = Math.max(0, confirmedOrders.reduce((total, order) => total + (order.order_items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0), 0) - refundedTicketCount)
   const publishedEvents = events.filter(e => e.status === 'published').length
-  const avgOrderValue = netRevenueOrders.length ? Math.round(totalRevenue / netRevenueOrders.length) : 0
   const eventAnalytics = new Map<string, { tickets: number; revenue: number }>()
   netRevenueOrders.forEach(order => {
     const current = eventAnalytics.get(order.event_id) ?? { tickets: 0, revenue: 0 }
@@ -1064,11 +1062,8 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                   <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     <StatCard Icon={TicketIcon} label="Tickets Sold" value={totalTicketsSold.toLocaleString()} />
                     <StatCard Icon={DollarSignIcon} label="Net Ticket Revenue" value={formatPrice(totalRevenue)} />
-                    <StatCard Icon={DollarSignIcon} label="Platform Fees" value={formatPrice(totalPlatformFees)} sub="Deducted from sales" color="#fca5a5" />
                     <StatCard Icon={DollarSignIcon} label="Available Balance" value={formatPrice(availableWithdrawalBalance)} sub={reservedWithdrawalAmount ? `${formatPrice(reservedWithdrawalAmount)} reserved` : 'Ready to withdraw'} color="#86efac" />
                     <StatCard Icon={CalendarIcon} label="Published Events" value={publishedEvents.toString()} />
-                    <StatCard Icon={UsersIcon} label="Customers" value={customers.length.toString()}
-                      sub={`Avg order: ${avgOrderValue > 0 ? formatPrice(avgOrderValue) : '—'}`} />
                   </div>
 
                   {/* Chart + recent */}
