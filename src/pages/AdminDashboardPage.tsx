@@ -232,7 +232,8 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
   const [ticketRows, setTicketRows] = useState<Array<{ event: string; sold: string; available: string; utilization: string }>>([])
   const [orderRows, setOrderRows] = useState<Array<{ customer: string; event: string; amount: string; status: string }>>([])
   const [paymentRows, setPaymentRows] = useState<Array<{ reference: string; customer: string; method: string; amount: string; platformFee: string; organizerProceeds: string }>>([])
-  const [payoutRows, setPayoutRows] = useState<Array<{ organizer: string; expected: string; status: string; window: string }>>([])
+  const [payoutRows, setPayoutRows] = useState<Array<{ id: string; organizer: string; expected: string; status: string; window: string; method: string; destination: string; note: string | null }>>([])
+  const [payoutActionId, setPayoutActionId] = useState<string | null>(null)
   const [agentRows, setAgentRows] = useState<Array<{ agent: string; sales: string; revenue: string; commission: string; commissionRate: number }>>([])
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings>(DEFAULT_PLATFORM_SETTINGS)
   const [settingsLoading, setSettingsLoading] = useState(true)
@@ -335,7 +336,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
       setDashboardError('')
 
       try {
-        const [eventsResult, profilesResult, organizersResult, ordersResult, ticketTierResult, transactionsResult, agentSalesResult, ticketsResult, refundsResult, commissionsResult] = await Promise.all([
+        const [eventsResult, profilesResult, organizersResult, ordersResult, ticketTierResult, transactionsResult, agentSalesResult, ticketsResult, refundsResult, commissionsResult, withdrawalsResult] = await Promise.all([
           supabase.from('events').select('id, status, organizer_id, created_at, title, capacity, organizers:organizer_id(name)').order('created_at', { ascending: false }),
           supabase.from('profiles').select('id, created_at, full_name, role').order('created_at', { ascending: false }),
           supabase.from('organizers').select('id, user_id, verified, created_at, name').order('created_at', { ascending: false }),
@@ -346,6 +347,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
           supabase.from('tickets').select('id, order_id, ticket_tier_id, status, created_at, checked_in_at'),
           supabase.from('refund_requests').select('order_id, ticket_id, status'),
           supabase.from('commissions').select('sale_id, amount, status, agent_sales!inner(order_id)'),
+          supabase.from('organizer_withdrawals').select('id, organizer_id, amount, payment_method, payment_reference, status, note, requested_at, organizers:organizer_id(name)').order('requested_at', { ascending: false }),
         ])
 
         if (eventsResult.error) throw eventsResult.error
@@ -358,6 +360,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
         if (ticketsResult.error) throw ticketsResult.error
         if (refundsResult.error) throw refundsResult.error
         if (commissionsResult.error) throw commissionsResult.error
+        if (withdrawalsResult.error) throw withdrawalsResult.error
 
         const allEvents = eventsResult.data ?? []
         const allProfiles = profilesResult.data ?? []
@@ -369,6 +372,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
         const allTickets = ticketsResult.data ?? []
         const allRefunds = refundsResult.data ?? []
         const allCommissions = commissionsResult.data ?? []
+        const allWithdrawals = withdrawalsResult.data ?? []
 
         const events = allEvents.filter(event => withinDateRange(event.created_at as string | null))
         const profiles = allProfiles.filter(profileRow => withinDateRange(profileRow.created_at as string | null))
@@ -377,6 +381,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
         const ticketTiers = allTicketTiers.filter(tier => withinDateRange((tier as { created_at?: string | null }).created_at as string | null))
         const transactions = allTransactions.filter(transaction => withinDateRange(transaction.created_at as string | null))
         const agentSales = allAgentSales.filter(sale => withinDateRange(sale.created_at as string | null))
+        const withdrawals = allWithdrawals.filter(withdrawal => withinDateRange(withdrawal.requested_at as string | null))
 
         const previousWindowStart = dateRange === 'all' ? null : Date.now() - (rangeWindowMs[dateRange] * 2)
         const previousWindowEnd = dateRange === 'all' ? null : Date.now() - rangeWindowMs[dateRange]
@@ -536,11 +541,15 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
           organizerProceeds: formatMoneyShort(Math.max(0, (Number(order.subtotal) || 0) - serviceFeeForOrder(order))),
         }))
 
-        const payoutRowsData = (transactions as Array<{ organizers?: { name?: string | null }; amount?: number | null; status?: string | null; created_at?: string | null; type?: string | null }>).filter(transaction => transaction.type === 'payout').slice(0, 6).map(transaction => ({
-          organizer: transaction.organizers?.name ?? 'Organizer',
-          expected: formatMoneyShort(transaction.amount ?? 0),
-          status: transaction.status ?? 'pending',
-          window: transaction.created_at ? new Date(transaction.created_at).toLocaleDateString() : 'Today',
+        const payoutRowsData = (withdrawals as Array<{ id: string; organizers?: { name?: string | null }; amount?: number | null; status?: string | null; requested_at?: string | null; payment_method?: string | null; payment_reference?: string | null; note?: string | null }>).map(withdrawal => ({
+          id: withdrawal.id,
+          organizer: withdrawal.organizers?.name ?? 'Organizer',
+          expected: formatMoneyShort(withdrawal.amount ?? 0),
+          status: withdrawal.status ?? 'requested',
+          window: withdrawal.requested_at ? new Date(withdrawal.requested_at).toLocaleDateString() : 'Today',
+          method: withdrawal.payment_method === 'mobile_money' ? 'Mobile Money' : 'Bank transfer',
+          destination: withdrawal.payment_reference ?? '—',
+          note: withdrawal.note ?? null,
         }))
 
         const agentMetrics = new Map<string, { agent: string; tickets: number; revenue: number; commission: number }>()
@@ -700,11 +709,11 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
           value: formatMoneyShort(order.total ?? 0),
           status: order.status ?? 'pending',
         })))
-        setRecentPayouts((transactions as Array<{ organizers?: { name?: string | null }; amount?: number | null; status?: string | null; type?: string | null }>).filter(transaction => transaction.type === 'payout').slice(0, 4).map(transaction => ({
-          organizer: transaction.organizers?.name ?? 'Organizer',
-          amount: formatMoneyShort(transaction.amount ?? 0),
-          status: transaction.status ?? 'pending',
-          method: 'Bank transfer',
+        setRecentPayouts(payoutRowsData.slice(0, 4).map(withdrawal => ({
+          organizer: withdrawal.organizer,
+          amount: withdrawal.expected,
+          status: withdrawal.status,
+          method: withdrawal.method,
         })))
         setUserRows(userRowsData)
         setOrganizerRows(organizerRowsData)
@@ -787,6 +796,22 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
     setSettingsSaving(false)
   }
 
+  const reviewWithdrawal = async (withdrawalId: string, status: 'processing' | 'paid' | 'rejected') => {
+    setPayoutActionId(withdrawalId)
+    setDashboardError('')
+    const { error } = await supabase.rpc('review_organizer_withdrawal', {
+      p_withdrawal_id: withdrawalId,
+      p_status: status,
+      p_note: status === 'rejected' ? 'Rejected by a platform administrator.' : null,
+    })
+    setPayoutActionId(null)
+    if (error) {
+      setDashboardError(error.message)
+      return
+    }
+    setRefreshTick(current => current + 1)
+  }
+
   const toComparableNumber = (value: string) => Number.parseFloat(value.replace(/[^0-9.]/g, '')) || 0
 
   const sortRows = <T,>(rows: T[], primary: ((item: T) => number | string), secondary?: (item: T) => number | string) => {
@@ -825,7 +850,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
         case 'payments':
           return paymentRows.filter(row => `${row.reference} ${row.customer}`.toLowerCase().includes(searchTerm.toLowerCase())).map(row => [row.reference, row.customer, row.method, row.amount, row.platformFee, row.organizerProceeds])
         case 'payouts':
-          return payoutRows.filter(row => `${row.organizer} ${row.status}`.toLowerCase().includes(searchTerm.toLowerCase())).map(row => [row.organizer, row.expected, row.status, row.window])
+          return payoutRows.filter(row => `${row.organizer} ${row.method} ${row.destination} ${row.status}`.toLowerCase().includes(searchTerm.toLowerCase())).map(row => [row.organizer, row.expected, row.method, row.destination, row.status, row.window])
         case 'agents':
           return agentRows.filter(row => `${row.agent} ${row.sales}`.toLowerCase().includes(searchTerm.toLowerCase())).map(row => [row.agent, row.sales, row.revenue, row.commission])
         default:
@@ -843,7 +868,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
         case 'tickets': return ['Event', 'Sold', 'Available', 'Utilization']
         case 'orders': return ['Customer', 'Event', 'Amount', 'Status']
         case 'payments': return ['Reference', 'Customer', 'Method', 'Customer paid', 'Platform fee', 'Organizer proceeds']
-        case 'payouts': return ['Organizer', 'Expected', 'Status', 'Window']
+        case 'payouts': return ['Organizer', 'Amount', 'Method', 'Destination', 'Status', 'Requested']
         case 'agents': return ['Agent', 'Sales', 'Revenue', 'Commission']
         default: return []
       }
@@ -1017,7 +1042,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
     const ticketsTable = applySearchAndSort(ticketRows.map(row => ({ ...row, nameValue: row.event, valueKey: Number(row.sold.replace(/,/g, '')) })), 'nameValue', 'valueKey').map(row => [row.event, row.sold, row.available, row.utilization])
     const orderTable = applySearchAndSort(orderRows.map(row => ({ ...row, nameValue: row.customer, valueKey: toComparableNumber(row.amount) })), 'nameValue', 'valueKey').map(row => [row.customer, row.event, row.amount, row.status])
     const paymentTable = applySearchAndSort(paymentRows.map(row => ({ ...row, nameValue: row.reference, valueKey: toComparableNumber(row.amount) })), 'nameValue', 'valueKey').map(row => [row.reference, row.customer, row.method, row.amount, row.platformFee, row.organizerProceeds])
-    const payoutTable = applySearchAndSort(payoutRows.map(row => ({ ...row, nameValue: row.organizer, valueKey: toComparableNumber(row.expected) })), 'nameValue', 'valueKey').map(row => [row.organizer, row.expected, row.status, row.window])
+    const visiblePayoutRows = applySearchAndSort(payoutRows.map(row => ({ ...row, note: row.note ?? '', nameValue: row.organizer, valueKey: toComparableNumber(row.expected) })), 'nameValue', 'valueKey')
     const agentTable = applySearchAndSort(agentRows.map(row => ({ ...row, nameValue: row.agent, valueKey: toComparableNumber(row.revenue) })), 'nameValue', 'valueKey').map(row => [row.agent, row.sales, row.revenue, row.commission])
 
     switch (section) {
@@ -1224,7 +1249,31 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
                   <button onClick={exportCurrentSection} className="rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-wide" style={{ background: 'var(--primary)', color: '#000' }}>Export CSV</button>
                 </div>
               </div>
-              <TableCard title="Payouts" subtitle="To organizers" columns={['Organizer', 'Expected', 'Status', 'Window']} rows={payoutTable.length ? payoutTable : [['No matching payouts', 'BIF 0', 'pending', '—']]} />
+              <div className="rounded-2xl border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+                <div className="border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}>
+                  <h3 className="text-sm font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Withdrawal requests</h3>
+                  <p className="mt-1 text-[10px] uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Review the transfer, then mark it paid only after it has been sent.</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[820px] text-left text-sm">
+                    <thead><tr style={{ background: 'rgba(255,255,255,0.02)' }}>{['Organizer', 'Amount', 'Destination', 'Status', 'Requested', 'Action'].map(column => <th key={column} className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--muted-foreground)' }}>{column}</th>)}</tr></thead>
+                    <tbody>
+                      {visiblePayoutRows.length === 0 ? <tr><td colSpan={6} className="px-5 py-10 text-center text-xs" style={{ color: 'var(--muted-foreground)' }}>No matching withdrawal requests.</td></tr> : visiblePayoutRows.map(row => {
+                        const actionInProgress = payoutActionId === row.id
+                        const finalStatus = row.status === 'paid' || row.status === 'rejected' || row.status === 'cancelled'
+                        return <tr key={row.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
+                          <td className="px-5 py-3 font-semibold">{row.organizer}</td>
+                          <td className="px-5 py-3 font-bold">{row.expected}</td>
+                          <td className="px-5 py-3"><p className="text-sm">{row.method}</p><p className="mt-0.5 max-w-[180px] truncate font-mono text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{row.destination}</p></td>
+                          <td className="px-5 py-3"><span className="inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold capitalize" style={{ background: row.status === 'paid' ? 'rgba(34,197,94,0.14)' : row.status === 'rejected' || row.status === 'cancelled' ? 'rgba(239,68,68,0.14)' : 'rgba(251,191,36,0.14)', color: row.status === 'paid' ? '#86efac' : row.status === 'rejected' || row.status === 'cancelled' ? '#fca5a5' : '#fcd34d' }}>{row.status}</span>{row.note && <p className="mt-1 max-w-[160px] text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{row.note}</p>}</td>
+                          <td className="px-5 py-3 text-xs" style={{ color: 'var(--muted-foreground)' }}>{row.window}</td>
+                          <td className="px-5 py-3">{finalStatus ? <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Finalized</span> : <div className="flex flex-wrap gap-2">{row.status === 'requested' && <button type="button" disabled={actionInProgress} onClick={() => void reviewWithdrawal(row.id, 'processing')} className="rounded-lg px-2.5 py-1.5 text-[10px] font-bold" style={{ background: 'rgba(251,191,36,0.14)', color: '#fcd34d', opacity: actionInProgress ? 0.6 : 1 }}>Start processing</button>}<button type="button" disabled={actionInProgress} onClick={() => void reviewWithdrawal(row.id, 'paid')} className="rounded-lg px-2.5 py-1.5 text-[10px] font-bold" style={{ background: 'rgba(34,197,94,0.14)', color: '#86efac', opacity: actionInProgress ? 0.6 : 1 }}>{actionInProgress ? 'Saving…' : 'Mark paid'}</button><button type="button" disabled={actionInProgress} onClick={() => void reviewWithdrawal(row.id, 'rejected')} className="rounded-lg px-2.5 py-1.5 text-[10px] font-bold" style={{ background: 'rgba(239,68,68,0.14)', color: '#fca5a5', opacity: actionInProgress ? 0.6 : 1 }}>Reject</button></div>}</td>
+                        </tr>
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
             {renderSimpleList('Payout health', [
               { label: 'Paid in selected period', value: formatMoneyShort(healthMetrics.payouts.paidAmount) },

@@ -198,6 +198,7 @@ export type Ticket = {
 export type Transaction = {
   id: string
   order_id: string | null
+  organizer_withdrawal_id?: string | null
   organizer_id: string
   type: 'payment' | 'refund' | 'payout' | 'fee'
   amount: number
@@ -206,4 +207,18 @@ export type Transaction = {
   reference: string | null
   created_at: string
   orders?: Order
+}
+
+export type OrganizerWithdrawal = {
+  id: string
+  organizer_id: string
+  requested_by: string
+  amount: number
+  payment_method: 'mobile_money' | 'bank'
+  payment_reference: string
+  status: 'requested' | 'processing' | 'paid' | 'rejected' | 'cancelled'
+  note: string | null
+  requested_at: string
+  processed_at: string | null
+  processed_by: string | null
 }

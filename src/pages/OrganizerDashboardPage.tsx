@@ -3,7 +3,7 @@ import { signOut, supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { formatPrice } from '../data/events'
 import { BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, UsersIcon, UserIcon, KeyIcon, TagIcon, DollarSignIcon, TicketIcon, TrendingUpIcon, CheckIcon, ArrowLeftIcon, EyeIcon, LinkIcon } from '../components/Icon'
-import type { Event, Order, Customer, Transaction, OrganizerMember, OrganizerRole, Subscription, Ticket, AgentAssignment } from '../lib/types'
+import type { Event, Order, Customer, Transaction, OrganizerMember, OrganizerRole, Subscription, Ticket, AgentAssignment, OrganizerWithdrawal } from '../lib/types'
 import { FEATURES } from '../lib/features'
 
 type Section = 'overview' | 'events' | 'orders' | 'customers' | 'followers' | 'members' | 'roles' | 'subscriptions' | 'transactions' | 'refunds' | 'checkin' | 'notifications'
@@ -182,6 +182,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const [roles, setRoles] = useState<OrganizerRole[]>([])
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [withdrawals, setWithdrawals] = useState<OrganizerWithdrawal[]>([])
   const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([])
   const [checkinTickets, setCheckinTickets] = useState<Ticket[]>([])
   const [organizerNotifications, setOrganizerNotifications] = useState<OrganizerNotification[]>([])
@@ -206,6 +207,9 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const [verificationStatus, setVerificationStatus] = useState<'unverified' | 'pending' | 'verified'>(organizer?.verification_status ?? (organizer?.verified ? 'verified' : 'unverified'))
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [editingAgentAssignment, setEditingAgentAssignment] = useState<AgentAssignment | null>(null)
+  const [showWithdrawal, setShowWithdrawal] = useState(false)
+  const [withdrawalForm, setWithdrawalForm] = useState({ amount: '', paymentMethod: 'mobile_money' as 'mobile_money' | 'bank', paymentReference: '' })
+  const [withdrawalSaving, setWithdrawalSaving] = useState(false)
 
   const orgId = organizer?.id
   const isOwner = !!organizer && organizer.user_id === profile?.id
@@ -302,18 +306,47 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     else setVerificationStatus('pending')
   }
 
+  const requestWithdrawal = async () => {
+    const amount = Number(withdrawalForm.amount)
+    const paymentReference = withdrawalForm.paymentReference.trim()
+    if (!isOwner) { setActionError('Only the organizer owner can request a withdrawal.'); return }
+    if (!Number.isInteger(amount) || amount <= 0) { setActionError('Enter a whole withdrawal amount greater than zero.'); return }
+    if (amount > availableWithdrawalBalance) { setActionError(`The amount exceeds your available balance of ${formatPrice(availableWithdrawalBalance)}.`); return }
+    if (!paymentReference) { setActionError('Enter the receiving phone number or bank account reference.'); return }
+
+    setWithdrawalSaving(true)
+    setActionError('')
+    const { error } = await supabase.rpc('request_organizer_withdrawal', {
+      p_amount: amount,
+      p_payment_method: withdrawalForm.paymentMethod,
+      p_payment_reference: paymentReference,
+    })
+    setWithdrawalSaving(false)
+    if (error) { setActionError(error.message); return }
+    setShowWithdrawal(false)
+    setWithdrawalForm({ amount: '', paymentMethod: 'mobile_money', paymentReference: '' })
+    void load()
+  }
+
+  const cancelWithdrawal = async (withdrawalId: string) => {
+    const { error } = await supabase.rpc('cancel_organizer_withdrawal', { p_withdrawal_id: withdrawalId })
+    if (error) { setActionError(error.message); return }
+    void load()
+  }
+
   const load = useCallback(async () => {
     if (!orgId) return
     setDataLoading(true)
     setDashboardLoadError(false)
-    const [ev, ord, cust, mem, rol, sub, txn, tickets, agentSales, assignments, refunds, commissions] = await Promise.all([
+    const [ev, ord, cust, mem, rol, sub, txn, withdrawalRows, tickets, agentSales, assignments, refunds, commissions] = await Promise.all([
       supabase.from('events').select('*, tags, ticket_tiers(id, event_id, name, price, description, ticket_type, extra_info, expires_at, group_size, quantity, sold, created_at)').eq('organizer_id', orgId).order('created_at', { ascending: false }),
       supabase.from('orders').select('*, events(title), profiles(full_name, email)').eq('organizer_id', orgId).order('created_at', { ascending: false }),
       supabase.from('customers').select('*').eq('organizer_id', orgId).order('total_spent', { ascending: false }),
       supabase.from('organizer_members').select('*, profiles(full_name, email, username, profile_image, avatar_url), organizer_roles(name)').eq('organizer_id', orgId),
       supabase.from('organizer_roles').select('*').eq('organizer_id', orgId),
       supabase.from('subscriptions').select('*').eq('organizer_id', orgId).order('created_at', { ascending: false }),
-      supabase.from('transactions').select('*, orders(id)').eq('organizer_id', orgId).order('created_at', { ascending: false }).limit(50),
+      supabase.from('transactions').select('*, orders(id)').eq('organizer_id', orgId).order('created_at', { ascending: false }),
+      supabase.from('organizer_withdrawals').select('*').eq('organizer_id', orgId).order('requested_at', { ascending: false }),
       supabase.from('tickets').select('*, events(id, title, organizer_id)').eq('events.organizer_id', orgId).order('checked_in_at', { ascending: false }),
       supabase.from('agent_sales').select('order_id, agent_user_id, payment_mode, status, quantity, profiles(full_name, email)').eq('organizer_id', orgId).order('created_at', { ascending: false }),
       supabase.from('agent_assignments').select('*, events(*, ticket_tiers(*)), profiles(full_name, email)').eq('organizer_id', orgId).order('created_at', { ascending: false }),
@@ -322,7 +355,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     ])
     const failedQueries = [
       ['events', ev.error], ['orders', ord.error], ['customers', cust.error], ['team', mem.error], ['roles', rol.error],
-      ['subscriptions', sub.error], ['transactions', txn.error], ['tickets', tickets.error], ['agent sales', agentSales.error],
+      ['subscriptions', sub.error], ['transactions', txn.error], ['withdrawals', withdrawalRows.error], ['tickets', tickets.error], ['agent sales', agentSales.error],
       ['assignments', assignments.error], ['refunds', refunds.error], ['commissions', commissions.error],
     ].filter(([, error]) => error).map(([name, error]) => `${name}: ${(error as { message: string }).message}`)
     if (failedQueries.length) {
@@ -349,6 +382,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     setRoles(rol.data ?? [])
     setSubscriptions(sub.data ?? [])
     setTransactions(txn.data ?? [])
+    setWithdrawals((withdrawalRows.data ?? []) as OrganizerWithdrawal[])
     setRefundRequests((refunds.data ?? []) as RefundRequest[])
     setCheckinTickets((tickets.data ?? []) as Ticket[])
     setLastUpdated(new Date())
@@ -372,6 +406,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_sales', filter: `organizer_id=eq.${orgId}` }, () => { void load() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_assignments', filter: `organizer_id=eq.${orgId}` }, () => { void load() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `organizer_id=eq.${orgId}` }, () => { void load() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'organizer_withdrawals', filter: `organizer_id=eq.${orgId}` }, () => { void load() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'refund_requests', filter: `organizer_id=eq.${orgId}` }, () => { void load() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'customers', filter: `organizer_id=eq.${orgId}` }, () => { void load() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'organizer_roles', filter: `organizer_id=eq.${orgId}` }, () => { void load() })
@@ -476,7 +511,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     refundAmountByOrder.set(request.order_id, (refundAmountByOrder.get(request.order_id) ?? 0) + refundAmount)
   })
   const commissionAmountByOrder = new Map<string, number>()
-  agentCommissions.filter(commission => commission.status !== 'reversed').forEach(commission => {
+  agentCommissions.filter(commission => ['pending', 'available', 'paid'].includes(commission.status)).forEach(commission => {
     const sale = Array.isArray(commission.agent_sales) ? commission.agent_sales[0] : commission.agent_sales
     if (sale?.order_id) commissionAmountByOrder.set(sale.order_id, (commissionAmountByOrder.get(sale.order_id) ?? 0) + (Number(commission.amount) || 0))
   })
@@ -487,6 +522,17 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const netRevenueOrders = confirmedOrders.filter(order => netTicketRevenueForOrder(order) > 0)
   const totalRevenue = netRevenueOrders.reduce((sum, order) => sum + netTicketRevenueForOrder(order), 0)
   const totalPlatformFees = confirmedOrders.reduce((sum, order) => sum + platformFeeForOrder(order), 0)
+  // The withdrawal balance deliberately uses the ledger instead of the order
+  // table. This makes completed fees, refunds, and paid/held withdrawals part
+  // of the same calculation that is enforced by request_organizer_withdrawal.
+  const completedCustomerPayments = transactions.filter(transaction => transaction.type === 'payment' && transaction.status === 'completed').reduce((sum, transaction) => sum + (Number(transaction.amount) || 0), 0)
+  const completedPlatformFees = transactions.filter(transaction => transaction.type === 'fee' && transaction.status === 'completed').reduce((sum, transaction) => sum + (Number(transaction.amount) || 0), 0)
+  const completedRefunds = transactions.filter(transaction => transaction.type === 'refund' && transaction.status === 'completed').reduce((sum, transaction) => sum + (Number(transaction.amount) || 0), 0)
+  const outstandingAgentCommissions = agentCommissions.filter(commission => ['pending', 'available', 'paid'].includes(commission.status)).reduce((sum, commission) => sum + (Number(commission.amount) || 0), 0)
+  const lifetimeNetRevenue = Math.max(0, completedCustomerPayments - completedPlatformFees - completedRefunds - outstandingAgentCommissions)
+  const withdrawnAmount = transactions.filter(transaction => transaction.type === 'payout' && transaction.status === 'completed').reduce((sum, transaction) => sum + (Number(transaction.amount) || 0), 0)
+  const reservedWithdrawalAmount = transactions.filter(transaction => transaction.type === 'payout' && transaction.status === 'pending').reduce((sum, transaction) => sum + (Number(transaction.amount) || 0), 0)
+  const availableWithdrawalBalance = Math.max(0, lifetimeNetRevenue - withdrawnAmount - reservedWithdrawalAmount)
   const refundedTicketCount = new Set(processedRefunds
     .filter(request => confirmedOrders.some(order => order.id === request.order_id))
     .map(request => request.ticket_id)
@@ -797,6 +843,33 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
           </div>
         )
       })()}
+      {showWithdrawal && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" onClick={() => !withdrawalSaving && setShowWithdrawal(false)}>
+          <form onSubmit={event => { event.preventDefault(); void requestWithdrawal() }} className="w-full max-w-md rounded-2xl border p-5 shadow-2xl" style={{ background: '#171918', borderColor: 'var(--border)' }} onClick={event => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4 border-b pb-4" style={{ borderColor: 'var(--border)' }}>
+              <div><p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--primary)' }}>Payout request</p><h2 className="mt-1 text-xl font-black">Withdraw balance</h2></div>
+              <button type="button" onClick={() => setShowWithdrawal(false)} disabled={withdrawalSaving} className="text-xl" style={{ color: 'var(--muted-foreground)' }}>×</button>
+            </div>
+            <div className="mt-4 rounded-xl border p-3 text-sm" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.025)' }}>
+              <span style={{ color: 'var(--muted-foreground)' }}>Available to withdraw</span><p className="mt-1 text-lg font-black" style={{ color: '#86efac' }}>{formatPrice(availableWithdrawalBalance)}</p>
+              <p className="mt-1 text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Pending requests reserve money until they are paid, rejected, or cancelled.</p>
+            </div>
+            <label className="mt-4 block text-xs font-bold">Amount (BIF)
+              <input required type="number" min="1" step="1" max={availableWithdrawalBalance || undefined} value={withdrawalForm.amount} onChange={event => setWithdrawalForm(current => ({ ...current, amount: event.target.value }))} placeholder="0" className="mt-2 w-full rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
+            </label>
+            <label className="mt-4 block text-xs font-bold">Method
+              <select value={withdrawalForm.paymentMethod} onChange={event => setWithdrawalForm(current => ({ ...current, paymentMethod: event.target.value as 'mobile_money' | 'bank' }))} className="mt-2 w-full rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: '#1a1d1d', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
+                <option value="mobile_money">Mobile Money</option>
+                <option value="bank">Bank transfer</option>
+              </select>
+            </label>
+            <label className="mt-4 block text-xs font-bold">{withdrawalForm.paymentMethod === 'mobile_money' ? 'Mobile Money number' : 'Bank account reference'}
+              <input required value={withdrawalForm.paymentReference} onChange={event => setWithdrawalForm(current => ({ ...current, paymentReference: event.target.value }))} placeholder={withdrawalForm.paymentMethod === 'mobile_money' ? 'e.g. +257 …' : 'Account number or IBAN'} className="mt-2 w-full rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
+            </label>
+            <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setShowWithdrawal(false)} disabled={withdrawalSaving} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>Cancel</button><button type="submit" disabled={withdrawalSaving || availableWithdrawalBalance <= 0} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: 'var(--primary)', color: '#000', opacity: withdrawalSaving || availableWithdrawalBalance <= 0 ? 0.6 : 1 }}>{withdrawalSaving ? 'Requesting…' : 'Request withdrawal'}</button></div>
+          </form>
+        </div>
+      )}
       {actionError && (
         <div className="fixed top-4 right-4 z-[70] max-w-sm rounded-xl px-4 py-3 text-left text-xs font-semibold shadow-2xl" style={{ background: '#3a1717', border: '1px solid #ef4444', color: '#fecaca' }}>
           <p>{actionError}</p>
@@ -988,10 +1061,11 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                     <button onClick={requestVerification} disabled={verificationStatus !== 'unverified'} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: verificationStatus === 'unverified' ? 'var(--primary)' : 'var(--muted)', color: verificationStatus === 'unverified' ? '#000' : 'var(--muted-foreground)' }}>{verificationStatus === 'verified' ? 'Verified' : verificationStatus === 'pending' ? 'Pending review' : 'Request verification'}</button>
                   </div>
                   {/* KPI grid */}
-                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                     <StatCard Icon={TicketIcon} label="Tickets Sold" value={totalTicketsSold.toLocaleString()} />
                     <StatCard Icon={DollarSignIcon} label="Net Ticket Revenue" value={formatPrice(totalRevenue)} />
                     <StatCard Icon={DollarSignIcon} label="Platform Fees" value={formatPrice(totalPlatformFees)} sub="Deducted from sales" color="#fca5a5" />
+                    <StatCard Icon={DollarSignIcon} label="Available Balance" value={formatPrice(availableWithdrawalBalance)} sub={reservedWithdrawalAmount ? `${formatPrice(reservedWithdrawalAmount)} reserved` : 'Ready to withdraw'} color="#86efac" />
                     <StatCard Icon={CalendarIcon} label="Published Events" value={publishedEvents.toString()} />
                     <StatCard Icon={UsersIcon} label="Customers" value={customers.length.toString()}
                       sub={`Avg order: ${avgOrderValue > 0 ? formatPrice(avgOrderValue) : '—'}`} />
@@ -1511,6 +1585,26 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
               {/* ── TRANSACTIONS ── */}
               {section === 'transactions' && (
                 <div className="space-y-4">
+                  <div className="rounded-2xl border p-5" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div><p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--primary)' }}>Organizer wallet</p><h2 className="mt-1 text-xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Available balance: <span style={{ color: '#86efac' }}>{formatPrice(availableWithdrawalBalance)}</span></h2><p className="mt-2 max-w-2xl text-xs leading-5" style={{ color: 'var(--muted-foreground)' }}>Confirmed customer payments, minus platform fees, processed refunds, agent commissions, paid payouts, and requests currently being processed.</p></div>
+                      {isOwner && <button type="button" onClick={() => { setActionError(''); setShowWithdrawal(true) }} disabled={availableWithdrawalBalance <= 0} className="shrink-0 rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: 'var(--primary)', color: '#000', opacity: availableWithdrawalBalance <= 0 ? 0.55 : 1 }}>Request withdrawal</button>}
+                    </div>
+                    <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                      {[
+                        ['Lifetime net earnings', lifetimeNetRevenue, '#86efac'],
+                        ['Paid out', withdrawnAmount, 'var(--primary)'],
+                        ['Reserved in requests', reservedWithdrawalAmount, '#fbbf24'],
+                        ['Available now', availableWithdrawalBalance, '#86efac'],
+                      ].map(([label, amount, color]) => <div key={label as string} className="rounded-xl border p-3" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.025)' }}><p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--muted-foreground)' }}>{label as string}</p><p className="mt-1 font-black" style={{ color: color as string }}>{formatPrice(amount as number)}</p></div>)}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                    <div className="flex items-center justify-between gap-3 border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}><div><h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Withdrawal requests</h2><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>A request is reserved immediately. Only a paid request reduces your settled payout balance.</p></div><span className="text-xs font-bold" style={{ color: 'var(--muted-foreground)' }}>{withdrawals.length} total</span></div>
+                    {withdrawals.length === 0 ? <div className="px-5 py-10 text-center text-xs" style={{ color: 'var(--muted-foreground)' }}>No withdrawal requests yet.</div> : <div className="divide-y" style={{ borderColor: 'var(--border)' }}>{withdrawals.map(withdrawal => <div key={withdrawal.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-bold">{formatPrice(withdrawal.amount)}</p><Badge label={withdrawal.status} color={STATUS_COLORS[withdrawal.status] ?? '#888'} /></div><p className="mt-1 text-xs capitalize" style={{ color: 'var(--muted-foreground)' }}>{withdrawal.payment_method.replace('_', ' ')} · {withdrawal.payment_reference} · {new Date(withdrawal.requested_at).toLocaleString()}</p>{withdrawal.note && <p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{withdrawal.note}</p>}</div>{isOwner && withdrawal.status === 'requested' && <button type="button" onClick={() => void cancelWithdrawal(withdrawal.id)} className="shrink-0 rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'rgba(239,68,68,0.12)', color: '#fca5a5' }}>Cancel request</button>}</div>)}</div>}
+                  </div>
+
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {(['payment', 'payout', 'refund', 'fee'] as const).map(type => {
                       const total = transactions.filter(t => t.type === type && t.status === 'completed').reduce((s, t) => s + t.amount, 0)
@@ -1541,8 +1635,8 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                             <tr key={t.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
                               <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--muted-foreground)' }}>{t.id.slice(0, 8)}…</td>
                               <td className="px-4 py-3"><Badge label={t.type} color={STATUS_COLORS[t.type] ?? '#888'} /></td>
-                              <td className="px-4 py-3 text-xs font-bold" style={{ color: t.type === 'refund' || t.type === 'fee' ? '#ef4444' : 'var(--primary)' }}>
-                                {t.type === 'refund' || t.type === 'fee' ? '-' : '+'}{formatPrice(t.amount)}
+                              <td className="px-4 py-3 text-xs font-bold" style={{ color: t.type === 'refund' || t.type === 'fee' || t.type === 'payout' ? '#ef4444' : 'var(--primary)' }}>
+                                {t.type === 'refund' || t.type === 'fee' || t.type === 'payout' ? '-' : '+'}{formatPrice(t.amount)}
                               </td>
                               <td className="px-4 py-3 text-xs">{t.currency}</td>
                               <td className="px-4 py-3"><Badge label={t.status} color={STATUS_COLORS[t.status === 'completed' ? 'completed_t' : t.status === 'failed' ? 'failed' : 'pending_t'] ?? '#888'} /></td>
