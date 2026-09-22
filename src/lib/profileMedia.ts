@@ -1,0 +1,1 @@
+export const ORGANIZER_COVER_PLACEHOLDER = 'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=1600&h=500&fit=crop&auto=format'
