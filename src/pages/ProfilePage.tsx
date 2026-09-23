@@ -48,7 +48,7 @@ export default function ProfilePage({ navigate }: Props) {
 
       const { data: organizers, error: organizersError } = await supabase
         .from('organizers')
-        .select('id, user_id, name, logo_url, profiles(full_name, username, avatar_url)')
+        .select('id, user_id, name, logo_url, profiles!organizers_user_id_fkey(full_name, username, avatar_url)')
         .in('id', organizerIds)
       if (organizersError) { setFollowingError(organizersError.message); return }
       const selfOrganizerIds = (organizers ?? []).filter(organizer => organizer.user_id === user.id).map(organizer => organizer.id)
@@ -188,7 +188,7 @@ export default function ProfilePage({ navigate }: Props) {
       let organizerUpdateError = ''
       const organizerRole = profile?.role === 'organizer' || user.user_metadata?.role === 'organizer' || user.user_metadata?.intent === 'organizer'
       if (organizerRole && nextProfile.avatar_url) {
-        const { data: organizerRow } = await supabase.from('organizers').select('*, profiles(id, full_name, username, profile_image, avatar_url, cover_image, email)').eq('user_id', user.id).maybeSingle()
+        const { data: organizerRow } = await supabase.from('organizers').select('*, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email)').eq('user_id', user.id).maybeSingle()
         const organizerName = nextProfile.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Organizer'
         if (organizerRow) {
           const { error: organizerError } = await supabase.from('organizers').update({ name: organizerName, logo_url: nextProfile.avatar_url, description: accountForm.organizer_bio.trim() || null }).eq('id', organizerRow.id)
@@ -314,7 +314,7 @@ export default function ProfilePage({ navigate }: Props) {
       if (oldPaths.length) await supabase.storage.from('profile-media').remove(oldPaths)
       const organizerRole = profile?.role === 'organizer' || user.user_metadata?.role === 'organizer' || user.user_metadata?.intent === 'organizer'
       if (organizerRole && (uploaded.profile_image || nextProfileData.avatar_url || uploaded.cover_image)) {
-        const { data: organizerRow } = await supabase.from('organizers').select('*, profiles(id, full_name, username, profile_image, avatar_url, cover_image, email)').eq('user_id', user.id).maybeSingle()
+        const { data: organizerRow } = await supabase.from('organizers').select('*, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email)').eq('user_id', user.id).maybeSingle()
         const organizerName = nextProfileData.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Organizer'
         const nextLogo = uploaded.profile_image ?? nextProfileData.avatar_url ?? null
         if (organizerRow) {

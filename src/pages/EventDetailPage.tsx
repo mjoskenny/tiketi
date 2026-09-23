@@ -137,7 +137,7 @@ export default function EventDetailPage({ event, navigate, onRequireAuth }: Prop
   useEffect(() => {
     const loadRelated = async () => {
       setRelatedError('')
-      const { data, error } = await supabase.from('events').select('*, tags, ticket_tiers(id, event_id, name, price, description, ticket_type, extra_info, expires_at, group_size, quantity, sold, created_at), organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles(id, full_name, username, profile_image, avatar_url, cover_image, email))').eq('status', 'published').neq('id', event.id).limit(8)
+      const { data, error } = await supabase.from('events').select('*, tags, ticket_tiers(id, event_id, name, price, description, ticket_type, extra_info, expires_at, group_size, quantity, sold, created_at), organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email))').eq('status', 'published').neq('id', event.id).limit(8)
       if (error) { setRelatedError(error.message); return }
       setRelated(sortUpcomingFirst((data as Event[]) ?? []))
     }

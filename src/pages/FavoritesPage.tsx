@@ -16,7 +16,7 @@ export default function FavoritesPage({ navigate }: Props) {
     if (!ids.length) { setEvents([]); setLoading(false); return }
     const { data } = await supabase
       .from('events')
-      .select('*, tags, ticket_tiers(id, event_id, name, price, description, ticket_type, extra_info, expires_at, group_size, quantity, sold, created_at), organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles(id, full_name, username, profile_image, avatar_url, cover_image, email))')
+      .select('*, tags, ticket_tiers(id, event_id, name, price, description, ticket_type, extra_info, expires_at, group_size, quantity, sold, created_at), organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email))')
       .in('id', ids)
     setEvents((data as Event[]) ?? [])
     setLoading(false)

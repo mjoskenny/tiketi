@@ -217,13 +217,13 @@ export default function App() {
     const loadSharedResource = async () => {
       if (page === 'event-detail' && (!eventDetail || eventDetail.id !== resourceId)) {
         setEventDetail(null)
-        const { data, error } = await supabase.from('events').select('*, ticket_tiers(*), organizers(*, profiles(*))').eq('id', resourceId).single()
+        const { data, error } = await supabase.from('events').select('*, ticket_tiers(*), organizers(*, profiles!organizers_user_id_fkey(*))').eq('id', resourceId).single()
         if (error) { setResourceError(error.message); return }
         if (data) setEventDetail(data as Event)
       }
       if (page === 'organizer-profile' && (!organizerDetail || organizerDetail.id !== resourceId)) {
         setOrganizerDetail(null)
-        const { data, error } = await supabase.from('organizers').select('*, profiles(*)').eq('id', resourceId).single()
+        const { data, error } = await supabase.from('organizers').select('*, profiles!organizers_user_id_fkey(*)').eq('id', resourceId).single()
         if (error) { setResourceError(error.message); return }
         if (data) setOrganizerDetail(data as Organizer)
       }

@@ -122,7 +122,7 @@ export default function OrganizerProfilePage({ organizer: initialOrganizer, navi
 
       const { data, error } = await supabase
         .from('events')
-        .select('*, organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles(id, full_name, username, avatar_url, cover_image, email))')
+        .select('*, organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles!organizers_user_id_fkey(id, full_name, username, avatar_url, cover_image, email))')
         .eq('organizer_id', organizer.id)
         .eq('status', 'published')
         .order('date', { ascending: true })

@@ -158,7 +158,7 @@ export default function HomePage({ navigate }: Props) {
     const loadEvents = async () => {
       setLoading(true)
       setLoadError('')
-      const { data, error } = await supabase.from('events').select('*, tags, ticket_tiers(id, event_id, name, price, description, ticket_type, extra_info, expires_at, group_size, quantity, sold, created_at), organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles(id, full_name, username, profile_image, avatar_url, cover_image, email))').eq('status', 'published').order('created_at', { ascending: false }).limit(24)
+      const { data, error } = await supabase.from('events').select('*, tags, ticket_tiers(id, event_id, name, price, description, ticket_type, extra_info, expires_at, group_size, quantity, sold, created_at), organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email))').eq('status', 'published').order('created_at', { ascending: false }).limit(24)
       if (error) { setLoadError(error.message); setLoading(false); return }
       setEvents(data ?? [])
       setLoading(false)

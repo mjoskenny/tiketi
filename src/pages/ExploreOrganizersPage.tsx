@@ -18,7 +18,7 @@ export default function ExploreOrganizersPage({ navigate }: Props) {
       setLoading(true)
       setLoadError('')
       const [{ data: organizerData }, { data: eventData }] = await Promise.all([
-        supabase.from('organizers').select('*, profiles(id, full_name, username, profile_image, avatar_url, cover_image, email)').order('name', { ascending: true }),
+        supabase.from('organizers').select('*, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email)').order('name', { ascending: true }),
         supabase.from('events').select('organizer_id, cover_image').eq('status', 'published').order('created_at', { ascending: false }),
       ])
 

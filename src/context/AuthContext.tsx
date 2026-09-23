@@ -94,7 +94,7 @@ async function ensureOrganizerAccount(user: User): Promise<Organizer | null> {
 
   const { data: existing } = await supabase
     .from('organizers')
-    .select('*, profiles(id, full_name, username, profile_image, avatar_url, cover_image, email)')
+    .select('*, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email)')
     .eq('user_id', user.id)
     .maybeSingle()
 
@@ -107,7 +107,7 @@ async function ensureOrganizerAccount(user: User): Promise<Organizer | null> {
   const { data: created } = await supabase
     .from('organizers')
     .insert({ user_id: user.id, name, logo_url: profileImage })
-    .select('*, profiles(id, full_name, username, profile_image, avatar_url, cover_image, email)').single()
+    .select('*, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email)').single()
 
   if (!created) return fallbackOrganizer(user)
 
@@ -152,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { data: membership } = await supabase
         .from('organizer_members')
-        .select('*, organizer_roles(*), organizers(*, profiles(id, full_name, username, profile_image, avatar_url, cover_image, email))')
+        .select('*, organizer_roles(*), organizers(*, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email))')
         .eq('user_id', verified.id)
         .in('status', ['pending', 'active'])
         .maybeSingle()
@@ -160,7 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ?? (membership?.organizer_id
           ? (await supabase
             .from('organizers')
-            .select('*, profiles(id, full_name, username, profile_image, avatar_url, cover_image, email)')
+            .select('*, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email)')
             .eq('id', membership.organizer_id)
             .maybeSingle()).data
           : null)
