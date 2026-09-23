@@ -193,13 +193,13 @@ export default function OrganizerProfilePage({ organizer: initialOrganizer, navi
           </button>
         </div>
         <div className="sinc-organizer-cover-content">
-          <div className="sinc-organizer-avatar">{organizerAvatar ? <img src={organizerAvatar} alt={displayName} /> : initials}{(organizer.verified || organizer.verification_status === 'verified') && <span className="sinc-organizer-verified"><CheckIcon size={13} /></span>}</div>
+          <div className="sinc-organizer-avatar">{organizerAvatar ? <img src={organizerAvatar} alt={displayName} /> : initials}{(organizer.verified || organizer.verification_status === 'verified') && <span className="sinc-organizer-verified" aria-label="Verified organizer"><CheckIcon size={13} /></span>}</div>
           <div className="sinc-organizer-actions">
             <button type="button" onClick={user?.id === organizer.user_id ? () => navigate('profile') : toggleFollow} disabled={followBusy}>{user?.id === organizer.user_id ? 'Your profile' : isFollowing ? 'Following' : 'Follow'}</button>
           </div>
         </div>
         <div className="sinc-organizer-identities">
-          <p className="sinc-organizer-kicker">Organizer profile</p><h1 className="flex items-center gap-2">{displayName}{(organizer.verified || organizer.verification_status === 'verified') && <span className="event-verified inline-flex items-center gap-1" title="Verified organizer"><CheckIcon size={11} /> Verified</span>}</h1>
+          <p className="sinc-organizer-kicker">Organizer profile</p><h1 className="flex items-center gap-2">{displayName}{(organizer.verified || organizer.verification_status === 'verified') && <span className="organizer-profile-verified inline-flex items-center gap-1" title="Verified organizer"><CheckIcon size={12} /> Verified</span>}</h1>
           {organizerUsername && <p style={{ color: 'var(--accent)' }}>@{organizerUsername}</p>}
           <div className="sinc-organizer-profile-meta"><span><UsersIcon size={14} /> {followerCount} follower{followerCount === 1 ? '' : 's'}</span><span><CalendarIcon size={14} /> {events.length} published event{events.length === 1 ? '' : 's'}</span>{organizer.city && <span><MapPinIcon size={14} /> {organizer.city}</span>}</div>
           {organizer.description && <p className="sinc-organizer-description">{organizer.description}</p>}

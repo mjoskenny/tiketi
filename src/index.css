@@ -966,7 +966,7 @@ main table td.font-medium {
 .explore-organizers-section-head > span { display: inline-flex; align-items: center; gap: .45rem; color: rgba(255,255,255,.48); font-size: .75rem; }
 .organizer-directory-card { border-color: rgba(255,255,255,.1) !important; background: linear-gradient(155deg, rgba(255,255,255,.08), rgba(255,255,255,.035)) !important; box-shadow: 0 18px 45px rgba(0,0,0,.16); }
 .organizer-directory-card:hover { border-color: rgba(249,112,21,.55) !important; box-shadow: 0 22px 50px rgba(0,0,0,.34), 0 0 0 1px rgba(249,112,21,.12); transform: translateY(-4px); }
-.organizer-directory-card .event-verified, .organizer-profile-refresh .event-verified { background: rgba(249,112,21,.16); color: #ffad78; }
+.organizer-directory-card .event-verified { background: rgba(249,112,21,.16); color: #ffad78; }
 .organizer-directory-arrow { border-color: rgba(255,255,255,.14) !important; color: #ffad78; transition: background .2s, transform .2s; }
 .organizer-directory-card:hover .organizer-directory-arrow { background: rgba(249,112,21,.16); transform: translateX(2px); }
 
@@ -975,6 +975,9 @@ main table td.font-medium {
 .organizer-profile-refresh .sinc-organizer-cover::after { display: block; height: 100%; background: linear-gradient(180deg, rgba(5,5,5,.1), rgba(5,5,5,.8)); content: ''; }
 .organizer-profile-refresh .sinc-organizer-back { top: 1.4rem; left: max(1rem, calc((100% - 1040px) / 2)); border-color: rgba(255,255,255,.22); background: rgba(8,8,8,.5); backdrop-filter: blur(16px); }
 .organizer-profile-refresh .sinc-organizer-avatar { border-color: #080808; box-shadow: 0 12px 35px rgba(0,0,0,.4); }
+.organizer-profile-refresh .sinc-organizer-verified { right: -.28rem; bottom: -.12rem; width: 1.8rem; height: 1.8rem; border-color: #080808; background: linear-gradient(135deg, #38bdf8, #2563eb); color: #fff; box-shadow: 0 5px 14px rgba(37,99,235,.5); }
+.organizer-profile-verified { flex: none; padding: .32rem .58rem; border: 1px solid rgba(96,165,250,.58); border-radius: 999px; background: linear-gradient(135deg, rgba(14,165,233,.24), rgba(37,99,235,.3)); color: #dbeafe; font-size: .66rem; font-weight: 800; letter-spacing: .01em; line-height: 1; box-shadow: 0 4px 14px rgba(37,99,235,.22); }
+.organizer-profile-verified svg { color: #7dd3fc; }
 .organizer-profile-refresh .sinc-organizer-identities { padding-top: 3.2rem; padding-bottom: 2.8rem; }
 .organizer-profile-refresh .sinc-organizer-identities h1 { font-size: clamp(2.5rem, 5vw, 4.4rem); }
 .organizer-profile-refresh .sinc-organizer-kicker { margin-bottom: .7rem; color: var(--foreground); }
