@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CalendarIcon, CheckIcon, HeartIcon, MapPinIcon, TagIcon } from './Icon'
+import { CalendarIcon, HeartIcon, MapPinIcon, TagIcon } from './Icon'
 import type { Event } from '../lib/types'
 import { isFavoriteEvent, toggleFavoriteEvent } from '../lib/favorites'
 import { useAuth } from '../context/AuthContext'
@@ -65,13 +65,12 @@ function eventStatus(date: string, time: string, endTime?: string | null) {
   return null
 }
 
-function OrganizerMark({ name, avatar, verified }: { name: string; avatar?: string | null; verified: boolean }) {
-  return <span className="event-card-organizer-avatar">
-    {avatar
-      ? <img src={avatar} alt={name} className="h-full w-full rounded-full object-cover" loading="lazy" />
-      : <span className="flex h-full w-full items-center justify-center rounded-full bg-white text-[9px] font-black text-black">{name.slice(0, 1).toUpperCase()}</span>}
-    {verified && <span className="verified-profile-badge event-card-verified-badge" aria-label="Verified organizer"><CheckIcon size={7} /></span>}
-  </span>
+function OrganizerMark({ name, avatar }: { name: string; avatar?: string | null }) {
+  if (avatar) {
+    return <img src={avatar} alt={name} className="h-5 w-5 shrink-0 rounded-full object-cover" loading="lazy" />
+  }
+
+  return <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-[9px] font-black text-black">{name.slice(0, 1).toUpperCase()}</span>
 }
 
 export default function EventCard({ event, onClick, size = 'md', compact = false, poster = false, fullWidthMobile = false }: Props) {
@@ -82,7 +81,6 @@ export default function EventCard({ event, onClick, size = 'md', compact = false
   const organizer = event.organizers?.profiles?.full_name?.trim() || event.organizers?.name || 'Tiketi events'
   const organizerCover = event.organizers?.profiles?.cover_image ?? event.organizers?.logo_url ?? event.cover_image ?? null
   const organizerAvatar = event.organizers?.profiles?.profile_image ?? event.organizers?.profiles?.avatar_url ?? event.organizers?.logo_url ?? null
-  const organizerIsVerified = event.organizers?.verified || event.organizers?.verification_status === 'verified'
   const [days, hours, minutes] = countdown(event.date, event.time)
   const status = eventStatus(event.date, event.time, event.end_time)
 
@@ -131,7 +129,7 @@ export default function EventCard({ event, onClick, size = 'md', compact = false
       {poster && <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-white/90"><MapPinIcon size={14} /><span className="truncate">{event.venue}</span></div>}
       <h3 className={`line-clamp-2 font-extrabold leading-[1.18] text-white ${poster ? 'text-[18px]' : 'text-[17px]'}`}>{event.title}</h3>
       <div className="mt-3 flex items-center justify-between gap-2 text-xs">
-        <span className="flex min-w-0 items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5 text-white" style={{ background: 'rgba(255,255,255,0.13)', border: '1px solid rgba(255,255,255,0.16)', backdropFilter: 'blur(10px)' }}><OrganizerMark name={organizer} avatar={organizerAvatar} verified={!!organizerIsVerified} /><span className="truncate">{organizer}</span></span>
+        <span className="flex min-w-0 items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5 text-white" style={{ background: 'rgba(255,255,255,0.13)', border: '1px solid rgba(255,255,255,0.16)', backdropFilter: 'blur(10px)' }}><OrganizerMark name={organizer} avatar={organizerAvatar} /><span className="truncate">{organizer}</span></span>
         <span className="flex shrink-0 items-center gap-1 font-semibold text-white"><TagIcon size={13} />{fmtPrice(minPrice)}</span>
       </div>
     </div>
