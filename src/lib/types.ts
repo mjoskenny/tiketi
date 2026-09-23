@@ -25,6 +25,7 @@ export type Organizer = {
   verification_status?: 'unverified' | 'pending' | 'verified'
   verification_requested_at?: string | null
   verification_reviewed_at?: string | null
+  verification_reviewed_by?: string | null
   verification_note?: string | null
   subscription_tier: 'free' | 'starter' | 'pro' | 'enterprise'
   created_at: string

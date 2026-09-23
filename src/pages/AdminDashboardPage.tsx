@@ -63,6 +63,20 @@ type PlatformSettings = {
   updated_at?: string
 }
 
+type VerificationRequest = {
+  id: string
+  name: string
+  city: string | null
+  phone: string | null
+  website: string | null
+  requestedAt: string | null
+}
+
+const organizerVerificationStatus = (organizer: { verified?: boolean | null; verification_status?: string | null }) => {
+  if (organizer.verification_status === 'pending' || organizer.verification_status === 'verified' || organizer.verification_status === 'unverified') return organizer.verification_status
+  return organizer.verified ? 'verified' : 'unverified'
+}
+
 const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   id: true,
   platform_name: 'Tiketi',
@@ -228,6 +242,9 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
   const [refreshTick, setRefreshTick] = useState(0)
   const [userRows, setUserRows] = useState<Array<{ name: string; status: string; ticketsBought: string; lastActive: string }>>([])
   const [organizerRows, setOrganizerRows] = useState<Array<{ name: string; events: string; revenue: string; verification: string }>>([])
+  const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([])
+  const [verificationActionId, setVerificationActionId] = useState<string | null>(null)
+  const [verificationNotice, setVerificationNotice] = useState('')
   const [eventRows, setEventRows] = useState<Array<{ event: string; organizer: string; capacity: string; status: string }>>([])
   const [ticketRows, setTicketRows] = useState<Array<{ event: string; sold: string; available: string; utilization: string }>>([])
   const [orderRows, setOrderRows] = useState<Array<{ customer: string; event: string; amount: string; status: string }>>([])
@@ -339,7 +356,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
         const [eventsResult, profilesResult, organizersResult, ordersResult, ticketTierResult, transactionsResult, agentSalesResult, ticketsResult, refundsResult, commissionsResult, withdrawalsResult] = await Promise.all([
           supabase.from('events').select('id, status, organizer_id, created_at, title, capacity, organizers:organizer_id(name)').order('created_at', { ascending: false }),
           supabase.from('profiles').select('id, created_at, full_name, role').order('created_at', { ascending: false }),
-          supabase.from('organizers').select('id, user_id, verified, created_at, name').order('created_at', { ascending: false }),
+          supabase.from('organizers').select('id, user_id, verified, verification_status, verification_requested_at, verification_note, verification_reviewed_at, created_at, name, city, phone, website').order('created_at', { ascending: false }),
           supabase.from('orders').select('id, customer_id, organizer_id, event_id, status, subtotal, service_fee, total, payment_method, created_at, profiles:customer_id(full_name), events:event_id(title), order_items:order_items(quantity, total_price, unit_price)').order('created_at', { ascending: false }),
           supabase.from('ticket_tiers').select('id, sold, price, quantity, event_id, created_at, events:event_id(title)').order('created_at', { ascending: false }),
           supabase.from('transactions').select('id, organizer_id, type, amount, status, created_at, reference, organizers:organizer_id(name)').order('created_at', { ascending: false }),
@@ -495,16 +512,28 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
           }
         })
 
-        const organizerRowsData = (organizers as Array<{ name?: string | null; id?: string; verified?: boolean | null; created_at?: string | null }>).slice(0, 6).map(organizerRow => {
+        const organizerRowsData = (organizers as Array<{ name?: string | null; id?: string; verified?: boolean | null; verification_status?: string | null; created_at?: string | null }>).slice(0, 6).map(organizerRow => {
           const organizerEvents = (events as Array<{ organizer_id?: string | null }>).filter(event => event.organizer_id === organizerRow.id).length
           const organizerSales = (orders as Array<{ id: string; organizer_id?: string | null; subtotal?: number | null; order_items?: Array<{ total_price?: number | null }> | null; status?: string | null }>).filter(order => order.organizer_id === organizerRow.id && order.status === 'confirmed').reduce((sum, order) => sum + netTicketRevenueForOrder(order), 0)
           return {
             name: organizerRow.name ?? 'Unnamed organizer',
             events: `${organizerEvents}`,
             revenue: formatMoneyShort(organizerSales),
-            verification: organizerRow.verified ? 'Verified' : 'Pending',
+            verification: organizerVerificationStatus(organizerRow) === 'verified' ? 'Verified' : organizerVerificationStatus(organizerRow) === 'pending' ? 'Pending review' : 'Unverified',
           }
         })
+
+        const verificationRequestsData = (allOrganizers as Array<{ id?: string; name?: string | null; city?: string | null; phone?: string | null; website?: string | null; verification_status?: string | null; verified?: boolean | null; verification_requested_at?: string | null }>)
+          .filter(organizer => organizer.id && organizerVerificationStatus(organizer) === 'pending')
+          .sort((left, right) => new Date(left.verification_requested_at ?? 0).getTime() - new Date(right.verification_requested_at ?? 0).getTime())
+          .map(organizer => ({
+            id: organizer.id!,
+            name: organizer.name ?? 'Unnamed organizer',
+            city: organizer.city ?? null,
+            phone: organizer.phone ?? null,
+            website: organizer.website ?? null,
+            requestedAt: organizer.verification_requested_at ?? null,
+          }))
 
         const eventRowsData = (events as Array<{ title?: string | null; organizers?: { name?: string | null } | null; capacity?: number | null; status?: string | null }>).slice(0, 6).map(eventRow => ({
           event: eventRow.title ?? 'Untitled event',
@@ -609,9 +638,9 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
             adminAccounts: (allProfiles as Array<{ role?: string | null }>).filter(profileRow => profileRow.role === 'admin').length,
           },
           organizers: {
-            awaitingVerification: (allOrganizers as Array<{ verified?: boolean | null }>).filter(organizer => !organizer.verified).length,
-            verified: (allOrganizers as Array<{ verified?: boolean | null }>).filter(organizer => organizer.verified).length,
-            unverified: (allOrganizers as Array<{ verified?: boolean | null }>).filter(organizer => !organizer.verified).length,
+            awaitingVerification: (allOrganizers as Array<{ verified?: boolean | null; verification_status?: string | null }>).filter(organizer => organizerVerificationStatus(organizer) === 'pending').length,
+            verified: (allOrganizers as Array<{ verified?: boolean | null; verification_status?: string | null }>).filter(organizer => organizerVerificationStatus(organizer) === 'verified').length,
+            unverified: (allOrganizers as Array<{ verified?: boolean | null; verification_status?: string | null }>).filter(organizer => organizerVerificationStatus(organizer) === 'unverified').length,
           },
           events: {
             published: (events as Array<{ status?: string | null }>).filter(event => event.status === 'published').length,
@@ -717,6 +746,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
         })))
         setUserRows(userRowsData)
         setOrganizerRows(organizerRowsData)
+        setVerificationRequests(verificationRequestsData)
         setEventRows(eventRowsData)
         setTicketRows(ticketRowsData)
         setOrderRows(orderRowsData)
@@ -809,6 +839,33 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
       setDashboardError(error.message)
       return
     }
+    setRefreshTick(current => current + 1)
+  }
+
+  const reviewOrganizerVerification = async (request: VerificationRequest, decision: 'approved' | 'rejected') => {
+    const isApproval = decision === 'approved'
+    if (!window.confirm(`${isApproval ? 'Approve' : 'Decline'} verification for ${request.name}?`)) return
+
+    const note = window.prompt(
+      isApproval ? 'Optional note for the organizer' : 'Reason for declining this verification request',
+      isApproval ? '' : 'Please update your organizer profile and submit a new request.',
+    )
+    if (note === null) return
+
+    setVerificationActionId(request.id)
+    setDashboardError('')
+    setVerificationNotice('')
+    const { error } = await supabase.rpc('review_organizer_verification', {
+      p_organizer_id: request.id,
+      p_decision: decision,
+      p_note: note,
+    })
+    setVerificationActionId(null)
+    if (error) {
+      setDashboardError(error.message)
+      return
+    }
+    setVerificationNotice(`${request.name} has been ${isApproval ? 'verified' : 'declined'}.`)
     setRefreshTick(current => current + 1)
   }
 
@@ -1085,8 +1142,33 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
         )
       case 'organizers':
         return (
-          <div className="grid gap-5 xl:grid-cols-[1.4fr_0.6fr]">
-            <div className="space-y-4">
+          <div className="space-y-5">
+            {verificationNotice ? <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{verificationNotice}</div> : null}
+            <section className="rounded-2xl border p-5" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--muted-foreground)' }}>Quality control</p>
+                  <h3 className="mt-1 text-xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Verification requests</h3>
+                  <p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Review the organizer’s public contact details before making a decision.</p>
+                </div>
+                <span className="rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ borderColor: 'var(--border)', color: verificationRequests.length ? '#f9d97d' : '#86efac' }}>{verificationRequests.length} awaiting review</span>
+              </div>
+              {verificationRequests.length ? <div className="mt-5 space-y-3">{verificationRequests.map(request => {
+                const contact = [request.city, request.phone, request.website].filter(Boolean).join(' · ')
+                const isReviewing = verificationActionId === request.id
+                return <div key={request.id} className="flex flex-col gap-4 rounded-xl border p-4 lg:flex-row lg:items-center lg:justify-between" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.025)' }}>
+                  <div className="min-w-0">
+                    <p className="font-bold">{request.name}</p>
+                    <p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{contact || 'No public contact details added'}</p>
+                    <p className="mt-1 text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Requested {request.requestedAt ? new Date(request.requestedAt).toLocaleString() : 'recently'}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2"><button type="button" disabled={isReviewing} onClick={() => void reviewOrganizerVerification(request, 'approved')} className="rounded-xl px-3 py-2 text-xs font-bold disabled:opacity-50" style={{ background: 'rgba(34,197,94,0.16)', color: '#86efac' }}>{isReviewing ? 'Saving…' : 'Approve'}</button><button type="button" disabled={isReviewing} onClick={() => void reviewOrganizerVerification(request, 'rejected')} className="rounded-xl px-3 py-2 text-xs font-bold disabled:opacity-50" style={{ background: 'rgba(239,68,68,0.14)', color: '#fca5a5' }}>Decline</button></div>
+                </div>
+              })}</div> : <p className="mt-5 rounded-xl px-3 py-4 text-sm" style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--muted-foreground)' }}>No organizer verification requests are waiting for review.</p>}
+            </section>
+
+            <div className="grid gap-5 xl:grid-cols-[1.4fr_0.6fr]">
+              <div className="space-y-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="flex flex-1 items-center gap-2 rounded-xl border px-3 py-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border)' }}>
                   <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Search</span>
@@ -1105,11 +1187,12 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
               </div>
               <TableCard title="Organizers" subtitle="Account activity" columns={['Name', 'Events', 'Revenue', 'Verification']} rows={organizersTable.length ? organizersTable : [['No matching organizers', '0', 'BIF 0', 'Pending']]} />
             </div>
-            {renderSimpleList('Verification queue', [
-              { label: 'Awaiting verification', value: healthMetrics.organizers.awaitingVerification.toLocaleString() },
-              { label: 'Verified', value: healthMetrics.organizers.verified.toLocaleString() },
-              { label: 'Unverified', value: healthMetrics.organizers.unverified.toLocaleString() },
-            ], 'Quality control')}
+              {renderSimpleList('Verification queue', [
+                { label: 'Awaiting verification', value: healthMetrics.organizers.awaitingVerification.toLocaleString() },
+                { label: 'Verified', value: healthMetrics.organizers.verified.toLocaleString() },
+                { label: 'Unverified', value: healthMetrics.organizers.unverified.toLocaleString() },
+              ], 'Quality control')}
+            </div>
           </div>
         )
       case 'events':

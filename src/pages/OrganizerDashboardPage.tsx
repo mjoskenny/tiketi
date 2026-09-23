@@ -205,6 +205,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const [actionError, setActionError] = useState('')
   const [dashboardLoadError, setDashboardLoadError] = useState(false)
   const [verificationStatus, setVerificationStatus] = useState<'unverified' | 'pending' | 'verified'>(organizer?.verification_status ?? (organizer?.verified ? 'verified' : 'unverified'))
+  const [verificationNote, setVerificationNote] = useState(organizer?.verification_note ?? null)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [editingAgentAssignment, setEditingAgentAssignment] = useState<AgentAssignment | null>(null)
   const [showWithdrawal, setShowWithdrawal] = useState(false)
@@ -241,14 +242,16 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   useEffect(() => {
     const nextStatus = organizer?.verification_status ?? (organizer?.verified ? 'verified' : 'unverified')
     setVerificationStatus(nextStatus)
-  }, [organizer?.id, organizer?.verification_status, organizer?.verified])
+    setVerificationNote(organizer?.verification_note ?? null)
+  }, [organizer?.id, organizer?.verification_status, organizer?.verified, organizer?.verification_note])
 
   useEffect(() => {
     if (!orgId) return
     const channel = supabase.channel(`organizer-verification:${orgId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'organizers', filter: `id=eq.${orgId}` }, payload => {
-        const next = payload.new as { verification_status?: 'unverified' | 'pending' | 'verified'; verified?: boolean }
+        const next = payload.new as { verification_status?: 'unverified' | 'pending' | 'verified'; verified?: boolean; verification_note?: string | null }
         setVerificationStatus(next.verification_status ?? (next.verified ? 'verified' : 'unverified'))
+        setVerificationNote(next.verification_note ?? null)
       })
       .subscribe()
     return () => { void supabase.removeChannel(channel) }
@@ -301,9 +304,13 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
   const requestVerification = async () => {
     if (!orgId || verificationStatus !== 'unverified') return
-    const { error } = await supabase.from('organizers').update({ verification_status: 'pending', verification_requested_at: new Date().toISOString() }).eq('id', orgId)
+    setActionError('')
+    const { error } = await supabase.rpc('request_organizer_verification', { p_organizer_id: orgId })
     if (error) setActionError(error.message)
-    else setVerificationStatus('pending')
+    else {
+      setVerificationStatus('pending')
+      setVerificationNote(null)
+    }
   }
 
   const requestWithdrawal = async () => {
@@ -1055,7 +1062,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                     {analyticsRange === 'custom' && <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--muted-foreground)' }}><label>From<input type="date" value={analyticsStart} onChange={event => setAnalyticsStart(event.target.value)} className="ml-1 rounded-lg border px-2 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.035)', borderColor: 'rgba(255,255,255,0.14)', color: 'var(--foreground)', backdropFilter: 'blur(18px)' }} /></label><label>To<input type="date" value={analyticsEnd} onChange={event => setAnalyticsEnd(event.target.value)} className="ml-1 rounded-lg border px-2 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.035)', borderColor: 'rgba(255,255,255,0.14)', color: 'var(--foreground)', backdropFilter: 'blur(18px)' }} /></label></div>}
                   </div>
                   <div className="flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                    <div><p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Organizer verification</p><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>{verificationStatus === 'verified' ? 'Your organizer profile is verified.' : verificationStatus === 'pending' ? 'Your verification request is awaiting review.' : 'Verify your profile to show a trusted badge on organizer cards and profiles.'}</p></div>
+                    <div><p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Organizer verification</p><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>{verificationStatus === 'verified' ? 'Your organizer profile is verified.' : verificationStatus === 'pending' ? 'Your verification request is awaiting review.' : verificationNote ? 'Your last request was reviewed. You can update your profile and submit a new request.' : 'Verify your profile to show a trusted badge on organizer cards and profiles.'}</p>{verificationStatus === 'unverified' && verificationNote && <p className="mt-2 text-xs leading-5" style={{ color: '#f9d97d' }}>{verificationNote}</p>}</div>
                     <button onClick={requestVerification} disabled={verificationStatus !== 'unverified'} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: verificationStatus === 'unverified' ? 'var(--primary)' : 'var(--muted)', color: verificationStatus === 'unverified' ? '#000' : 'var(--muted-foreground)' }}>{verificationStatus === 'verified' ? 'Verified' : verificationStatus === 'pending' ? 'Pending review' : 'Request verification'}</button>
                   </div>
                   {/* KPI grid */}
