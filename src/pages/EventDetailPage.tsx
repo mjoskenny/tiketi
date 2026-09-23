@@ -159,6 +159,7 @@ export default function EventDetailPage({ event, navigate, onRequireAuth }: Prop
   const organizerName = event.organizers?.profiles?.full_name?.trim() || event.organizers?.name || 'Tiketi events'
   const organizerUsername = event.organizers?.profiles?.username?.trim().replace(/^@/, '') || null
   const organizerAvatar = event.organizers?.profiles?.profile_image ?? event.organizers?.profiles?.avatar_url ?? event.organizers?.logo_url ?? null
+  const organizerIsVerified = event.organizers?.verified || event.organizers?.verification_status === 'verified'
   const soldPercent = event.capacity ? Math.round((tiers.reduce((sum, tier) => sum + tier.sold, 0) / event.capacity) * 100) : 0
   const ended = eventHasEnded(event)
   const hasVenueCoordinates = typeof event.venue_latitude === 'number' && typeof event.venue_longitude === 'number'
@@ -208,7 +209,7 @@ export default function EventDetailPage({ event, navigate, onRequireAuth }: Prop
         <div className="sinc-countdown"><p><span /> STARTS IN</p><div>{countdown.map((value, index) => <span key={index}><strong>{String(value).padStart(2, '0')}</strong><small>{['Days', 'Hrs', 'Min', 'Sec'][index]}</small></span>)}</div></div>
         <div className="sinc-title-row"><h1>{event.title}</h1>{ended && <span className="sinc-ended-badge">Event ended</span>}</div>
         <div className="sinc-organizer">
-          <span className="sinc-organizer-logo">{organizerAvatar ? <img src={organizerAvatar} alt={organizerName} /> : organizerName.slice(0, 1).toUpperCase()}</span>
+          <span className="sinc-organizer-logo">{organizerAvatar ? <img src={organizerAvatar} alt={organizerName} /> : organizerName.slice(0, 1).toUpperCase()}{organizerIsVerified && <span className="verified-profile-badge" aria-label="Verified organizer"><CheckIcon size={10} /></span>}</span>
           <span><small>Organizer</small><b>{organizerUsername ? `@${organizerUsername}` : organizerName}</b></span>
         </div>
         <div className="sinc-profile-actions"><button onClick={() => event.organizers && navigate('organizer-profile', event.organizers)}>View Profile</button><button onClick={user?.id === event.organizers?.user_id ? () => navigate('profile') : toggleOrganizerFollow} disabled={followBusy}>{user?.id === event.organizers?.user_id ? 'Your profile' : isFollowingOrganizer ? 'Following' : 'Follow'}</button></div>{followError && <p className="text-xs mt-2" style={{ color: '#fca5a5' }}>{followError}</p>}

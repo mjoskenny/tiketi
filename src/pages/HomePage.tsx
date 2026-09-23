@@ -122,18 +122,20 @@ function OrganizerProfileCard({ organizer, eventCount, coverImage, onClick }: { 
   const bannerImage = organizer.profiles?.cover_image ?? coverImage ?? ORGANIZER_COVER_PLACEHOLDER
   const profileImage = organizer.profiles?.profile_image ?? organizer.profiles?.avatar_url ?? organizer.logo_url ?? null
   const username = organizer.profiles?.username?.trim().replace(/^@/, '') || null
+  const isVerified = organizer.verified || organizer.verification_status === 'verified'
   return (
     <button onClick={onClick} className="home-organizer-card group relative flex min-w-[300px] flex-1 flex-col overflow-hidden rounded-2xl border text-left transition-all" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
       <span className="relative block h-32 w-full shrink-0" style={{ background: 'var(--muted)' }}>
         {bannerImage && <img src={bannerImage} alt="" className="h-full w-full rounded-t-2xl object-cover opacity-75 transition-transform duration-300 group-hover:scale-105" />}
         <span className="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
-        <span className="absolute bottom-0 left-4 translate-y-1/2">
+        <span className="verified-profile-avatar absolute bottom-0 left-4 z-10 translate-y-1/2">
           {profileImage ? <img src={profileImage} alt={organizerName} className="h-14 w-14 rounded-full border-4 border-[var(--card)] object-cover" /> : <span className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-[var(--card)] text-lg font-semibold" style={{ background: 'rgba(249,112,21,0.9)', color: '#fff' }}>{initials}</span>}
+          {isVerified && <span className="verified-profile-badge" aria-label="Verified organizer"><CheckIcon size={11} /></span>}
         </span>
       </span>
       <span className="flex min-w-0 flex-1 items-start gap-3 px-4 pb-4 pt-9">
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5 truncate text-base font-semibold text-white">{organizerName}{(organizer.verified || organizer.verification_status === 'verified') && <span className="event-verified inline-flex items-center gap-1" title="Verified organizer"><CheckIcon size={10} /></span>}</span>
+          <span className="block truncate text-base font-semibold text-white">{organizerName}</span>
           {username && <span className="mt-0.5 block truncate text-xs" style={{ color: 'var(--muted-foreground)' }}>@{username}</span>}
           <span className="mt-2 block truncate text-xs" style={{ color: 'var(--muted-foreground)' }}>{organizer.description || `${eventCount} published event${eventCount === 1 ? '' : 's'}`}</span>
         </span>

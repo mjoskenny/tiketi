@@ -399,7 +399,6 @@ button[style*="124,58,237"],
 .event-organizer-line { display: flex; align-items: center; gap: .65rem; margin-top: 2rem; color: rgba(255,255,255,.57); font-size: .75rem; }
 .event-avatar { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; border-radius: 50%; background: #fa791c; color: #111; font-weight: 900; }
 .event-organizer-line b { color: #fff; }
-.event-verified { padding: .25rem .5rem; border: 1px solid rgba(181,245,47,.3); border-radius: 99px; color: #b5f52f; font-size: .62rem; font-weight: 800; }
 .event-content-shell { padding-top: 4rem; padding-bottom: 6rem; }
 .event-facts-grid { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid rgba(255,255,255,.13); border-bottom: 1px solid rgba(255,255,255,.13); }
 .event-facts-grid > div { display: flex; gap: .75rem; padding: 1.4rem 1rem; border-right: 1px solid rgba(255,255,255,.13); color: #b5f52f; }
@@ -492,9 +491,9 @@ button[style*="124,58,237"],
 .sinc-title-row h1 { margin-bottom: 0; }
 .sinc-ended-badge { padding: .4rem .7rem; border: 1px solid rgba(248,113,113,.35); border-radius: 999px; background: rgba(248,113,113,.12); color: #f87171; font-size: .7rem; font-weight: 800; text-transform: uppercase; }
 .sinc-organizer { display: flex; align-items: center; gap: .75rem; margin-top: 1.25rem; }
-.sinc-organizer-logo { display: grid; place-items: center; width: 2.7rem; height: 2.7rem; flex: 0 0 2.7rem; overflow: hidden; border: 1px solid #dbe8ff; border-radius: 50%; background: #192550; color: #fff; font-weight: 900; }
-.sinc-organizer-logo img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.sinc-organizer span:last-child { display: flex; flex-direction: column; gap: .2rem; }.sinc-organizer small { color: #fff; font-size: .68rem; }.sinc-organizer b { color: #ff791b; font-size: .85rem; font-weight: 500; }
+.sinc-organizer-logo { position: relative; display: grid; place-items: center; width: 2.7rem; height: 2.7rem; flex: 0 0 2.7rem; overflow: visible; border: 1px solid #dbe8ff; border-radius: 50%; background: #192550; color: #fff; font-weight: 900; }
+.sinc-organizer-logo img { display: block; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+.sinc-organizer > span:last-child { display: flex; flex-direction: column; gap: .2rem; }.sinc-organizer small { color: #fff; font-size: .68rem; }.sinc-organizer b { color: #ff791b; font-size: .85rem; font-weight: 500; }
 .sinc-profile-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.45rem; max-width: 660px; }.sinc-profile-actions button { height: 2.75rem; border: 1px solid rgba(255,255,255,.08); border-radius: 999px; background: #202020; color: #fff; font-family: inherit; font-size: .82rem; font-weight: 800; cursor: pointer; }.sinc-profile-actions button:last-child { border-color: transparent; background: #ff7617; }
 .sinc-event-body { display: contents; }
 .sinc-event-description, .sinc-ticket-section, .sinc-location-section { grid-column: 2; }
@@ -539,9 +538,10 @@ button[style*="124,58,237"],
 .sinc-organizer-actions a, .sinc-organizer-actions button { display: inline-flex; align-items: center; justify-content: center; min-height: 2.55rem; padding: 0 .95rem; border: 1px solid rgba(255,255,255,.08); border-radius: 999px; background: var(--card); color: var(--foreground); font-family: inherit; font-size: .78rem; font-weight: 800; text-decoration: none; cursor: pointer; }
 .sinc-organizer-actions a { width: 2.55rem; padding: 0; }
 .sinc-organizer-actions button { min-width: 8rem; border-color: transparent; background: var(--primary); color: var(--primary-foreground); }
-.sinc-organizer-avatar { position: absolute; top: -6.15rem; left: 0; display: grid; place-items: center; width: 7.5rem; height: 7.5rem; overflow: hidden; border: 5px solid var(--background); border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: #1b1009; font-size: 2.5rem; font-weight: 900; box-shadow: 0 5px 20px rgba(0,0,0,.4); }
+.sinc-organizer-avatar { position: absolute; top: -6.15rem; left: 0; display: grid; place-items: center; width: 7.5rem; height: 7.5rem; overflow: visible; border: 5px solid var(--background); border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: #1b1009; font-size: 2.5rem; font-weight: 900; box-shadow: 0 5px 20px rgba(0,0,0,.4); }
 .sinc-organizer-avatar img { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
-.sinc-organizer-verified { position: absolute; right: -.2rem; bottom: -.1rem; display: grid; place-items: center; width: 1.65rem; height: 1.65rem; border: 3px solid var(--border); border-radius: 50%; background: var(--primary); color: var(--primary-foreground); }
+.verified-profile-avatar { position: relative; display: block; overflow: visible; line-height: 0; }
+.verified-profile-badge { position: absolute; right: -.12rem; bottom: -.08rem; z-index: 2; display: grid; place-items: center; width: 1.4rem; height: 1.4rem; border: 2px solid var(--card); border-radius: 50%; background: linear-gradient(135deg, #38bdf8, #2563eb); color: #fff; box-shadow: 0 4px 12px rgba(37,99,235,.55); }
 .sinc-organizer-identities { width: min(100% - 2rem, 1040px); margin: 0 auto; padding: 2.55rem 0 2.4rem; }
 .sinc-organizer-kicker { margin: 0 0 .55rem; color: var(--primary-light); font-size: .68rem; font-weight: 800; letter-spacing: .16em; }
 .sinc-organizer-identities h1 { max-width: 620px; margin: 0; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.05; letter-spacing: -.055em; }
@@ -966,7 +966,6 @@ main table td.font-medium {
 .explore-organizers-section-head > span { display: inline-flex; align-items: center; gap: .45rem; color: rgba(255,255,255,.48); font-size: .75rem; }
 .organizer-directory-card { border-color: rgba(255,255,255,.1) !important; background: linear-gradient(155deg, rgba(255,255,255,.08), rgba(255,255,255,.035)) !important; box-shadow: 0 18px 45px rgba(0,0,0,.16); }
 .organizer-directory-card:hover { border-color: rgba(249,112,21,.55) !important; box-shadow: 0 22px 50px rgba(0,0,0,.34), 0 0 0 1px rgba(249,112,21,.12); transform: translateY(-4px); }
-.organizer-directory-card .event-verified { background: rgba(249,112,21,.16); color: #ffad78; }
 .organizer-directory-arrow { border-color: rgba(255,255,255,.14) !important; color: #ffad78; transition: background .2s, transform .2s; }
 .organizer-directory-card:hover .organizer-directory-arrow { background: rgba(249,112,21,.16); transform: translateX(2px); }
 
@@ -975,9 +974,7 @@ main table td.font-medium {
 .organizer-profile-refresh .sinc-organizer-cover::after { display: block; height: 100%; background: linear-gradient(180deg, rgba(5,5,5,.1), rgba(5,5,5,.8)); content: ''; }
 .organizer-profile-refresh .sinc-organizer-back { top: 1.4rem; left: max(1rem, calc((100% - 1040px) / 2)); border-color: rgba(255,255,255,.22); background: rgba(8,8,8,.5); backdrop-filter: blur(16px); }
 .organizer-profile-refresh .sinc-organizer-avatar { border-color: #080808; box-shadow: 0 12px 35px rgba(0,0,0,.4); }
-.organizer-profile-refresh .sinc-organizer-verified { right: -.28rem; bottom: -.12rem; width: 1.8rem; height: 1.8rem; border-color: #080808; background: linear-gradient(135deg, #38bdf8, #2563eb); color: #fff; box-shadow: 0 5px 14px rgba(37,99,235,.5); }
-.organizer-profile-verified { flex: none; padding: .32rem .58rem; border: 1px solid rgba(96,165,250,.58); border-radius: 999px; background: linear-gradient(135deg, rgba(14,165,233,.24), rgba(37,99,235,.3)); color: #dbeafe; font-size: .66rem; font-weight: 800; letter-spacing: .01em; line-height: 1; box-shadow: 0 4px 14px rgba(37,99,235,.22); }
-.organizer-profile-verified svg { color: #7dd3fc; }
+.organizer-profile-refresh .sinc-organizer-verified { right: -.3rem; bottom: -.14rem; width: 1.85rem; height: 1.85rem; border: 3px solid #080808; box-shadow: 0 5px 14px rgba(37,99,235,.6); }
 .organizer-profile-refresh .sinc-organizer-identities { padding-top: 3.2rem; padding-bottom: 2.8rem; }
 .organizer-profile-refresh .sinc-organizer-identities h1 { font-size: clamp(2.5rem, 5vw, 4.4rem); }
 .organizer-profile-refresh .sinc-organizer-kicker { margin-bottom: .7rem; color: var(--foreground); }
