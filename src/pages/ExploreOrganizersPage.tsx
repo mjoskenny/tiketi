@@ -110,15 +110,15 @@ export default function ExploreOrganizersPage({ navigate }: Props) {
             const isVerified = organizer.verified || organizer.verification_status === 'verified'
             return (
               <button key={organizer.id} onClick={() => navigate('organizer-profile', organizer)} className="organizer-directory-card group overflow-hidden rounded-2xl border text-left transition-all">
-                <div className="relative h-40 w-full" style={{ background: 'var(--muted)' }}>
-                  {organizer.cover_image && <img src={organizer.cover_image} alt="" className="h-full w-full rounded-t-2xl object-cover opacity-75 transition-transform duration-300 group-hover:scale-105" />}
+                <div className="organizer-directory-cover relative h-40 w-full" style={{ background: 'var(--muted)' }}>
+                  {organizer.cover_image && <img src={organizer.cover_image} alt="" className="organizer-directory-cover-image h-full w-full rounded-t-2xl object-cover opacity-75 transition-transform duration-300 group-hover:scale-105" />}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                   <div className="verified-profile-avatar absolute bottom-0 left-5 z-10 h-16 w-16 translate-y-1/2">
                     {organizer.logo_url ? <img src={organizer.logo_url} alt={organizerName} className="h-full w-full rounded-full border-4 border-[var(--card)] object-cover" /> : <span className="flex h-full w-full items-center justify-center rounded-full border-4 border-[var(--card)] text-xl font-semibold" style={{ background: 'var(--primary)', color: '#17100a' }}>{initials}</span>}
                     {isVerified && <span className="verified-profile-badge" aria-label="Verified organizer"><CheckIcon size={12} /></span>}
                   </div>
                 </div>
-                <div className="flex items-start gap-3 px-5 pb-5 pt-11">
+                <div className="flex min-h-[5.75rem] items-start gap-3 px-5 pb-5 pl-24 pt-4">
                   <span className="min-w-0 flex-1"><span className="block truncate text-lg font-semibold text-white">{organizerName}</span>{username && <span className="mt-0.5 block truncate text-xs" style={{ color: 'var(--muted-foreground)' }}>@{username}</span>}<span className="mt-2 block line-clamp-2 min-h-10 text-sm" style={{ color: 'var(--muted-foreground)' }}>{organizer.description || 'Event organizer'} </span><span className="mt-3 block text-xs" style={{ color: 'var(--primary-light)' }}>{organizer.event_count} published event{organizer.event_count === 1 ? '' : 's'}</span></span>
                   <span className="organizer-directory-arrow mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border" aria-hidden="true"><ArrowRightIcon size={15} /></span>
                 </div>

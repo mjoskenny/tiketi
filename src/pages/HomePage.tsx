@@ -133,7 +133,7 @@ function OrganizerProfileCard({ organizer, eventCount, coverImage, onClick }: { 
           {isVerified && <span className="verified-profile-badge" aria-label="Verified organizer"><CheckIcon size={11} /></span>}
         </span>
       </span>
-      <span className="flex min-w-0 flex-1 items-start gap-3 px-4 pb-4 pt-9">
+      <span className="flex min-h-[5.5rem] min-w-0 flex-1 items-start gap-3 px-4 pb-4 pl-[5.25rem] pt-4">
         <span className="min-w-0 flex-1">
           <span className="block truncate text-base font-semibold text-white">{organizerName}</span>
           {username && <span className="mt-0.5 block truncate text-xs" style={{ color: 'var(--muted-foreground)' }}>@{username}</span>}
