@@ -113,8 +113,8 @@ export default function ExploreOrganizersPage({ navigate }: Props) {
                 <div className="relative h-40 w-full" style={{ background: 'var(--muted)' }}>
                   {organizer.cover_image && <img src={organizer.cover_image} alt="" className="h-full w-full rounded-t-2xl object-cover opacity-75 transition-transform duration-300 group-hover:scale-105" />}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                  <div className="verified-profile-avatar absolute bottom-0 left-5 z-10 translate-y-1/2">
-                    {organizer.logo_url ? <img src={organizer.logo_url} alt={organizerName} className="h-16 w-16 rounded-full border-4 border-[var(--card)] object-cover" /> : <span className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-[var(--card)] text-xl font-semibold" style={{ background: 'var(--primary)', color: '#17100a' }}>{initials}</span>}
+                  <div className="verified-profile-avatar absolute bottom-0 left-5 z-10 h-16 w-16 translate-y-1/2">
+                    {organizer.logo_url ? <img src={organizer.logo_url} alt={organizerName} className="h-full w-full rounded-full border-4 border-[var(--card)] object-cover" /> : <span className="flex h-full w-full items-center justify-center rounded-full border-4 border-[var(--card)] text-xl font-semibold" style={{ background: 'var(--primary)', color: '#17100a' }}>{initials}</span>}
                     {isVerified && <span className="verified-profile-badge" aria-label="Verified organizer"><CheckIcon size={12} /></span>}
                   </div>
                 </div>

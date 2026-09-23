@@ -193,7 +193,7 @@ export default function OrganizerProfilePage({ organizer: initialOrganizer, navi
           </button>
         </div>
         <div className="sinc-organizer-cover-content">
-          <div className="sinc-organizer-avatar">{organizerAvatar ? <img src={organizerAvatar} alt={displayName} /> : initials}{(organizer.verified || organizer.verification_status === 'verified') && <span className="verified-profile-badge sinc-organizer-verified" aria-label="Verified organizer"><CheckIcon size={13} /></span>}</div>
+          <div className="sinc-organizer-avatar"><span className="sinc-organizer-avatar-image">{organizerAvatar ? <img src={organizerAvatar} alt={displayName} /> : initials}</span>{(organizer.verified || organizer.verification_status === 'verified') && <span className="verified-profile-badge sinc-organizer-verified" aria-label="Verified organizer"><CheckIcon size={13} /></span>}</div>
           <div className="sinc-organizer-actions">
             <button type="button" onClick={user?.id === organizer.user_id ? () => navigate('profile') : toggleFollow} disabled={followBusy}>{user?.id === organizer.user_id ? 'Your profile' : isFollowing ? 'Following' : 'Follow'}</button>
           </div>
