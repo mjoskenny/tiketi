@@ -205,12 +205,12 @@ select option { background: #18181B; }
 .hero-shell::before {
   content: '';
   position: absolute;
-  inset: -4% -2% 0 -2%;
+  inset: -5% -3% -8% -3%;
   background:
-    linear-gradient(180deg, rgba(10, 10, 10, 0.18) 0%, rgba(10, 10, 10, 0.74) 58%, rgba(10, 10, 10, 0.96) 100%),
+    linear-gradient(180deg, rgba(10, 10, 10, 0.18) 0%, rgba(10, 10, 10, 0.62) 50%, rgba(10, 10, 10, 0.9) 80%, rgba(10, 10, 10, 1) 100%),
     url('https://sinc.events/_next/image?url=%2F_next%2Fstatic%2Fimmutable%2Fmedia%2FEventsBackground.2iy41yrix23m1.png&w=1920&q=75') center top / cover no-repeat;
   filter: blur(10px) brightness(0.72) saturate(1.15);
-  transform: scale(1.12);
+  transform: scale(1.14);
   opacity: 1;
   z-index: 0;
 }
@@ -218,8 +218,8 @@ select option { background: #18181B; }
 .hero-shell::after {
   content: '';
   position: absolute;
-  inset: 0 0 0 0;
-  background: linear-gradient(180deg, rgba(12,12,12,0) 34%, rgba(12,12,12,0.82) 100%);
+  inset: 0 0 -2px 0;
+  background: linear-gradient(180deg, rgba(12,12,12,0) 30%, rgba(12,12,12,0.28) 52%, rgba(12,12,12,0.88) 100%);
   z-index: 1;
   pointer-events: none;
 }
