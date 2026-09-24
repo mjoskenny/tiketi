@@ -72,7 +72,7 @@ export default function Footer({ navigate, publicPlatformSettings }: FooterProps
           <div>
             <h4 className="mb-4 text-xs font-semibold tracking-widest" style={{ color: 'var(--muted-foreground)', letterSpacing: '0.08em' }}>PLATFORM</h4>
             {[
-              { label: 'Discover', page: 'events' },
+              { label: 'Discover', page: 'discover' },
               { label: 'Events', page: 'events' },
               { label: 'For Organizers', page: 'organizers' },
               { label: 'My Tickets', page: 'my-tickets' },
