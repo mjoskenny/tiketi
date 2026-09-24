@@ -61,20 +61,35 @@ const NO_NAV: Set<Page> = new Set(['checkin', 'auth-customer', 'auth-organizer',
 const EVENTS_PLATFORM_PAGES: Set<Page> = new Set(['home', 'events', 'event-detail', 'checkout', 'ticket', 'my-tickets', 'profile', 'notifications', 'favorites', 'organizer-profile'])
 const MARKETPLACE_PAGES: Set<Page> = new Set(['home', 'events', 'event-detail', 'organizers', 'explore-organizers', 'organizer-profile'])
 
+type SocialLinkSetting = {
+  platform: 'instagram' | 'facebook' | 'x' | 'tiktok' | 'whatsapp'
+  label: string
+  href: string
+  active: boolean
+}
+
 type PublicPlatformSettings = {
   platform_name: string
   support_email: string
+  support_phone: string
+  contact_whatsapp: string
+  contact_address: string
   maintenance_mode: boolean
   maintenance_message: string
   marketplace_enabled: boolean
+  social_links: SocialLinkSetting[]
 }
 
 const DEFAULT_PUBLIC_PLATFORM_SETTINGS: PublicPlatformSettings = {
   platform_name: 'Tiketi',
   support_email: 'hello@tiketi.events',
+  support_phone: '+257 22 000 000',
+  contact_whatsapp: '+257 22 000 000',
+  contact_address: 'Bujumbura, Burundi',
   maintenance_mode: false,
   maintenance_message: '',
   marketplace_enabled: true,
+  social_links: [],
 }
 
 const PAGE_PATHS: Record<Page, string> = {
@@ -171,20 +186,47 @@ export default function App() {
 
   useEffect(() => {
     let isMounted = true
+
     const loadPublicPlatformSettings = async () => {
       const { data } = await supabase.rpc('get_public_platform_checkout_settings')
       const settings = Array.isArray(data) ? data[0] : data
       if (!isMounted || !settings) return
+
+      const socialLinks: SocialLinkSetting[] = [
+        { platform: 'instagram', label: 'Instagram', href: settings.social_instagram_url ?? '', active: Boolean(settings.social_instagram_active) },
+        { platform: 'facebook', label: 'Facebook', href: settings.social_facebook_url ?? '', active: Boolean(settings.social_facebook_active) },
+        { platform: 'x', label: 'X / Twitter', href: settings.social_x_url ?? '', active: Boolean(settings.social_x_active) },
+        { platform: 'tiktok', label: 'TikTok', href: settings.social_tiktok_url ?? '', active: Boolean(settings.social_tiktok_active) },
+        { platform: 'whatsapp', label: 'WhatsApp', href: settings.social_whatsapp_url ?? '', active: Boolean(settings.social_whatsapp_active) },
+      ].filter(link => link.active && link.href)
+
+      const supportPhone = settings.support_phone ?? settings.contact_phone ?? DEFAULT_PUBLIC_PLATFORM_SETTINGS.support_phone
+      const contactAddress = settings.contact_address ?? DEFAULT_PUBLIC_PLATFORM_SETTINGS.contact_address
+
       setPublicPlatformSettings({
         platform_name: settings.platform_name ?? DEFAULT_PUBLIC_PLATFORM_SETTINGS.platform_name,
         support_email: settings.support_email ?? DEFAULT_PUBLIC_PLATFORM_SETTINGS.support_email,
+        support_phone: supportPhone,
+        contact_whatsapp: settings.contact_whatsapp ?? DEFAULT_PUBLIC_PLATFORM_SETTINGS.contact_whatsapp,
+        contact_address: contactAddress,
         maintenance_mode: settings.maintenance_mode ?? false,
         maintenance_message: settings.maintenance_message ?? '',
         marketplace_enabled: settings.marketplace_enabled ?? true,
+        social_links: socialLinks,
       })
     }
+
+    const refreshPublicPlatformSettings = () => {
+      void loadPublicPlatformSettings()
+    }
+
     void loadPublicPlatformSettings()
-    return () => { isMounted = false }
+    window.addEventListener('tiketi:platform-settings-updated', refreshPublicPlatformSettings)
+
+    return () => {
+      isMounted = false
+      window.removeEventListener('tiketi:platform-settings-updated', refreshPublicPlatformSettings)
+    }
   }, [])
 
   // After sign-in, redirect away from auth pages once profile is confirmed loaded
@@ -442,7 +484,7 @@ export default function App() {
               ? <AgentDashboardPage navigate={navigate} />
               : <div className="flex min-h-screen items-center justify-center flex-col gap-4"><p className="text-xl font-bold">Agent access required.</p><p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>This account does not have an active agent assignment.</p></div>
       )}
-      {!['auth-customer', 'auth-organizer', 'checkin', 'dashboard', 'agent-dashboard', 'agent-ticket', 'admin-dashboard'].includes(page) && <Footer navigate={navigate} />}
+      {!['auth-customer', 'auth-organizer', 'checkin', 'dashboard', 'agent-dashboard', 'agent-ticket', 'admin-dashboard'].includes(page) && <Footer navigate={navigate} publicPlatformSettings={publicPlatformSettings} />}
     </div>
   )
 }

@@ -48,6 +48,9 @@ type PlatformSettings = {
   id: boolean
   platform_name: string
   support_email: string
+  support_phone: string
+  contact_whatsapp: string
+  contact_address: string
   checkout_notice: string
   service_fee_percent: number
   ticket_sales_enabled: boolean
@@ -60,6 +63,16 @@ type PlatformSettings = {
   require_verified_organizers_to_publish: boolean
   refund_requests_enabled: boolean
   checkin_enabled: boolean
+  social_instagram_url: string
+  social_instagram_active: boolean
+  social_facebook_url: string
+  social_facebook_active: boolean
+  social_x_url: string
+  social_x_active: boolean
+  social_tiktok_url: string
+  social_tiktok_active: boolean
+  social_whatsapp_url: string
+  social_whatsapp_active: boolean
   updated_at?: string
 }
 
@@ -81,6 +94,9 @@ const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   id: true,
   platform_name: 'Tiketi',
   support_email: 'hello@tiketi.events',
+  support_phone: '+257 22 000 000',
+  contact_whatsapp: '+257 22 000 000',
+  contact_address: 'Bujumbura, Burundi',
   checkout_notice: '',
   service_fee_percent: 5,
   ticket_sales_enabled: true,
@@ -93,6 +109,16 @@ const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   require_verified_organizers_to_publish: false,
   refund_requests_enabled: true,
   checkin_enabled: true,
+  social_instagram_url: '',
+  social_instagram_active: false,
+  social_facebook_url: '',
+  social_facebook_active: false,
+  social_x_url: '',
+  social_x_active: false,
+  social_tiktok_url: '',
+  social_tiktok_active: false,
+  social_whatsapp_url: '',
+  social_whatsapp_active: false,
 }
 
 const NAV: { key: Section; label: string }[] = [
@@ -287,7 +313,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
     const loadPlatformSettings = async () => {
       setSettingsLoading(true)
       setSettingsError('')
-      const { data, error } = await supabase.from('platform_settings').select('id, platform_name, support_email, checkout_notice, service_fee_percent, ticket_sales_enabled, mobile_money_enabled, card_payments_enabled, maintenance_mode, maintenance_message, marketplace_enabled, max_tickets_per_order, require_verified_organizers_to_publish, refund_requests_enabled, checkin_enabled, updated_at').eq('id', true).maybeSingle()
+      const { data, error } = await supabase.from('platform_settings').select('id, platform_name, support_email, support_phone, contact_whatsapp, contact_address, checkout_notice, service_fee_percent, ticket_sales_enabled, mobile_money_enabled, card_payments_enabled, maintenance_mode, maintenance_message, marketplace_enabled, max_tickets_per_order, require_verified_organizers_to_publish, refund_requests_enabled, checkin_enabled, social_instagram_url, social_instagram_active, social_facebook_url, social_facebook_active, social_x_url, social_x_active, social_tiktok_url, social_tiktok_active, social_whatsapp_url, social_whatsapp_active, updated_at').eq('id', true).maybeSingle()
 
       if (!isMounted) return
       if (error) {
@@ -297,6 +323,9 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
           id: true,
           platform_name: data.platform_name ?? DEFAULT_PLATFORM_SETTINGS.platform_name,
           support_email: data.support_email ?? DEFAULT_PLATFORM_SETTINGS.support_email,
+          support_phone: data.support_phone ?? DEFAULT_PLATFORM_SETTINGS.support_phone,
+          contact_whatsapp: data.contact_whatsapp ?? DEFAULT_PLATFORM_SETTINGS.contact_whatsapp,
+          contact_address: data.contact_address ?? DEFAULT_PLATFORM_SETTINGS.contact_address,
           checkout_notice: data.checkout_notice ?? '',
           service_fee_percent: Number(data.service_fee_percent ?? DEFAULT_PLATFORM_SETTINGS.service_fee_percent),
           ticket_sales_enabled: data.ticket_sales_enabled ?? true,
@@ -309,6 +338,16 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
           require_verified_organizers_to_publish: data.require_verified_organizers_to_publish ?? false,
           refund_requests_enabled: data.refund_requests_enabled ?? true,
           checkin_enabled: data.checkin_enabled ?? true,
+          social_instagram_url: data.social_instagram_url ?? DEFAULT_PLATFORM_SETTINGS.social_instagram_url,
+          social_instagram_active: data.social_instagram_active ?? DEFAULT_PLATFORM_SETTINGS.social_instagram_active,
+          social_facebook_url: data.social_facebook_url ?? DEFAULT_PLATFORM_SETTINGS.social_facebook_url,
+          social_facebook_active: data.social_facebook_active ?? DEFAULT_PLATFORM_SETTINGS.social_facebook_active,
+          social_x_url: data.social_x_url ?? DEFAULT_PLATFORM_SETTINGS.social_x_url,
+          social_x_active: data.social_x_active ?? DEFAULT_PLATFORM_SETTINGS.social_x_active,
+          social_tiktok_url: data.social_tiktok_url ?? DEFAULT_PLATFORM_SETTINGS.social_tiktok_url,
+          social_tiktok_active: data.social_tiktok_active ?? DEFAULT_PLATFORM_SETTINGS.social_tiktok_active,
+          social_whatsapp_url: data.social_whatsapp_url ?? DEFAULT_PLATFORM_SETTINGS.social_whatsapp_url,
+          social_whatsapp_active: data.social_whatsapp_active ?? DEFAULT_PLATFORM_SETTINGS.social_whatsapp_active,
           updated_at: data.updated_at ?? undefined,
         })
       }
@@ -801,6 +840,9 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
   const savePlatformSettings = async () => {
     const platformName = platformSettings.platform_name.trim()
     const supportEmail = platformSettings.support_email.trim()
+    const supportPhone = platformSettings.support_phone.trim()
+    const contactWhatsApp = platformSettings.contact_whatsapp.trim()
+    const contactAddress = platformSettings.contact_address.trim()
     const checkoutNotice = platformSettings.checkout_notice.trim()
     const maintenanceMessage = platformSettings.maintenance_message.trim()
     const serviceFeePercent = Number(platformSettings.service_fee_percent)
@@ -808,6 +850,8 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
 
     if (!platformName) { setSettingsError('Enter a platform name.'); return }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail)) { setSettingsError('Enter a valid support email address.'); return }
+    if (!supportPhone) { setSettingsError('Enter a support phone number for your contact details.'); return }
+    if (!contactAddress) { setSettingsError('Enter a contact address for your public footer.'); return }
     if (!Number.isFinite(serviceFeePercent) || serviceFeePercent < 0 || serviceFeePercent > 100) { setSettingsError('Service fee must be between 0% and 100%.'); return }
     if (!Number.isInteger(maxTicketsPerOrder) || maxTicketsPerOrder < 1 || maxTicketsPerOrder > 100) { setSettingsError('Tickets per order must be a whole number between 1 and 100.'); return }
     if (!platformSettings.mobile_money_enabled && !platformSettings.card_payments_enabled) { setSettingsError('Keep at least one payment method enabled.'); return }
@@ -815,13 +859,25 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
     setSettingsSaving(true)
     setSettingsError('')
     setSettingsNotice('')
-    const nextSettings = { ...platformSettings, platform_name: platformName, support_email: supportEmail, checkout_notice: checkoutNotice, maintenance_message: maintenanceMessage, service_fee_percent: serviceFeePercent, max_tickets_per_order: maxTicketsPerOrder }
+    const nextSettings = {
+      ...platformSettings,
+      platform_name: platformName,
+      support_email: supportEmail,
+      support_phone: supportPhone,
+      contact_whatsapp: contactWhatsApp,
+      contact_address: contactAddress,
+      checkout_notice: checkoutNotice,
+      maintenance_message: maintenanceMessage,
+      service_fee_percent: serviceFeePercent,
+      max_tickets_per_order: maxTicketsPerOrder,
+    }
     const { error } = await supabase.from('platform_settings').upsert({ ...nextSettings, updated_by: user?.id }, { onConflict: 'id' })
     if (error) {
       setSettingsError(error.message)
     } else {
       setPlatformSettings(nextSettings)
       setSettingsNotice('Platform settings saved. Operational changes are now active; pricing changes apply to new orders only.')
+      window.dispatchEvent(new CustomEvent('tiketi:platform-settings-updated'))
     }
     setSettingsSaving(false)
   }
@@ -1432,6 +1488,9 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
                   <div className="mt-5 space-y-4">
                     <label className="block text-sm font-semibold">Platform name<input value={platformSettings.platform_name} onChange={event => updatePlatformSetting('platform_name', event.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
                     <label className="block text-sm font-semibold">Support email<input type="email" value={platformSettings.support_email} onChange={event => updatePlatformSetting('support_email', event.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
+                    <label className="block text-sm font-semibold">Support phone<input value={platformSettings.support_phone} onChange={event => updatePlatformSetting('support_phone', event.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
+                    <label className="block text-sm font-semibold">Contact WhatsApp<input value={platformSettings.contact_whatsapp} onChange={event => updatePlatformSetting('contact_whatsapp', event.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
+                    <label className="block text-sm font-semibold">Contact address<input value={platformSettings.contact_address} onChange={event => updatePlatformSetting('contact_address', event.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
                     <label className="block text-sm font-semibold">Checkout notice<span className="mt-1 block text-xs font-normal leading-5" style={{ color: 'var(--muted-foreground)' }}>Shown to customers when ticket sales are paused.</span><textarea value={platformSettings.checkout_notice} onChange={event => updatePlatformSetting('checkout_notice', event.target.value)} placeholder="Ticket sales are temporarily unavailable. Please check back soon." rows={3} className="mt-2 w-full resize-y rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
                   </div>
                 </section>
@@ -1454,6 +1513,34 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
                     <ToggleSetting label="Maintenance mode" description="Show a maintenance screen to non-admin users while you carry out platform work." checked={platformSettings.maintenance_mode} onChange={value => updatePlatformSetting('maintenance_mode', value)} />
                     <label className="block rounded-xl border p-4 text-sm font-bold" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.025)' }}>Maintenance message<span className="mt-1 block text-xs font-normal leading-5" style={{ color: 'var(--muted-foreground)' }}>Shown when maintenance mode is enabled. Leave blank to use the default message.</span><textarea value={platformSettings.maintenance_message} onChange={event => updatePlatformSetting('maintenance_message', event.target.value)} placeholder="We are making a few improvements. Please check back shortly." rows={3} className="mt-3 w-full resize-y rounded-lg border px-3 py-2 text-sm font-normal outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
                     <ToggleSetting label="Marketplace visibility" description="Show published events in the public discovery catalog. Organizers keep access to their own events." checked={platformSettings.marketplace_enabled} onChange={value => updatePlatformSetting('marketplace_enabled', value)} />
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border p-5 lg:col-span-2" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--muted-foreground)' }}>Social media</p>
+                  <h3 className="mt-1 text-lg font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Public social links</h3>
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    {[
+                      { key: 'social_instagram', label: 'Instagram', url: platformSettings.social_instagram_url, active: platformSettings.social_instagram_active },
+                      { key: 'social_facebook', label: 'Facebook', url: platformSettings.social_facebook_url, active: platformSettings.social_facebook_active },
+                      { key: 'social_x', label: 'X / Twitter', url: platformSettings.social_x_url, active: platformSettings.social_x_active },
+                      { key: 'social_tiktok', label: 'TikTok', url: platformSettings.social_tiktok_url, active: platformSettings.social_tiktok_active },
+                    ].map(item => (
+                      <div key={item.key} className="rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.025)' }}>
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <span className="text-sm font-bold">{item.label}</span>
+                          <ToggleSetting label="Active" description="" checked={item.active} onChange={value => updatePlatformSetting(`${item.key}_active` as keyof PlatformSettings, value as never)} />
+                        </div>
+                        <input value={item.url} onChange={event => updatePlatformSetting(`${item.key}_url` as keyof PlatformSettings, event.target.value as never)} placeholder={`https://...${item.label.toLowerCase()}`} className="w-full rounded-lg border px-3 py-2 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
+                      </div>
+                    ))}
+                    <div className="rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.025)' }}>
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <span className="text-sm font-bold">WhatsApp</span>
+                        <ToggleSetting label="Active" description="" checked={platformSettings.social_whatsapp_active} onChange={value => updatePlatformSetting('social_whatsapp_active', value)} />
+                      </div>
+                      <input value={platformSettings.social_whatsapp_url} onChange={event => updatePlatformSetting('social_whatsapp_url', event.target.value)} placeholder="https://wa.me/25700000000" className="w-full rounded-lg border px-3 py-2 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
+                    </div>
                   </div>
                 </section>
 

@@ -69,6 +69,7 @@ export const ArrowRightIcon = base(['M5 12h14M12 5l7 7-7 7'])
 export const SparkleIcon = base(['M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z', 'M5 16l1 3 3-1-1-3-3 1z', 'M17 16l1 3-3 1-1-3 3-1z'])
 export const BellIcon = base(['M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9', 'M13.73 21a2 2 0 0 1-3.46 0'])
 export const SortIcon = base(['M3 6h18M7 12h10M11 18h2'])
+export const PhoneIcon = base(['M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.95.36 1.88.68 2.78a2 2 0 0 1-.45 2.11L8 9.91c1.15 2.23 3.01 4.09 5.24 5.24l1.3-1.34a2 2 0 0 1 2.11-.45c.9.32 1.83.55 2.78.68A2 2 0 0 1 22 16.92z'])
 export const LoaderIcon = ({ size = 18, className, style }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className={className} style={{ animation: 'spin 1s linear infinite', ...style }}>
     <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
