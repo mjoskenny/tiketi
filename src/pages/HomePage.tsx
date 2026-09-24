@@ -224,7 +224,7 @@ export default function HomePage({ navigate }: Props) {
         <div className="home-hero-content max-w-4xl mx-auto">
           <div className="text-center mb-8 md:mb-10">
             <p className="hero-kicker">Your next great night starts here</p>
-            <h1 className="hero-title">Find <span>live moments</span> worth showing up for</h1>
+            <h1 className="hero-title whitespace-nowrap">Find <span className="text-[var(--primary)]">live moments</span> worth showing up for</h1>
             <p className="hero-copy">Discover concerts, cultural nights, community events, and unforgettable experiences across Burundi.</p>
           </div>
           <div className="relative mb-4 rounded-[1.35rem] search-shell">
