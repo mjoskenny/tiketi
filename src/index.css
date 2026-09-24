@@ -253,6 +253,21 @@ select option { background: #18181B; }
   text-transform: uppercase;
 }
 
+.hero-kicker-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1.2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.82);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 35px rgba(0,0,0,0.18);
+  letter-spacing: 0.08em;
+}
+
 .hero-title {
   max-width: 42rem;
   margin: 0 auto;
@@ -262,7 +277,15 @@ select option { background: #18181B; }
   letter-spacing: -0.06em;
 }
 
-.hero-title span { color: var(--primary-light); }
+.hero-gradient-text {
+  display: inline-block;
+  background: linear-gradient(115deg, #ff7a18 0%, #ff9e45 28%, #ffc978 58%, #ff8a1d 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 12px 32px rgba(255, 144, 52, 0.28);
+}
 
 .hero-copy {
   max-width: 30rem;
