@@ -31,6 +31,7 @@ import { FEATURES } from './lib/features'
 
 type Page =
   | 'home'
+  | 'discover'
   | 'events'
   | 'event-detail'
   | 'checkout'
@@ -58,8 +59,8 @@ type Page =
   | 'refunds'
 
 const NO_NAV: Set<Page> = new Set(['checkin', 'auth-customer', 'auth-organizer', 'dashboard', 'agent-dashboard', 'admin-dashboard', 'agent-ticket'])
-const EVENTS_PLATFORM_PAGES: Set<Page> = new Set(['home', 'events', 'event-detail', 'checkout', 'ticket', 'my-tickets', 'profile', 'notifications', 'favorites', 'organizer-profile'])
-const MARKETPLACE_PAGES: Set<Page> = new Set(['home', 'events', 'event-detail', 'organizers', 'explore-organizers', 'organizer-profile'])
+const EVENTS_PLATFORM_PAGES: Set<Page> = new Set(['home', 'discover', 'events', 'event-detail', 'checkout', 'ticket', 'my-tickets', 'profile', 'notifications', 'favorites', 'organizer-profile'])
+const MARKETPLACE_PAGES: Set<Page> = new Set(['home', 'discover', 'events', 'event-detail', 'organizers', 'explore-organizers', 'organizer-profile'])
 
 type SocialLinkSetting = {
   platform: 'instagram' | 'facebook' | 'x' | 'tiktok' | 'whatsapp'
@@ -94,7 +95,8 @@ const DEFAULT_PUBLIC_PLATFORM_SETTINGS: PublicPlatformSettings = {
 
 const PAGE_PATHS: Record<Page, string> = {
   home: '/',
-  events: '/discover-events',
+  discover: '/discover-events',
+  events: '/events',
   'event-detail': '/event',
   checkout: '/checkout',
   ticket: '/ticket',
@@ -129,6 +131,8 @@ const PATH_PAGES = Object.entries(PAGE_PATHS).reduce<Record<string, Page>>((page
 function pageFromPath(pathname: string): Page {
   const normalizedPath = pathname.replace(/\/$/, '') || '/'
   if (!FEATURES.refunds && normalizedPath === '/refunds') return 'home'
+  if (normalizedPath === '/discover-events') return 'discover'
+  if (normalizedPath === '/events') return 'events'
   if (normalizedPath.startsWith('/events/') || normalizedPath.startsWith('/event/')) return 'event-detail'
   if (normalizedPath.startsWith('/organizers/') || normalizedPath.startsWith('/organizer/')) return 'organizer-profile'
   if (normalizedPath.startsWith('/checkout/')) return 'checkout'
@@ -404,6 +408,7 @@ export default function App() {
       )}
 
       {page === 'home' && <AboutPage navigate={navigate} />}
+      {page === 'discover' && <HomePage navigate={navigate} />}
       {page === 'events' && <EventsPage navigate={navigate} />}
       {page === 'event-detail' && eventDetail && <EventDetailPage event={eventDetail as any} navigate={navigate} onRequireAuth={requestAuth} />}
       {page === 'event-detail' && !eventDetail && (

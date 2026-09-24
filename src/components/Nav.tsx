@@ -91,7 +91,8 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
           </button>
 
           <div className="hidden md:flex items-center gap-7">
-            {navLink('Discover events', 'events')}
+            {navLink('Discover events', 'discover')}
+            {navLink('About', 'about')}
             {navLink('For Organizers', 'organizers')}
           </div>
 
@@ -225,7 +226,8 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
             style={{ background: 'rgba(8,8,15,0.98)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255,255,255,0.06)' }}>
             <div className="px-4 py-5 flex flex-col gap-1">
               {[
-                { label: 'Discover events', page: 'home' },
+                { label: 'Discover events', page: 'discover' },
+                { label: 'About', page: 'about' },
                 { label: 'For Organizers', page: 'organizers' },
                 ...(!isOrganizer && isLoggedIn ? [{ label: 'My Tickets', page: 'my-tickets' }] : []),
                 ...(shouldShowOrganizerDashboard ? [{ label: 'Dashboard', page: 'dashboard' }] : []),
