@@ -223,7 +223,7 @@ export default function HomePage({ navigate }: Props) {
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pt-12 pb-10 md:pt-20 md:pb-16">
         <div className="home-hero-content max-w-4xl mx-auto">
           <div className="text-center mb-8 md:mb-10">
-            <p className="hero-kicker"><span className="hero-kicker-pill">Your next great night starts here</span></p>
+            <p className="hero-kicker">Your next great night starts here</p>
             <h1 className="hero-title whitespace-nowrap">Find <span className="hero-gradient-text">events nearby</span></h1>
             <p className="hero-copy">Discover concerts, cultural nights, community events, and unforgettable experiences across Burundi.</p>
           </div>
