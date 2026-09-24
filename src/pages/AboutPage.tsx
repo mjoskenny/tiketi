@@ -72,7 +72,7 @@ export default function AboutPage({ navigate }: Props) {
           <h1>Moments worth<br /><em>showing up for.</em></h1>
           <p className="about-hero-copy">Tiketi helps people discover local experiences and gives organizers a simple, trusted way to sell tickets and bring communities together.</p>
           <div className="about-hero-actions">
-            <button onClick={() => navigate('home')} className="about-primary-button">Discover events <ArrowRightIcon size={16} /></button>
+            <button onClick={() => navigate('events')} className="about-primary-button">Discover events <ArrowRightIcon size={16} /></button>
             <button onClick={() => navigate('auth-organizer')} className="about-text-button">Host an event <ArrowRightIcon size={15} /></button>
           </div>
           <div className="about-hero-note"><span className="about-avatar-stack"><i /><i /><i /></span><span>Built for the people, artists, and communities shaping the city.</span></div>
@@ -83,14 +83,14 @@ export default function AboutPage({ navigate }: Props) {
       <section className="about-featured about-section-shell">
         <div className="about-featured-heading"><div><div className="about-section-label">Featured events</div><h2>What is happening<br /><span>right now.</span></h2></div></div>
         {featuredLoading ? <div className="about-featured-row">{[1, 2, 3].map(item => <div className="about-featured-skeleton" key={item} />)}</div> : featuredEvents.length > 0 ? <div className="about-featured-row">{featuredEvents.map(event => <EventCard key={event.id} event={event} poster fullWidthMobile onClick={() => navigate('event-detail', event)} />)}</div> : <div className="about-featured-empty"><TicketIcon size={20} /><span>New experiences are coming soon.</span></div>}
-        <div className="about-featured-action"><button onClick={() => navigate('home')} className="about-glass-button">Browse all events <ArrowRightIcon size={15} /></button></div>
+        <div className="about-featured-action"><button onClick={() => navigate('events')} className="about-glass-button">Browse all events <ArrowRightIcon size={15} /></button></div>
       </section>
 
       <section className="about-story about-section-shell">
         <div className="about-section-label">01 / Why Tiketi</div>
         <div className="about-story-intro"><div><h2>Less searching.<br /><span>More showing up.</span></h2><p>There is always something happening. Tiketi makes the good stuff easier to find, trust, and be part of.</p></div><div className="about-story-stamp"><span>BUILT<br />FOR<br /><b>THE MOMENT</b></span><ArrowRightIcon size={17} /></div></div>
         <div className="about-story-grid"><div className="about-story-visual"><div className="about-story-card about-story-card-main"><span>TONIGHT</span><strong>Find your<br />next thing.</strong><small>Music · Culture · Community</small></div><div className="about-story-card about-story-card-small"><MapPinIcon size={15} /><span>Bujumbura<br /><b>is alive</b></span></div><div className="about-story-line" /></div><div className="about-story-copy"><p>From a room full of ideas to a night of music, events are how a city keeps its pulse. But discovery should not feel like work.</p><p>Tiketi brings discovery, booking, and the ticket at the door into one clear journey, while giving the people behind each experience the confidence to host brilliantly.</p></div></div>
-        <div className="about-story-action"><button onClick={() => navigate('home')} className="about-glass-button">See what is happening <ArrowRightIcon size={15} /></button></div>
+        <div className="about-story-action"><button onClick={() => navigate('events')} className="about-glass-button">See what is happening <ArrowRightIcon size={15} /></button></div>
       </section>
 
       <section className="about-impact about-section-shell">

@@ -361,7 +361,7 @@ export default function App() {
         </div>
       )}
 
-      {page === 'home' && <HomePage navigate={navigate} />}
+      {page === 'home' && <AboutPage navigate={navigate} />}
       {page === 'events' && <EventsPage navigate={navigate} />}
       {page === 'event-detail' && eventDetail && <EventDetailPage event={eventDetail as any} navigate={navigate} onRequireAuth={requestAuth} />}
       {page === 'event-detail' && !eventDetail && (

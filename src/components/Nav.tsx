@@ -91,7 +91,7 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
           </button>
 
           <div className="hidden md:flex items-center gap-7">
-            {navLink('Discover events', 'home')}
+            {navLink('Discover events', 'events')}
             {navLink('For Organizers', 'organizers')}
           </div>
 
