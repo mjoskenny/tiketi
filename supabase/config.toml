@@ -1,0 +1,6 @@
+project_id = "nunysxvsgoxyxywjtbku"
+
+[functions.server]
+# Payment-provider webhooks do not send a Supabase user JWT.
+# User-facing ticket email routes perform their own auth and permission checks.
+verify_jwt = false

@@ -3,6 +3,7 @@ import { CalendarIcon, MapPinIcon, ShieldIcon, TicketIcon, CheckIcon, ArrowLeftI
 import type { Event, TicketTier } from '../lib/types'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { sendOrderTicketEmails } from '../lib/ticketEmail'
 
 type CheckoutData = {
   event: Event
@@ -183,6 +184,7 @@ export default function CheckoutPage({ data, navigate }: Props) {
     setLoading(false)
     window.sessionStorage.removeItem(`tiketi-checkout:${event.id}`)
     const tickets = Array.isArray(confirmedTickets) ? confirmedTickets : []
+    const emailDelivery = await sendOrderTicketEmails(orderId)
     const firstTicket = tickets[0]
     const firstTier = tiers.find(tier => tier.id === firstTicket?.ticket_tier_id) ?? tiers[0]
     navigate('ticket', {
@@ -198,6 +200,7 @@ export default function CheckoutPage({ data, navigate }: Props) {
       ticketExtraInfo: firstTier?.extra_info ?? '',
       ticketExpiry: firstTier?.expires_at ?? '',
       ticketGroupSize: firstTier?.group_size ?? 1,
+      emailDelivery,
     })
   }
 

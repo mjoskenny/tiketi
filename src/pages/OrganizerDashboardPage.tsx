@@ -5,8 +5,10 @@ import { formatPrice } from '../data/events'
 import { BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, UsersIcon, UserIcon, KeyIcon, TagIcon, DollarSignIcon, TicketIcon, TrendingUpIcon, CheckIcon, ArrowLeftIcon, EyeIcon, LinkIcon } from '../components/Icon'
 import type { Event, Order, Customer, Transaction, OrganizerMember, OrganizerRole, Subscription, Ticket, AgentAssignment } from '../lib/types'
 import { FEATURES } from '../lib/features'
+import OrganizerEventViewPage from './OrganizerEventViewPage'
+import { sendOrderTicketEmails } from '../lib/ticketEmail'
 
-type Section = 'overview' | 'events' | 'orders' | 'customers' | 'followers' | 'members' | 'roles' | 'subscriptions' | 'transactions' | 'refunds' | 'checkin' | 'notifications'
+type Section = 'overview' | 'events' | 'orders' | 'customers' | 'followers' | 'members' | 'roles' | 'subscriptions' | 'transactions' | 'refunds' | 'notifications'
 type AnalyticsRange = 'all' | 'day' | 'week' | 'month' | 'year' | 'custom'
 type NotificationFilter = 'all' | 'unread' | 'events' | 'sales' | 'followers' | 'team'
 type OrganizerNotification = { id: string; type: string; title: string; body: string; created_at: string; read_at: string | null; event_id?: string | null; recipient_scope?: string }
@@ -26,7 +28,6 @@ const NAV_ICONS: Record<Section, React.FC<{ size?: number }>> = {
   subscriptions: TagIcon,
   transactions: DollarSignIcon,
   refunds: DollarSignIcon,
-  checkin: TicketIcon,
   notifications: BellIcon,
 }
 
@@ -40,7 +41,6 @@ const NAV: { key: Section; label: string }[] = [
   { key: 'roles', label: 'Roles' },
   { key: 'transactions', label: 'Transactions' },
   ...(FEATURES.refunds ? [{ key: 'refunds' as Section, label: 'Refund requests' }] : []),
-  { key: 'checkin', label: 'Check-in' },
   { key: 'notifications', label: 'Notifications' },
 ]
 
@@ -55,7 +55,6 @@ const SECTION_PATHS: Record<Section, string> = {
   subscriptions: '/dashboard/subscriptions',
   transactions: '/dashboard/transactions',
   refunds: '/dashboard/refunds',
-  checkin: '/dashboard/check-in',
   notifications: '/dashboard/notifications',
 }
 
@@ -63,6 +62,11 @@ function sectionFromPath(pathname: string): Section {
   const slug = pathname.split('/').filter(Boolean)[1]
   const match = Object.entries(SECTION_PATHS).find(([, path]) => path.split('/').pop() === slug)
   return (match?.[0] as Section | undefined) ?? 'overview'
+}
+
+function eventIdFromPath(pathname: string) {
+  const parts = pathname.split('/').filter(Boolean)
+  return parts[0] === 'dashboard' && parts[1] === 'events' ? parts[2] ?? null : null
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -166,6 +170,7 @@ function EventPerformanceChart({ events, orders }: { events: Event[]; orders: Or
 export default function OrganizerDashboardPage({ navigate }: Props) {
   const { user, profile, organizer, teamMembership } = useAuth()
   const [section, setSection] = useState<Section>(() => sectionFromPath(window.location.pathname))
+  const [eventViewId, setEventViewId] = useState<string | null>(() => eventIdFromPath(window.location.pathname))
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [utilityPopup, setUtilityPopup] = useState<'notifications' | 'calendar' | 'profile' | null>(null)
 
@@ -208,14 +213,18 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const orgId = organizer?.id
   const isOwner = !!organizer && organizer.user_id === profile?.id
   const membershipPermissions = (teamMembership?.organizer_roles?.permissions ?? {}) as Record<string, boolean>
-  const canAccessSection = (key: Section) => isOwner || membershipPermissions.all === true || membershipPermissions[key] === true || (key === 'overview' && membershipPermissions.analytics === true) || (key === 'checkin' && membershipPermissions.checkin === true)
+  const canAccessSection = (key: Section) => isOwner || membershipPermissions.all === true || membershipPermissions[key] === true || (key === 'overview' && membershipPermissions.analytics === true) || (key === 'events' && (membershipPermissions.checkin === true || membershipPermissions.orders === true))
   const canUseCalendar = isOwner || membershipPermissions.all === true || membershipPermissions.calendar === true
-  const canViewEvents = isOwner || membershipPermissions.all === true || membershipPermissions.events === true
+  const canViewEvents = isOwner || membershipPermissions.all === true || membershipPermissions.events === true || membershipPermissions.checkin === true || membershipPermissions.orders === true
   const canCheckIn = isOwner || membershipPermissions.all === true || membershipPermissions.checkin === true
+  const canRecordTransactions = isOwner || membershipPermissions.all === true || membershipPermissions.orders === true
   const visibleNav = NAV.filter(item => canAccessSection(item.key))
 
   useEffect(() => {
-    const handlePathChange = () => setSection(sectionFromPath(window.location.pathname))
+    const handlePathChange = () => {
+      setSection(sectionFromPath(window.location.pathname))
+      setEventViewId(eventIdFromPath(window.location.pathname))
+    }
     window.addEventListener('popstate', handlePathChange)
     return () => window.removeEventListener('popstate', handlePathChange)
   }, [])
@@ -223,8 +232,18 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const selectSection = (nextSection: Section) => {
     if (!canAccessSection(nextSection)) return
     setSection(nextSection)
+    setEventViewId(null)
     setSidebarOpen(false)
     const nextPath = SECTION_PATHS[nextSection]
+    if (window.location.pathname !== nextPath) window.history.pushState({}, '', nextPath)
+  }
+
+  const openEventView = (event: Event) => {
+    if (!canViewEvents) return
+    setSection('events')
+    setEventViewId(event.id)
+    setSidebarOpen(false)
+    const nextPath = `/dashboard/events/${event.id}`
     if (window.location.pathname !== nextPath) window.history.pushState({}, '', nextPath)
   }
 
@@ -305,7 +324,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     setDataLoading(true)
     setDashboardLoadError(false)
     const [ev, ord, cust, mem, rol, sub, txn, tickets, agentSales, assignments, refunds] = await Promise.all([
-      supabase.from('events').select('*, tags, ticket_tiers(id, event_id, name, price, description, ticket_type, extra_info, expires_at, group_size, quantity, sold, created_at)').eq('organizer_id', orgId).order('created_at', { ascending: false }),
+      supabase.from('events').select('*, tags, ticket_tiers(id, event_id, name, price, description, ticket_type, consumable_amount, extra_info, expires_at, group_size, quantity, sold, created_at)').eq('organizer_id', orgId).order('created_at', { ascending: false }),
       supabase.from('orders').select('*, events(title), profiles(full_name, email)').eq('organizer_id', orgId).order('created_at', { ascending: false }),
       supabase.from('customers').select('*').eq('organizer_id', orgId).order('total_spent', { ascending: false }),
       supabase.from('organizer_members').select('*, profiles(full_name, email, username, profile_image, avatar_url), organizer_roles(name)').eq('organizer_id', orgId),
@@ -674,6 +693,10 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     setActionError('')
     const { error } = await supabase.rpc('confirm_agent_cash_sale', { p_order_id: order.id })
     if (error) { setActionError(error.message); return }
+    const emailDelivery = await sendOrderTicketEmails(order.id)
+    if (emailDelivery.failedCount) {
+      setActionError(`Sale confirmed, but ${emailDelivery.sentCount} of ${emailDelivery.total} ticket emails were sent. ${emailDelivery.reason ?? ''}`)
+    }
     setSelectedOrder(null)
     await load()
   }
@@ -856,9 +879,6 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {canCheckIn && <button onClick={() => navigate('checkin')} className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold lg:hidden" style={{ background: 'var(--primary)', color: '#000' }}>
-              <TicketIcon size={14} /> Check-in
-            </button>}
             {utilityPopup && <button className="fixed inset-0 z-10 cursor-default" aria-label="Close popup" onClick={() => setUtilityPopup(null)} />}
             <div className="relative z-20">
               <button onClick={() => setUtilityPopup(current => current === 'notifications' ? null : 'notifications')} aria-label="Notifications" title="Notifications" className="relative flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: utilityPopup === 'notifications' ? 'rgba(200,169,110,0.14)' : 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}>
@@ -890,7 +910,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                   <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold">Event calendar</p><CalendarIcon size={15} /></div>
                   <div className="mt-3 space-y-2">
                     {events.slice(0, 3).map(event => (
-                      <button key={event.id} onClick={() => { setUtilityPopup(null); navigate('event-detail', event) }} className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                      <button key={event.id} onClick={() => { setUtilityPopup(null); openEventView(event) }} className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left" style={{ background: 'rgba(255,255,255,0.05)' }}>
                         <span className="min-w-0 truncate text-xs font-semibold">{event.title}</span>
                         <span className="shrink-0 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{event.date}</span>
                       </button>
@@ -1127,6 +1147,20 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
               {/* ── EVENTS ── */}
               {section === 'events' && (
+                eventViewId ? <OrganizerEventViewPage
+                  event={events.find(event => event.id === eventViewId) ?? null}
+                  orders={orders}
+                  tickets={checkinTickets}
+                  agentOrderMeta={agentOrderMeta}
+                  canCheckIn={canCheckIn}
+                  canRecordTransaction={canRecordTransactions}
+                  onTicketsChanged={() => { void load() }}
+                  onSaleRecorded={() => { void load() }}
+                  loading={dataLoading}
+                  onBack={() => selectSection('events')}
+                  onEdit={event => setEditingEvent(event)}
+                  navigate={navigate}
+                /> :
                 <div className="space-y-4">
                   <div className="flex items-center justify-between gap-4">
                     <div><h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Events</h2><p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{events.length} event{events.length === 1 ? '' : 's'} in your workspace</p></div>
@@ -1165,6 +1199,9 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                           </div>
                         </div>
                         <div className="flex gap-2 flex-shrink-0 self-stretch sm:self-auto">
+                          <button onClick={() => openEventView(ev)} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--foreground)' }}>
+                            View
+                          </button>
                           <button onClick={() => setEditingEvent(ev)} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background: 'rgba(249,112,21,0.12)', color: 'var(--primary)' }}>
                             Edit
                           </button>
@@ -1183,6 +1220,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                     )
                   })}
                 </div>
+                
               )}
 
               {/* ── ORDERS ── */}
@@ -1288,40 +1326,6 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                       </div>
                     )
                   })}
-                </div>
-              )}
-
-              {section === 'checkin' && (
-                <div className="space-y-5">
-                  <div>
-                    <h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Check-in</h2>
-                    <p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Attendance activity for your events.</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                    <StatCard Icon={CheckIcon} label="Checked in" value={checkinTickets.filter(ticket => ticket.checked_in_at || ticket.status === 'used').length.toString()} />
-                    <StatCard Icon={TicketIcon} label="Tickets issued" value={checkinTickets.length.toString()} />
-                    <StatCard Icon={TrendingUpIcon} label="Attendance rate" value={checkinTickets.length ? `${Math.round((checkinTickets.filter(ticket => ticket.checked_in_at || ticket.status === 'used').length / checkinTickets.length) * 100)}%` : '0%'} />
-                    <StatCard Icon={CalendarIcon} label="Events covered" value={new Set(checkinTickets.map(ticket => ticket.event_id)).size.toString()} />
-                  </div>
-                  <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                    <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}><h3 className="font-bold">Recent check-ins</h3></div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead><tr style={{ background: 'var(--muted)' }}>{['Guest', 'Event', 'Ticket', 'Checked in'].map(label => <th key={label} className="px-4 py-3 text-left text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{label}</th>)}</tr></thead>
-                        <tbody>
-                          {checkinTickets.filter(ticket => ticket.checked_in_at || ticket.status === 'used').slice(0, 25).map(ticket => (
-                            <tr key={ticket.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                              <td className="px-4 py-3 text-xs font-medium">{ticket.holder_name ?? 'Guest'}</td>
-                              <td className="px-4 py-3 text-xs">{ticket.events?.title ?? 'Event'}</td>
-                              <td className="px-4 py-3 text-xs font-mono">{ticket.qr_code.slice(0, 12)}…</td>
-                              <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted-foreground)' }}>{ticket.checked_in_at ? new Date(ticket.checked_in_at).toLocaleString() : 'Recorded'}</td>
-                            </tr>
-                          ))}
-                          {checkinTickets.filter(ticket => ticket.checked_in_at || ticket.status === 'used').length === 0 && <tr><td colSpan={4} className="px-4 py-12 text-center text-xs" style={{ color: 'var(--muted-foreground)' }}>No check-ins recorded yet</td></tr>}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -1550,14 +1554,14 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
 // ── Modals ──
 
-type EventTierForm = { id?: string; name: string; price: string; quantity: string; description: string; ticket_type: 'consumable' | 'non_consumable'; extra_info: string; expires_at: string; group_size: string; sold: number }
+type EventTierForm = { id?: string; name: string; price: string; quantity: string; description: string; ticket_type: 'consumable' | 'non_consumable'; consumable_amount: string; extra_info: string; expires_at: string; group_size: string; show_optional_details: boolean; sold: number }
 
 function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string; event?: Event | null; onClose: () => void; onCreated: () => void }) {
   const [form, setForm] = useState(() => ({ title: event?.title ?? '', category: event?.category ?? 'Music', date: event?.date ?? '', time: event?.time ?? '18:00', end_time: event?.end_time ?? '', venue: event?.venue ?? '', venue_latitude: event?.venue_latitude ?? null as number | null, venue_longitude: event?.venue_longitude ?? null as number | null, city: event?.city ?? 'Bujumbura', description: event?.description ?? '', capacity: String(event?.capacity ?? 500), cover_image: event?.cover_image ?? '', tags: event?.tags?.join(', ') ?? '', status: event?.status ?? 'draft', featured: event?.is_featured ?? false, refund_policy: event?.refund_policy ?? 'Tickets are non-refundable', entry_policy: event?.entry_policy ?? 'Valid ID required at entry' }))
   const [venueSearch, setVenueSearch] = useState(event?.venue ?? '')
   const [venueResults, setVenueResults] = useState<Array<{ display_name: string; lat: string; lon: string; class?: string; type?: string; address?: { city?: string; town?: string; village?: string } }>>([])
   const [venueSearching, setVenueSearching] = useState(false)
-  const [tiers, setTiers] = useState<EventTierForm[]>(() => event?.ticket_tiers?.map(tier => ({ id: tier.id, name: tier.name, price: String(tier.price), quantity: String(tier.quantity), description: tier.description ?? '', ticket_type: tier.ticket_type ?? 'consumable', extra_info: tier.extra_info ?? '', expires_at: tier.expires_at ?? '', group_size: String(tier.group_size ?? 1), sold: tier.sold })) ?? [{ name: 'REGULAR', price: '30000', quantity: '500', description: 'General admission', ticket_type: 'consumable', extra_info: '', expires_at: '', group_size: '1', sold: 0 }])
+  const [tiers, setTiers] = useState<EventTierForm[]>(() => event?.ticket_tiers?.map(tier => ({ id: tier.id, name: tier.name, price: String(tier.price), quantity: String(tier.quantity), description: tier.description ?? '', ticket_type: tier.ticket_type ?? 'non_consumable', consumable_amount: String(tier.consumable_amount ?? ''), extra_info: tier.extra_info ?? '', expires_at: tier.expires_at ?? '', group_size: String(tier.group_size ?? 1), show_optional_details: false, sold: tier.sold })) ?? [{ name: 'REGULAR', price: '30000', quantity: '500', description: 'General admission', ticket_type: 'non_consumable', consumable_amount: '', extra_info: '', expires_at: '', group_size: '1', show_optional_details: false, sold: 0 }])
   const [coverFile, setCoverFile] = useState<File | null>(null)
   const [coverPreview, setCoverPreview] = useState('')
   const [saving, setSaving] = useState(false)
@@ -1596,12 +1600,15 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
       const tierName = tier.name.trim()
       const price = Number.parseInt(tier.price, 10)
       const quantity = Number.parseInt(tier.quantity, 10)
-      const groupSize = Number.parseInt(tier.group_size, 10)
+      const parsedGroupSize = Number.parseInt(tier.group_size, 10)
+      const groupSize = parsedGroupSize || 1
+      const consumableAmount = Number.parseInt(tier.consumable_amount, 10)
       if (!tierName) { setError('Every ticket tier needs a name.'); return }
       if (normalizedTierNames.has(tierName.toLowerCase())) { setError('Ticket tier names must be unique.'); return }
       if (!Number.isInteger(price) || price < 0) { setError(`Enter a valid price for ${tierName}.`); return }
       if (!Number.isInteger(quantity) || quantity < 1 || quantity < tier.sold) { setError(`${tierName} quantity must be at least ${tier.sold} and greater than zero.`); return }
-      if (!Number.isInteger(groupSize) || groupSize < 1) { setError(`Group size for ${tierName} must be at least 1.`); return }
+      if (tier.show_optional_details && tier.group_size && (!Number.isInteger(parsedGroupSize) || parsedGroupSize < 1)) { setError(`Group size for ${tierName} must be at least 1.`); return }
+      if (tier.ticket_type === 'consumable' && (!Number.isInteger(consumableAmount) || consumableAmount < 1)) { setError(`Enter the consumable amount for ${tierName}.`); return }
       normalizedTierNames.add(tierName.toLowerCase())
       totalTicketCapacity += quantity * groupSize
     }
@@ -1681,6 +1688,7 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
           quantity: parseInt(tier.quantity),
           description: tier.description,
           ticket_type: tier.ticket_type,
+          consumable_amount: tier.ticket_type === 'consumable' ? Number.parseInt(tier.consumable_amount, 10) : null,
           extra_info: tier.extra_info || null,
           expires_at: tier.expires_at || null,
           group_size: Math.max(1, parseInt(tier.group_size) || 1),
@@ -1851,7 +1859,7 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Ticket Tiers</label>
-              <button onClick={() => setTiers(t => [...t, { name: 'VIP', price: '75000', quantity: '100', description: '', ticket_type: 'consumable', extra_info: '', expires_at: '', group_size: '1', sold: 0 }])}
+              <button onClick={() => setTiers(t => [...t, { name: 'VIP', price: '75000', quantity: '100', description: '', ticket_type: 'non_consumable', consumable_amount: '', extra_info: '', expires_at: '', group_size: '1', show_optional_details: false, sold: 0 }])}
                 className="text-xs font-bold" style={{ color: 'var(--primary)' }}>+ Add tier</button>
             </div>
             {tiers.map((tier, i) => (
@@ -1867,15 +1875,18 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
                 </div>
                 <input placeholder="Ticket description" value={tier.description} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, description: e.target.value } : x))}
                   className="mb-2 w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} />
-                <textarea placeholder="Extra info (optional)" value={tier.extra_info} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, extra_info: e.target.value } : x))} rows={2}
-                  className="mb-2 w-full resize-none px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} />
                 <div className="grid grid-cols-2 gap-2">
-                  <div><label className="mb-1 block text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Ticket type</label><select value={tier.ticket_type} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, ticket_type: e.target.value as 'consumable' | 'non_consumable' } : x))} className="w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }}><option value="consumable">Consumable</option><option value="non_consumable">Non-consumable</option></select></div>
-                  <div><label className="mb-1 block text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Expiry (optional)</label><input type="date" value={tier.expires_at} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, expires_at: e.target.value } : x))} className="w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} /></div>
+                  <div><label className="mb-1 block text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Ticket type</label><select value={tier.ticket_type} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, ticket_type: e.target.value as 'consumable' | 'non_consumable' } : x))} className="w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }}><option value="non_consumable">Non-consumable</option><option value="consumable">Consumable</option></select></div>
+                  {tier.ticket_type === 'consumable' && <div><label className="mb-1 block text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Consumable amount *</label><input type="number" min="1" step="1" placeholder="e.g. 2 drinks" value={tier.consumable_amount} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, consumable_amount: e.target.value } : x))} className="w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} /></div>}
                 </div>
-                <label className="mt-2 block text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Group size</label>
-                <input type="number" min="1" value={tier.group_size} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, group_size: e.target.value } : x))} className="w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} />
-                <p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Number of individual tickets issued per purchase. A group size of 5 means 5 tickets will be sent for one transaction.</p>
+                <button type="button" aria-expanded={tier.show_optional_details} onClick={() => setTiers(t => t.map((x, j) => j === i ? { ...x, show_optional_details: !x.show_optional_details } : x))} className="mt-2 text-[11px] font-semibold" style={{ color: 'var(--primary)' }}>{tier.show_optional_details ? 'Hide optional details −' : 'Show optional details +'}</button>
+                {tier.show_optional_details && <div className="mt-2 space-y-2 rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                  <textarea placeholder="Extra info (optional)" value={tier.extra_info} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, extra_info: e.target.value } : x))} rows={2} className="w-full resize-none px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><label className="mb-1 block text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Group size (optional)</label><input type="number" min="1" value={tier.group_size} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, group_size: e.target.value } : x))} className="w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} /><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Tickets issued per purchase.</p></div>
+                    <div><label className="mb-1 block text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Expiry date (optional)</label><input type="date" value={tier.expires_at} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, expires_at: e.target.value } : x))} className="w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} /></div>
+                  </div>
+                </div>}
               </div>
             ))}
           </div>

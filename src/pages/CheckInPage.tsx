@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeftIcon, CheckIcon, CameraIcon, XIcon } from '../components/Icon'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../context/AuthContext'
 import { BrowserQRCodeReader, type IScannerControls } from '@zxing/browser'
+import type { Ticket } from '../lib/types'
 
-type Props = { navigate: (p: string) => void }
+type Props = { eventId: string; eventTitle: string; tickets: Ticket[]; onTicketsChanged: () => void; onClose: () => void }
 type ScanResult = 'valid' | 'used' | 'invalid' | 'declined' | 'error' | null
 type ScanData = { event_title: string | null; holder_name: string | null; ticket_name: string | null; checked_in_at: string | null }
 
@@ -15,8 +15,7 @@ const AlertIcon = ({ size = 24 }: { size?: number }) => (
   </svg>
 )
 
-export default function CheckInPage({ navigate }: Props) {
-  const { organizer } = useAuth()
+export default function CheckInPanel({ eventId, eventTitle, tickets, onTicketsChanged, onClose }: Props) {
   const [inputCode, setInputCode] = useState('')
   const [result, setResult] = useState<ScanResult>(null)
   const [resultData, setResultData] = useState<ScanData | null>(null)
@@ -31,23 +30,23 @@ export default function CheckInPage({ navigate }: Props) {
   const decodedRef = useRef(false)
 
   const loadScanCount = async () => {
-    if (!organizer?.id) return
-    const { data } = await supabase
+    if (!eventId) return
+    const { count } = await supabase
       .from('tickets')
-      .select('id, events!inner(organizer_id)')
-      .eq('events.organizer_id', organizer.id)
+      .select('id', { count: 'exact', head: true })
+      .eq('event_id', eventId)
       .eq('status', 'used')
-    setScanCount(data?.length ?? 0)
+    setScanCount(count ?? 0)
   }
 
   useEffect(() => {
     void loadScanCount()
-    if (!organizer?.id) return
-    const channel = supabase.channel(`check-in-tickets:${organizer.id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tickets' }, () => { void loadScanCount() })
+    if (!eventId) return
+    const channel = supabase.channel(`check-in-tickets:${eventId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tickets', filter: `event_id=eq.${eventId}` }, () => { void loadScanCount() })
       .subscribe()
     return () => { void supabase.removeChannel(channel) }
-  }, [organizer?.id])
+  }, [eventId])
 
   useEffect(() => {
     if (!cameraOpen) return
@@ -81,6 +80,12 @@ export default function CheckInPage({ navigate }: Props) {
   const handleScan = async (code: string) => {
     const normalizedCode = code.trim()
     if (!normalizedCode) return
+    const eventTicket = tickets.find(ticket => ticket.event_id === eventId && ticket.qr_code === normalizedCode)
+    if (!eventTicket) {
+      setResult('invalid')
+      setResultData(null)
+      return
+    }
     setScanning(true)
     setResult(null)
     setResultData(null)
@@ -97,6 +102,7 @@ export default function CheckInPage({ navigate }: Props) {
     const nextData: ScanData = ticket
     setResultData(nextData)
     setResult(ticket.ticket_status === 'used' ? 'used' : ticket.ticket_status === 'valid' ? 'valid' : ticket.ticket_status === 'cancelled' ? 'declined' : 'invalid')
+    if (ticket.ticket_status === 'valid') onTicketsChanged()
     if (ticket.ticket_status !== 'used') await loadScanCount()
   }
 
@@ -105,14 +111,14 @@ export default function CheckInPage({ navigate }: Props) {
   const reset = () => { setResult(null); setResultData(null); setScanError(''); setInputCode(''); setScanning(false); setCameraError('') }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#060606', color: '#fff' }}>
+    <div className="fixed inset-0 z-[85] flex min-h-screen flex-col overflow-y-auto" style={{ background: '#060606', color: '#fff' }}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
-        <button onClick={() => navigate('dashboard')} className="flex items-center gap-2 text-sm"
+        <button onClick={onClose} className="flex items-center gap-2 text-sm"
           style={{ color: 'var(--muted-foreground)' }}>
-          <ArrowLeftIcon size={14} /> Dashboard
+          <ArrowLeftIcon size={14} /> Event details
         </button>
-        <p className="font-black text-lg" style={{ fontFamily: 'Outfit, sans-serif', color: 'var(--primary)' }}>TIKETI Check-in</p>
+        <p className="font-black text-lg" style={{ fontFamily: 'Outfit, sans-serif', color: 'var(--primary)' }}>Event check-in</p>
         <div className="text-right">
           <p className="font-bold text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>{scanCount}</p>
           <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>checked in</p>
@@ -122,7 +128,7 @@ export default function CheckInPage({ navigate }: Props) {
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
         <div className="mb-8 text-center">
           <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--muted-foreground)', letterSpacing: '0.08em' }}>Live ticket scanner</p>
-          <h2 className="text-2xl font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>{organizer?.name ?? 'Organizer events'}</h2>
+          <h2 className="text-2xl font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>{eventTitle}</h2>
           <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>Scan a valid ticket QR code to check guests in.</p>
         </div>
 

@@ -13,7 +13,6 @@ import ExploreOrganizersPage from './pages/ExploreOrganizersPage.tsx'
 import OrganizerDashboardPage from './pages/OrganizerDashboardPage'
 import AgentDashboardPage from './pages/AgentDashboardPage'
 import AdminDashboardPage from './pages/AdminDashboardPage'
-import CheckInPage from './pages/CheckInPage'
 import AuthPage from './pages/AuthPage'
 import ProfilePage from './pages/ProfilePage'
 import NotificationsPage from './pages/NotificationsPage'
@@ -43,7 +42,6 @@ type Page =
   | 'dashboard'
   | 'agent-dashboard'
   | 'admin-dashboard'
-  | 'checkin'
   | 'auth-customer'
   | 'auth-organizer'
   | 'profile'
@@ -58,7 +56,7 @@ type Page =
   | 'privacy'
   | 'refunds'
 
-const NO_NAV: Set<Page> = new Set(['checkin', 'auth-customer', 'auth-organizer', 'dashboard', 'agent-dashboard', 'admin-dashboard', 'agent-ticket'])
+const NO_NAV: Set<Page> = new Set(['auth-customer', 'auth-organizer', 'dashboard', 'agent-dashboard', 'admin-dashboard', 'agent-ticket'])
 const EVENTS_PLATFORM_PAGES: Set<Page> = new Set(['discover', 'events', 'event-detail', 'checkout', 'ticket', 'my-tickets', 'profile', 'notifications', 'favorites', 'organizer-profile'])
 const MARKETPLACE_PAGES: Set<Page> = new Set(['home', 'discover', 'events', 'event-detail', 'organizers', 'explore-organizers', 'organizer-profile'])
 
@@ -107,7 +105,6 @@ const PAGE_PATHS: Record<Page, string> = {
   dashboard: '/dashboard',
   'agent-dashboard': '/agent-dashboard/overview',
   'admin-dashboard': '/admin-dashboard',
-  checkin: '/check-in',
   'auth-customer': '/sign-in',
   'auth-organizer': '/organizer-sign-in',
   profile: '/profile',
@@ -186,6 +183,7 @@ export default function App() {
   const [ticketData, setTicketData] = useState<{
     event: Event
     info: { name: string; phone: string; email: string }
+    emailDelivery?: { sentCount: number; total: number; failedCount: number; reason?: string }
   } | null>(null)
 
   useEffect(() => {
@@ -365,16 +363,6 @@ export default function App() {
         </div>
       </div>
     )
-  }
-
-  // Check-in is limited to organizer owners and team roles with checkin access.
-  if (page === 'checkin') {
-    const isOrganizerOwner = isOrganizer && organizer?.user_id === profile?.id
-    const isAuthorizedTeamMember = teamMembership?.status === 'active' && (teamMembership.organizer_roles?.permissions?.all === true || teamMembership.organizer_roles?.permissions?.checkin === true)
-    const canCheckIn = isOrganizerOwner || isAuthorizedTeamMember
-    return canCheckIn
-      ? <CheckInPage navigate={navigate} />
-      : <div className="flex min-h-screen items-center justify-center p-6 text-center" style={{ background: 'var(--background)', color: 'var(--foreground)' }}><div><p className="text-xl font-bold">Check-in access required</p><p className="mt-2 text-sm" style={{ color: 'var(--muted-foreground)' }}>Ask the organizer to assign the check-in permission to your role.</p><button onClick={() => navigate('dashboard')} className="mt-5 rounded-xl px-5 py-3 text-sm font-bold" style={{ background: 'var(--primary)', color: '#000' }}>Back to dashboard</button></div></div>
   }
 
   return (

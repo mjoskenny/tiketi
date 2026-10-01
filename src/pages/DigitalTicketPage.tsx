@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ArrowLeftIcon, CheckIcon, DownloadIcon, ShareIcon, TicketIcon } from '../components/Icon'
 
 type TicketInfo = { name: string; phone: string; email: string }
-type TicketData = { event: Record<string, unknown>; info: TicketInfo; tickets?: Array<{ qr_code: string; holder_name?: string | null; holder_email?: string | null; ticket_tier_id?: string; created_at?: string }>; ticket?: string | null; ticketStatus?: 'valid' | 'used' | 'cancelled'; ticketType?: string; ticketKind?: 'consumable' | 'non_consumable'; ticketPrice?: number; purchasedAt?: string; ticketExtraInfo?: string; ticketExpiry?: string; ticketGroupSize?: number }
+type TicketData = { event: Record<string, unknown>; info: TicketInfo; tickets?: Array<{ qr_code: string; holder_name?: string | null; holder_email?: string | null; ticket_tier_id?: string; created_at?: string }>; ticket?: string | null; ticketStatus?: 'valid' | 'used' | 'cancelled'; ticketType?: string; ticketKind?: 'consumable' | 'non_consumable'; ticketPrice?: number; purchasedAt?: string; ticketExtraInfo?: string; ticketExpiry?: string; ticketGroupSize?: number; emailDelivery?: { sentCount: number; total: number; failedCount: number; reason?: string } }
 type Props = { data: TicketData; navigate: (p: string) => void }
 
 async function imageDataUrl(url: string) {
@@ -191,6 +191,14 @@ export default function DigitalTicketPage({ data, navigate }: Props) {
         </h1>
         <p style={{ color: 'var(--muted-foreground)' }}>{status === 'VALID' ? 'Your ticket has been confirmed. See you there.' : `This ticket is ${status.toLowerCase()}.`}</p>
       </div>
+
+      {data.emailDelivery && <div role="status" className="mb-5 w-full max-w-sm rounded-2xl border px-4 py-3 text-sm" style={{ borderColor: data.emailDelivery.failedCount ? 'rgba(245,158,11,.35)' : 'rgba(34,197,94,.3)', background: data.emailDelivery.failedCount ? 'rgba(245,158,11,.08)' : 'rgba(34,197,94,.08)', color: data.emailDelivery.failedCount ? '#fcd34d' : '#86efac' }}>
+        {data.emailDelivery.total === 0
+          ? data.emailDelivery.reason ?? 'Your ticket is confirmed, but email delivery could not be checked.'
+          : data.emailDelivery.failedCount
+          ? `${data.emailDelivery.sentCount} of ${data.emailDelivery.total} ticket emails sent. ${data.emailDelivery.reason ?? 'Please contact the organizer to resend the remaining tickets.'}`
+          : `${data.emailDelivery.sentCount} ticket${data.emailDelivery.sentCount === 1 ? '' : 's'} emailed to ${info.email}.`}
+      </div>}
 
       {/* Ticket card */}
       <div className="w-full max-w-sm">

@@ -134,6 +134,7 @@ export type TicketTier = {
   price: number
   description: string | null
   ticket_type?: 'consumable' | 'non_consumable'
+  consumable_amount?: number | null
   extra_info?: string | null
   expires_at?: string | null
   group_size?: number

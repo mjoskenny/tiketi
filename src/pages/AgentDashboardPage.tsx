@@ -4,6 +4,7 @@ import { signOut, supabase } from '../lib/supabase'
 import { formatPrice } from '../data/events'
 import { BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, DollarSignIcon, TicketIcon, UserIcon, ArrowLeftIcon, EyeIcon } from '../components/Icon'
 import type { Event, TicketTier } from '../lib/types'
+import { sendOrderTicketEmails } from '../lib/ticketEmail'
 
 type Section = 'overview' | 'events' | 'sell' | 'sales' | 'commissions' | 'wallet' | 'withdrawals' | 'notifications' | 'profile'
 type AgentSale = {
@@ -443,6 +444,10 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
 
     await loadAgentData()
     setSaving(false)
+    const emailDelivery = await sendOrderTicketEmails(orderId)
+    setMessage(emailDelivery.failedCount
+      ? `Sale completed; ${emailDelivery.sentCount} of ${emailDelivery.total} ticket emails sent. ${emailDelivery.reason ?? ''}`
+      : `${emailDelivery.sentCount} ticket${emailDelivery.sentCount === 1 ? '' : 's'} emailed to ${form.email}.`)
     const issuedTicket = completed[0]
     const event = activeAssignment.events as Event | undefined
     if (!event) {

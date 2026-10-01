@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import type { Ticket } from '../lib/types'
-import { DownloadIcon, ShareIcon, TicketIcon } from '../components/Icon'
+import { TicketIcon } from '../components/Icon'
 import { FEATURES } from '../lib/features'
 
 type Props = { navigate: (p: string) => void }
@@ -145,27 +145,6 @@ export default function MyTicketsPage({ navigate }: Props) {
       ticketGroupSize: tier?.group_size ?? 1,
     })
   }
-  const downloadTicket = (ticket: Ticket) => {
-    const link = document.createElement('a')
-    link.href = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(ticket.qr_code)}&size=512x512&format=svg`
-    link.download = `${ticketEvent(ticket).title ?? 'tiketi-ticket'}-qr.svg`
-    link.target = '_blank'
-    link.rel = 'noopener'
-    link.click()
-  }
-  const shareTicket = async (ticket: Ticket) => {
-    const title = ticketEvent(ticket).title ?? 'Tiketi ticket'
-    const text = `${title}\nTicket: ${ticket.qr_code}`
-    try {
-      if (navigator.share) await navigator.share({ title, text })
-      else if (navigator.clipboard) await navigator.clipboard.writeText(text)
-      setActionMessage(navigator.share ? 'Ticket share sheet opened.' : 'Ticket details copied.')
-    } catch {
-      setActionMessage('Ticket sharing was cancelled.')
-    }
-    window.setTimeout(() => setActionMessage(''), 2500)
-  }
-
   const requestRefund = async () => {
     if (!refundTicket || !refundReason.trim()) return
     setRefundBusy(true)
@@ -282,8 +261,6 @@ export default function MyTicketsPage({ navigate }: Props) {
                       <button onClick={() => viewTicket(ticket)} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold" style={{ background: 'var(--primary)', color: '#000' }}><TicketIcon size={13} />View ticket</button>
                       {canShowQr && <button onClick={() => setShowQR(showQR === ticket.id ? null : ticket.id)} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold" style={{ background: showQR === ticket.id ? 'var(--primary)' : 'var(--muted)', color: showQR === ticket.id ? '#000' : 'rgba(255,255,255,0.7)' }}>{showQR === ticket.id ? 'Hide QR' : 'View QR'}</button>}
                       {FEATURES.refunds && ticket.status === 'valid' && !eventCancelled && !eventEnded && !refund && <button onClick={() => setRefundTicket(ticket)} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold" style={{ background: 'rgba(239,68,68,0.12)', color: '#fca5a5' }}>Request refund</button>}
-                      <button onClick={() => downloadTicket(ticket)} aria-label="Download ticket QR" className="inline-flex items-center justify-center rounded-lg p-2" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}><DownloadIcon size={14} /></button>
-                      <button onClick={() => void shareTicket(ticket)} aria-label="Share ticket" className="inline-flex items-center justify-center rounded-lg p-2" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}><ShareIcon size={14} /></button>
                     </div>
                   </div>
 

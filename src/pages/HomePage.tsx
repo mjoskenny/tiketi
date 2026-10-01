@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { categories } from '../data/events'
-import { SearchIcon, XIcon, FilterIcon, TagIcon, SparkleIcon, CalendarIcon, MapPinIcon, ArrowRightIcon, CheckIcon } from '../components/Icon'
+import { SearchIcon, XIcon, FilterIcon, TagIcon, SparkleIcon, CalendarIcon, MapPinIcon, ArrowRightIcon } from '../components/Icon'
 import EventCard from '../components/EventCard'
+import OrganizerCard from '../components/OrganizerCard'
 import type { Event, Organizer } from '../lib/types'
 import { ORGANIZER_COVER_PLACEHOLDER } from '../lib/profileMedia'
 
@@ -103,33 +104,6 @@ function EmptySection({ message = 'No events available' }: { message?: string })
   return <div className="rounded-2xl border border-dashed border-white/10 px-5 py-8 text-center text-sm text-white/45">{message}</div>
 }
 
-function OrganizerProfileCard({ organizer, eventCount, coverImage, onClick }: { organizer: Organizer; eventCount: number; coverImage: string | null; onClick: () => void }) {
-  const organizerName = organizer.profiles?.full_name?.trim() || organizer.name
-  const initials = organizerName.slice(0, 1).toUpperCase()
-  const bannerImage = organizer.profiles?.cover_image ?? coverImage ?? ORGANIZER_COVER_PLACEHOLDER
-  const profileImage = organizer.profiles?.profile_image ?? organizer.profiles?.avatar_url ?? organizer.logo_url ?? null
-  const username = organizer.profiles?.username?.trim().replace(/^@/, '') || null
-  return (
-    <button onClick={onClick} className="home-organizer-card group relative flex min-w-[300px] flex-1 flex-col overflow-hidden rounded-2xl border text-left transition-all" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-      <span className="relative block h-32 w-full shrink-0" style={{ background: 'var(--muted)' }}>
-        {bannerImage && <img src={bannerImage} alt="" className="h-full w-full rounded-t-2xl object-cover opacity-75 transition-transform duration-300 group-hover:scale-105" />}
-        <span className="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
-        <span className="absolute bottom-0 left-4 translate-y-1/2">
-          {profileImage ? <img src={profileImage} alt={organizerName} className="h-14 w-14 rounded-full border-4 border-[var(--card)] object-cover" /> : <span className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-[var(--card)] text-lg font-semibold" style={{ background: 'rgba(249,112,21,0.9)', color: '#fff' }}>{initials}</span>}
-        </span>
-      </span>
-      <span className="flex min-w-0 flex-1 items-start gap-3 px-4 pb-4 pt-9">
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5 truncate text-base font-semibold text-white">{organizerName}{(organizer.verified || organizer.verification_status === 'verified') && <span className="event-verified inline-flex items-center gap-1" title="Verified organizer"><CheckIcon size={10} /></span>}</span>
-          {username && <span className="mt-0.5 block truncate text-xs" style={{ color: 'var(--muted-foreground)' }}>@{username}</span>}
-          <span className="mt-2 block truncate text-xs" style={{ color: 'var(--muted-foreground)' }}>{organizer.description || `${eventCount} published event${eventCount === 1 ? '' : 's'}`}</span>
-        </span>
-        <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-transform group-hover:translate-x-0.5" style={{ borderColor: 'var(--border)', color: 'var(--primary-light)' }} aria-hidden="true"><ArrowRightIcon size={15} /></span>
-      </span>
-    </button>
-  )
-}
-
 export default function HomePage({ navigate }: Props) {
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
@@ -141,7 +115,7 @@ export default function HomePage({ navigate }: Props) {
 
   useEffect(() => {
     const loadEvents = async () => {
-      const { data } = await supabase.from('events').select('*, tags, ticket_tiers(id, event_id, name, price, description, quantity, sold, created_at), organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles(id, full_name, username, profile_image, avatar_url, cover_image, email))').eq('status', 'published').order('created_at', { ascending: false }).limit(24)
+      const { data } = await supabase.from('events').select('*, tags, ticket_tiers(id, event_id, name, price, description, quantity, sold, created_at), organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email))').eq('status', 'published').order('created_at', { ascending: false }).limit(24)
       setEvents(data ?? [])
       setLoading(false)
     }
@@ -187,7 +161,7 @@ export default function HomePage({ navigate }: Props) {
   const activeEvents = liveEvents.slice(0, 6)
   const organizers = Array.from(
     events.reduce((groups, event) => {
-      if (!event.organizers) return groups
+      if (!event.organizers || !(event.organizers.verified || event.organizers.verification_status === 'verified')) return groups
       const current = groups.get(event.organizers.id)
       const organizerCover = event.organizers.profiles?.cover_image ?? null
       groups.set(event.organizers.id, { organizer: event.organizers, eventCount: (current?.eventCount ?? 0) + 1, coverImage: current?.coverImage ?? organizerCover })
@@ -247,7 +221,7 @@ export default function HomePage({ navigate }: Props) {
         {loading ? <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="rounded-2xl animate-pulse" style={{ background: 'var(--muted)', height: 288 }} />)}</div> : filtered.length > 0 ? <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">{filtered.map(ev => <EventCard key={ev.id} event={ev} compact onClick={() => navigate('event-detail', ev)} />)}</div> : <div className="flex flex-col items-center justify-center py-24 gap-4"><div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}><SearchIcon size={22} style={{ color: 'var(--muted-foreground)' }} /></div><p className="font-semibold text-lg" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>No events found</p><p className="text-sm text-center max-w-xs" style={{ color: 'var(--muted-foreground)' }}>{events.length === 0 ? 'No published events yet. Check back soon or create your own.' : 'Try different filters or search terms.'}</p>{events.length > 0 && <button onClick={() => { setSearch(''); setActiveCategory('All'); setTimeFilter('all'); setPriceFilter('all') }} className="gradient-action px-5 py-2.5 rounded-xl text-sm font-semibold transition-all">Clear filters</button>}</div>}
         <div className="mt-6 flex justify-center"><button onClick={() => navigate('events')} className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--primary-light)' }}>View all events<ArrowRightIcon size={15} /></button></div>
       </section>
-      {!loading && organizers.length > 0 && <section><SectionHeading title="Meet the organizers" subtitle="Discover the people behind the events" /><div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>{organizers.map(([id, item]) => <OrganizerProfileCard key={id} organizer={item.organizer} eventCount={item.eventCount} coverImage={item.coverImage} onClick={() => navigate('organizer-profile', item.organizer)} />)}</div><div className="mt-6 flex justify-center"><button onClick={() => navigate('explore-organizers')} className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--primary-light)' }}>View all organizers<ArrowRightIcon size={15} /></button></div></section>}
+      {!loading && organizers.length > 0 && <section><SectionHeading title="Meet the organizers" subtitle="Discover the people behind the events" /><div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>{organizers.map(([id, item]) => <OrganizerCard key={id} organizer={item.organizer} eventCount={item.eventCount} coverImage={item.coverImage ?? ORGANIZER_COVER_PLACEHOLDER} onClick={() => navigate('organizer-profile', item.organizer)} />)}</div><div className="mt-6 flex justify-center"><button onClick={() => navigate('explore-organizers')} className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--primary-light)' }}>View all organizers<ArrowRightIcon size={15} /></button></div></section>}
       {!loading && <section className="relative rounded-3xl overflow-hidden p-8 md:p-10" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}><div className="absolute inset-0" aria-hidden style={{ background: 'radial-gradient(ellipse 60% 80% at 0% 50%, rgba(158,210,75,0.14) 0%, transparent 70%)' }} /><div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6"><div className="max-w-lg"><div className="flex items-center gap-2 mb-3"><SparkleIcon size={16} style={{ color: 'var(--accent)' }} /><span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--accent)', letterSpacing: '0.1em' }}>For Organizers</span></div><h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ letterSpacing: '-0.02em' }}>Have an event?</h2><p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.58)' }}>Create, sell and manage your tickets in one place. Reach thousands of people across Burundi and beyond.</p></div><div className="flex flex-col sm:flex-row gap-3 flex-shrink-0"><button onClick={() => navigate('auth-organizer')} className="gradient-action px-6 py-3 rounded-xl text-sm font-bold transition-all">Start for free</button><button onClick={() => navigate('organizers')} className="px-6 py-3 rounded-xl text-sm font-semibold transition-all" style={{ background: 'rgba(255,255,255,0.07)', border: '0', color: 'rgba(255,255,255,0.8)' }}>Learn more</button></div></div></section>}
     </div>
   </div>
