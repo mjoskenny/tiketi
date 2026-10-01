@@ -59,7 +59,7 @@ type Page =
   | 'refunds'
 
 const NO_NAV: Set<Page> = new Set(['checkin', 'auth-customer', 'auth-organizer', 'dashboard', 'agent-dashboard', 'admin-dashboard', 'agent-ticket'])
-const EVENTS_PLATFORM_PAGES: Set<Page> = new Set(['home', 'discover', 'events', 'event-detail', 'checkout', 'ticket', 'my-tickets', 'profile', 'notifications', 'favorites', 'organizer-profile'])
+const EVENTS_PLATFORM_PAGES: Set<Page> = new Set(['discover', 'events', 'event-detail', 'checkout', 'ticket', 'my-tickets', 'profile', 'notifications', 'favorites', 'organizer-profile'])
 const MARKETPLACE_PAGES: Set<Page> = new Set(['home', 'discover', 'events', 'event-detail', 'organizers', 'explore-organizers', 'organizer-profile'])
 
 type SocialLinkSetting = {

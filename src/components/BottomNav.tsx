@@ -53,7 +53,7 @@ export default function BottomNav({ current, navigate }: Props) {
   }, [])
 
   const items = [
-    { key: 'home', label: 'Discover', Icon: HomeIcon2 },
+    { key: 'discover', label: 'Discover', Icon: HomeIcon2 },
     { key: 'events', label: 'Events', Icon: SearchIcon },
     ...(user
       ? hasPendingInvitation
@@ -100,7 +100,7 @@ export default function BottomNav({ current, navigate }: Props) {
           return (
             <button
               key={key}
-              onClick={() => user || key === 'home' || key === 'events' ? navigate(key) : navigate('auth-customer')}
+              onClick={() => user || key === 'discover' || key === 'events' ? navigate(key) : navigate('auth-customer')}
               className={`relative flex flex-col items-center gap-1 rounded-2xl px-3 py-2 transition-all ${isCenter ? 'z-10 -translate-y-7 justify-self-center' : ''}`}
               style={{
                 color: isCenter || active ? '#fff' : 'rgba(255,255,255,0.6)',

@@ -9,19 +9,6 @@ import { ORGANIZER_COVER_PLACEHOLDER } from '../lib/profileMedia'
 type Props = { navigate: (p: string, extra?: unknown) => void }
 type QuickFilter = 'all' | 'today' | 'tomorrow' | 'weekend'
 
-function sortUpcomingFirst(events: Event[]) {
-  return [...events].sort((a, b) => {
-    const aTime = new Date(`${a.date}T${a.end_time || a.time || '23:59:59'}`).getTime()
-    const bTime = new Date(`${b.date}T${b.end_time || b.time || '23:59:59'}`).getTime()
-    const aUpcoming = aTime >= Date.now()
-    const bUpcoming = bTime >= Date.now()
-
-    if (aUpcoming !== bUpcoming) return aUpcoming ? -1 : 1
-    if (aUpcoming) return aTime - bTime
-    return bTime - aTime
-  })
-}
-
 function isToday(d: string) {
   const today = new Date(); const ed = new Date(d)
   return ed.toDateString() === today.toDateString()
@@ -104,7 +91,7 @@ function FeaturedCard({ event, onClick }: { event: Event; onClick: () => void })
           <span className="flex items-center gap-1"><MapPinIcon size={11} /> {event.venue}</span>
         </div>
         <div className="flex items-center justify-between mt-3">
-          <span className="text-sm font-bold" style={{ color: 'var(--primary)' }}>{minPrice === 0 ? 'Free' : `From ${fmtPrice(minPrice)}`}</span>
+          <span className="text-sm font-bold" style={{ color: '#dfff9a' }}>{minPrice === 0 ? 'Free' : `From ${fmtPrice(minPrice)}`}</span>
           <span className="text-xs font-semibold px-3 py-1.5 rounded-lg" style={{ background: 'rgba(249,112,21,0.16)', color: '#ffad78', border: '1px solid rgba(249,112,21,0.35)' }}>Get tickets</span>
         </div>
       </div>
@@ -122,20 +109,18 @@ function OrganizerProfileCard({ organizer, eventCount, coverImage, onClick }: { 
   const bannerImage = organizer.profiles?.cover_image ?? coverImage ?? ORGANIZER_COVER_PLACEHOLDER
   const profileImage = organizer.profiles?.profile_image ?? organizer.profiles?.avatar_url ?? organizer.logo_url ?? null
   const username = organizer.profiles?.username?.trim().replace(/^@/, '') || null
-  const isVerified = organizer.verified || organizer.verification_status === 'verified'
   return (
     <button onClick={onClick} className="home-organizer-card group relative flex min-w-[300px] flex-1 flex-col overflow-hidden rounded-2xl border text-left transition-all" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
       <span className="relative block h-32 w-full shrink-0" style={{ background: 'var(--muted)' }}>
         {bannerImage && <img src={bannerImage} alt="" className="h-full w-full rounded-t-2xl object-cover opacity-75 transition-transform duration-300 group-hover:scale-105" />}
         <span className="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
-        <span className="verified-profile-avatar absolute bottom-0 left-4 z-10 h-14 w-14 translate-y-1/2">
-          {profileImage ? <img src={profileImage} alt={organizerName} className="h-full w-full rounded-full border-4 border-[var(--card)] object-cover" /> : <span className="flex h-full w-full items-center justify-center rounded-full border-4 border-[var(--card)] text-lg font-semibold" style={{ background: 'rgba(249,112,21,0.9)', color: '#fff' }}>{initials}</span>}
-          {isVerified && <span className="verified-profile-badge" aria-label="Verified organizer"><CheckIcon size={11} /></span>}
+        <span className="absolute bottom-0 left-4 translate-y-1/2">
+          {profileImage ? <img src={profileImage} alt={organizerName} className="h-14 w-14 rounded-full border-4 border-[var(--card)] object-cover" /> : <span className="flex h-14 w-14 items-center justify-center rounded-full border-4 border-[var(--card)] text-lg font-semibold" style={{ background: 'rgba(249,112,21,0.9)', color: '#fff' }}>{initials}</span>}
         </span>
       </span>
-      <span className="flex min-h-[5.5rem] min-w-0 flex-1 items-start gap-3 px-4 pb-4 pl-[5.25rem] pt-4">
+      <span className="flex min-w-0 flex-1 items-start gap-3 px-4 pb-4 pt-9">
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-base font-semibold text-white">{organizerName}</span>
+          <span className="flex items-center gap-1.5 truncate text-base font-semibold text-white">{organizerName}{(organizer.verified || organizer.verification_status === 'verified') && <span className="event-verified inline-flex items-center gap-1" title="Verified organizer"><CheckIcon size={10} /></span>}</span>
           {username && <span className="mt-0.5 block truncate text-xs" style={{ color: 'var(--muted-foreground)' }}>@{username}</span>}
           <span className="mt-2 block truncate text-xs" style={{ color: 'var(--muted-foreground)' }}>{organizer.description || `${eventCount} published event${eventCount === 1 ? '' : 's'}`}</span>
         </span>
@@ -148,8 +133,6 @@ function OrganizerProfileCard({ organizer, eventCount, coverImage, onClick }: { 
 export default function HomePage({ navigate }: Props) {
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState('')
-  const [retryToken, setRetryToken] = useState(0)
   const [search, setSearch] = useState('')
   const [timeFilter, setTimeFilter] = useState<QuickFilter>('all')
   const [activeCategory, setActiveCategory] = useState('All')
@@ -158,10 +141,7 @@ export default function HomePage({ navigate }: Props) {
 
   useEffect(() => {
     const loadEvents = async () => {
-      setLoading(true)
-      setLoadError('')
-      const { data, error } = await supabase.from('events').select('*, tags, ticket_tiers(id, event_id, name, price, description, ticket_type, extra_info, expires_at, group_size, quantity, sold, created_at), organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email))').eq('status', 'published').order('created_at', { ascending: false }).limit(24)
-      if (error) { setLoadError(error.message); setLoading(false); return }
+      const { data } = await supabase.from('events').select('*, tags, ticket_tiers(id, event_id, name, price, description, quantity, sold, created_at), organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles(id, full_name, username, profile_image, avatar_url, cover_image, email))').eq('status', 'published').order('created_at', { ascending: false }).limit(24)
       setEvents(data ?? [])
       setLoading(false)
     }
@@ -183,14 +163,14 @@ export default function HomePage({ navigate }: Props) {
       void supabase.removeChannel(eventsChannel)
       void supabase.removeChannel(profilesChannel)
     }
-  }, [retryToken])
+  }, [])
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000)
     return () => window.clearInterval(timer)
   }, [])
 
-  const filtered = sortUpcomingFirst(events.filter(e => {
+  const filtered = events.filter(e => {
     const matchCat = activeCategory === 'All' || e.category === activeCategory
     const q = search.toLowerCase()
     const matchSearch = !q || e.title.toLowerCase().includes(q) || e.venue.toLowerCase().includes(q) || e.category.toLowerCase().includes(q)
@@ -198,9 +178,9 @@ export default function HomePage({ navigate }: Props) {
     const minPrice = e.ticket_tiers?.length ? Math.min(...e.ticket_tiers.map(t => t.price)) : 0
     const matchPrice = priceFilter === 'all' || (priceFilter === 'free' && minPrice === 0) || (priceFilter === 'paid' && minPrice > 0)
     return matchCat && matchSearch && matchTime && matchPrice
-  }))
-  const liveEvents = filtered.filter(e => new Date(`${e.date}T${e.end_time || '23:59:59'}`).getTime() > now)
-  const featured = liveEvents.filter(e => e.is_featured).slice(0, 6)
+  })
+  const liveEvents = filtered.filter(e => new Date(`${e.date}T${e.time || '00:00'}`).getTime() > now)
+  const featured = filtered.filter(e => e.is_featured).slice(0, 6)
   const happeningToday = filtered.filter(e => isToday(e.date)).slice(0, 4)
   const weekendEvents = filtered.filter(e => isWeekend(e.date)).slice(0, 4)
   const freeEvents = filtered.filter(e => !e.ticket_tiers?.length || Math.min(...e.ticket_tiers.map(t => t.price)) === 0).slice(0, 4)
@@ -223,8 +203,9 @@ export default function HomePage({ navigate }: Props) {
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pt-12 pb-10 md:pt-20 md:pb-16">
         <div className="home-hero-content max-w-4xl mx-auto">
           <div className="text-center mb-8 md:mb-10">
-            <h1 className="hero-title whitespace-nowrap">Find <span className="hero-gradient-text">events nearby</span></h1>
-            <p className="hero-copy">Discover concerts, cultural nights, community events, and unforgettable experiences across Burundi.</p>
+            <p className="hero-kicker">Discover what is happening near you</p>
+            <h1 className="hero-title">Find <span>events</span> nearby</h1>
+            <p className="hero-copy">Discover live experiences, artists, and unforgettable moments all in one place.</p>
           </div>
           <div className="relative mb-4 rounded-[1.35rem] search-shell">
             <div className="absolute left-5 top-1/2 -translate-y-1/2" style={{ color: 'rgba(255,255,255,0.54)' }}><SearchIcon size={19} /></div>
@@ -263,8 +244,8 @@ export default function HomePage({ navigate }: Props) {
       </>}
       <section>
         <div className="flex items-end justify-between gap-4 mb-5"><div><h2 className="text-xl font-bold" style={{ letterSpacing: '-0.025em' }}>{anyActive ? 'Search results' : 'All events'}</h2><p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>{loading ? 'Loading...' : `${filtered.length} event${filtered.length !== 1 ? 's' : ''} to explore`}</p></div>{anyActive && !loading && <button onClick={() => { setSearch(''); setActiveCategory('All'); setTimeFilter('all'); setPriceFilter('all') }} className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full" style={{ color: 'var(--accent)', background: 'rgba(199,243,107,0.1)', border: '0' }}><XIcon size={11} />Clear all</button>}</div>
-        {loading ? <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="rounded-2xl animate-pulse" style={{ background: 'var(--muted)', height: 288 }} />)}</div> : loadError ? <div className="flex flex-col items-center justify-center py-24 gap-4"><p className="font-semibold text-lg">Unable to load events</p><p className="max-w-sm text-center text-sm" style={{ color: 'var(--muted-foreground)' }}>{loadError}</p><button onClick={() => setRetryToken(current => current + 1)} className="px-5 py-2.5 rounded-xl text-sm font-semibold" style={{ background: 'var(--primary)', color: '#000' }}>Try again</button></div> : filtered.length > 0 ? <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">{filtered.map(ev => <EventCard key={ev.id} event={ev} compact onClick={() => navigate('event-detail', ev)} />)}</div> : <div className="flex flex-col items-center justify-center py-24 gap-4"><div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}><SearchIcon size={22} style={{ color: 'var(--muted-foreground)' }} /></div><p className="font-semibold text-lg" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>No events found</p><p className="text-sm text-center max-w-xs" style={{ color: 'var(--muted-foreground)' }}>{events.length === 0 ? 'No published events yet. Check back soon or create your own.' : 'Try different filters or search terms.'}</p>{events.length > 0 && <button onClick={() => { setSearch(''); setActiveCategory('All'); setTimeFilter('all'); setPriceFilter('all') }} className="gradient-action px-5 py-2.5 rounded-xl text-sm font-semibold transition-all">Clear filters</button>}</div>}
-        <div className="mt-6 flex justify-center"><button onClick={() => navigate('discover')} className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--primary-light)' }}>View all events<ArrowRightIcon size={15} /></button></div>
+        {loading ? <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="rounded-2xl animate-pulse" style={{ background: 'var(--muted)', height: 288 }} />)}</div> : filtered.length > 0 ? <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">{filtered.map(ev => <EventCard key={ev.id} event={ev} compact onClick={() => navigate('event-detail', ev)} />)}</div> : <div className="flex flex-col items-center justify-center py-24 gap-4"><div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}><SearchIcon size={22} style={{ color: 'var(--muted-foreground)' }} /></div><p className="font-semibold text-lg" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>No events found</p><p className="text-sm text-center max-w-xs" style={{ color: 'var(--muted-foreground)' }}>{events.length === 0 ? 'No published events yet. Check back soon or create your own.' : 'Try different filters or search terms.'}</p>{events.length > 0 && <button onClick={() => { setSearch(''); setActiveCategory('All'); setTimeFilter('all'); setPriceFilter('all') }} className="gradient-action px-5 py-2.5 rounded-xl text-sm font-semibold transition-all">Clear filters</button>}</div>}
+        <div className="mt-6 flex justify-center"><button onClick={() => navigate('events')} className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--primary-light)' }}>View all events<ArrowRightIcon size={15} /></button></div>
       </section>
       {!loading && organizers.length > 0 && <section><SectionHeading title="Meet the organizers" subtitle="Discover the people behind the events" /><div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>{organizers.map(([id, item]) => <OrganizerProfileCard key={id} organizer={item.organizer} eventCount={item.eventCount} coverImage={item.coverImage} onClick={() => navigate('organizer-profile', item.organizer)} />)}</div><div className="mt-6 flex justify-center"><button onClick={() => navigate('explore-organizers')} className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--primary-light)' }}>View all organizers<ArrowRightIcon size={15} /></button></div></section>}
       {!loading && <section className="relative rounded-3xl overflow-hidden p-8 md:p-10" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}><div className="absolute inset-0" aria-hidden style={{ background: 'radial-gradient(ellipse 60% 80% at 0% 50%, rgba(158,210,75,0.14) 0%, transparent 70%)' }} /><div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6"><div className="max-w-lg"><div className="flex items-center gap-2 mb-3"><SparkleIcon size={16} style={{ color: 'var(--accent)' }} /><span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--accent)', letterSpacing: '0.1em' }}>For Organizers</span></div><h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ letterSpacing: '-0.02em' }}>Have an event?</h2><p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.58)' }}>Create, sell and manage your tickets in one place. Reach thousands of people across Burundi and beyond.</p></div><div className="flex flex-col sm:flex-row gap-3 flex-shrink-0"><button onClick={() => navigate('auth-organizer')} className="gradient-action px-6 py-3 rounded-xl text-sm font-bold transition-all">Start for free</button><button onClick={() => navigate('organizers')} className="px-6 py-3 rounded-xl text-sm font-semibold transition-all" style={{ background: 'rgba(255,255,255,0.07)', border: '0', color: 'rgba(255,255,255,0.8)' }}>Learn more</button></div></div></section>}
