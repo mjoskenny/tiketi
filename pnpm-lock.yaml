@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@rolldown/binding-win32-x64-msvc':
+        specifier: ^1.2.7
+        version: 1.2.12
       '@supabase/supabase-js':
         specifier: ^2.115.0
         version: 2.115.0
@@ -223,6 +226,12 @@ packages:
 
   '@rolldown/binding-win32-x64-msvc@1.0.0-rc.12':
     resolution: {integrity: sha512-PyqoipaswDLAZtot351MLhrlrh6lcZPo2LSYE+VDxbVk24LVKAGOuE4hb8xZQmrPAuEtTZW8E6D2zc5EUZX4Lw==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    cpu: [x64]
+    os: [win32]
+
+  '@rolldown/binding-win32-x64-msvc@1.2.12':
+    resolution: {integrity: sha512-WIw2haVKwjuYdXkHaoC0mF8Le71TuCBxjrdKqLbJGctbBABj+ClfmNvtbOnzpq3RokNo5+V1qhtSzJyXorsklQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [win32]
@@ -843,6 +852,8 @@ snapshots:
 
   '@rolldown/binding-win32-x64-msvc@1.0.0-rc.12':
     optional: true
+
+  '@rolldown/binding-win32-x64-msvc@1.2.12': {}
 
   '@rolldown/pluginutils@1.0.0-rc.12': {}
 
