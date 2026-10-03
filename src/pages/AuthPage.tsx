@@ -48,7 +48,7 @@ function Field({ Icon, type, placeholder, value, onChange, right }: {
 }) {
   return (
     <div className="relative">
-      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--muted-foreground)' }}>
+      <div className="auth-field-icon absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--muted-foreground)' }}>
         <Icon size={14} />
       </div>
       <input type={type} placeholder={placeholder} value={value} onChange={onChange}
@@ -133,7 +133,7 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
   }
 
   return (
-    <div className="min-h-screen flex" style={{ background: 'radial-gradient(circle at 76% 12%, rgba(249,112,21,0.11), transparent 28%), var(--background)', color: 'var(--foreground)' }}>
+    <div className={`min-h-screen flex ${mode === 'customer' ? 'attendee-auth-theme' : ''}`} style={{ background: 'radial-gradient(circle at 76% 12%, rgba(249,112,21,0.11), transparent 28%), var(--background)', color: 'var(--foreground)' }}>
 
       {/* ── Left brand panel ── */}
       <div className="hidden lg:flex flex-col w-[46%] relative overflow-hidden">
@@ -236,9 +236,9 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
           {/* Heading */}
           {view === 'reset' ? (
             <div className="mb-5">
-              <button onClick={() => switchView('signin')} className="text-sm flex items-center gap-1.5 mb-4"
+              <button type="button" onClick={() => switchView('signin')} aria-label="Back to sign in" title="Back to sign in" className="mb-4 flex h-10 w-10 items-center justify-center rounded-full"
                 style={{ color: 'var(--muted-foreground)' }}>
-                <ArrowLeftIcon size={13} /> Back to sign in
+                <ArrowLeftIcon size={18} />
               </button>
               <h1 className="text-2xl font-bold mb-1" style={{ fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.02em' }}>Reset password</h1>
               <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>We&apos;ll email you a link to reset your password.</p>

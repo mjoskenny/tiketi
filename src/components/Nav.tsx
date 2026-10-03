@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { MenuIcon, XIcon, TicketIcon, UserIcon, LogOutIcon, BarChartIcon, BellIcon, HeartIcon } from './Icon'
 import { useAuth } from '../context/AuthContext'
 import type { Profile } from '../lib/types'
+import { LanguageSwitcher } from './LocaleContent'
 
 type NavProps = {
   current: string
@@ -68,15 +69,18 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
     navigate('home')
   }
 
-  const navLink = (label: string, page: string) => (
+  const navLink = (label: string, page: string) => {
+    const active = current === page || (page === 'discover' && current === 'home')
+    return (
     <button key={page} onClick={() => navigate(page)}
-      className={`nav-link text-sm font-bold transition-colors ${current === page ? 'is-active' : ''}`}
-      style={{ color: current === page ? '#fff' : 'rgba(255,255,255,0.78)' }}
+      className={`nav-link text-sm font-bold transition-colors ${active ? 'is-active' : ''}`}
+      style={{ color: active ? '#fff' : 'rgba(255,255,255,0.78)' }}
       onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
-      onMouseLeave={e => (e.currentTarget.style.color = current === page ? '#fff' : 'rgba(255,255,255,0.78)')}>
+      onMouseLeave={e => (e.currentTarget.style.color = active ? '#fff' : 'rgba(255,255,255,0.78)')}>
       {label}
     </button>
-  )
+    )
+  }
 
   return (
     <>
@@ -97,6 +101,7 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
           </div>
 
           <div className="hidden md:flex items-center gap-2.5">
+            <LanguageSwitcher bare />
             {isLoggedIn ? (
               <>
                 {hasPendingInvitation && (
@@ -210,10 +215,17 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
             )}
           </div>
 
-          <button className="md:hidden p-2 rounded-xl" style={{ color: 'var(--foreground)' }}
-            onClick={() => setMenuOpen(v => !v)}>
-            {menuOpen ? <XIcon size={20} /> : <MenuIcon size={20} />}
-          </button>
+          <div className="md:hidden flex items-center gap-2">
+            <LanguageSwitcher bare />
+            <button type="button" aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={menuOpen}
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white shadow-lg backdrop-blur-xl transition-all duration-300 hover:border-white/20 hover:bg-white/10 active:scale-90"
+              style={{ boxShadow: menuOpen ? '0 0 22px rgba(249,112,21,0.2)' : '0 6px 18px rgba(0,0,0,0.18)' }}
+              onClick={() => setMenuOpen(v => !v)}>
+              <span className={`transition-transform duration-300 ease-out ${menuOpen ? 'rotate-90' : 'rotate-0'}`}>
+                {menuOpen ? <XIcon size={22} /> : <MenuIcon size={22} />}
+              </span>
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -239,6 +251,11 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
                   {label}
                 </button>
               ))}
+              <button onClick={() => { navigate('auth-organizer'); setMenuOpen(false) }}
+                className="gradient-action mt-2 rounded-xl px-4 py-3 text-sm font-bold text-center transition-all active:scale-[0.98]"
+                style={{ boxShadow: '0 4px 18px rgba(249,112,21,0.2)' }}>
+                Create Event
+              </button>
               {hasPendingInvitation && (
                 <button onClick={() => { navigate('dashboard'); setMenuOpen(false) }}
                   className="mt-2 text-left py-3 px-3 rounded-xl text-sm font-bold"
@@ -268,18 +285,11 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
                     </button>
                   </>
                 ) : (
-                  <>
-                    <button onClick={() => { navigate('auth-customer'); setMenuOpen(false) }}
-                      className="py-3 rounded-xl text-sm font-medium text-center"
-                      style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>
-                      Sign in
-                    </button>
-                    <button onClick={() => { navigate('auth-organizer'); setMenuOpen(false) }}
-                      className="py-3 rounded-xl text-sm font-semibold text-center"
-                      style={{ background: 'var(--primary)', color: '#fff' }}>
-                      Create Event
-                    </button>
-                  </>
+                  <button onClick={() => { navigate('auth-customer'); setMenuOpen(false) }}
+                    className="py-3 rounded-xl text-sm font-medium text-center"
+                    style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>
+                    Sign in
+                  </button>
                 )}
               </div>
             </div>

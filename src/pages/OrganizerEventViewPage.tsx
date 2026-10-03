@@ -5,6 +5,7 @@ import type { Event, Order, Ticket } from '../lib/types'
 import { supabase } from '../lib/supabase'
 import { sendOrderTicketEmails } from '../lib/ticketEmail'
 import CheckInPanel from './CheckInPage'
+import { currentLocale, formatLocaleDate } from '../lib/locale'
 
 type Props = {
   event: Event | null
@@ -23,7 +24,7 @@ type Props = {
 
 function formatDate(value: string) {
   if (!value) return 'Date to be announced'
-  return new Date(`${value}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  return formatLocaleDate(`${value}T12:00:00`, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 }
 
 function Detail({ Icon, label, value }: { Icon: React.FC<{ size?: number }>; label: string; value: string }) {
@@ -41,7 +42,7 @@ function TrafficChart({ orders }: { orders: Order[] }) {
     const nextDay = new Date(day)
     nextDay.setDate(day.getDate() + 1)
     return {
-      label: day.toLocaleDateString('en', { weekday: 'short' }),
+      label: day.toLocaleDateString(currentLocale(), { weekday: 'short' }),
       count: orders.filter(order => {
         const created = new Date(order.created_at)
         return created >= day && created < nextDay
@@ -96,13 +97,18 @@ export default function OrganizerEventViewPage({ event, orders, tickets, agentOr
   const [savingSale, setSavingSale] = useState(false)
   if (!event) {
     return <div className="mx-auto max-w-5xl py-14 text-center">
-      <button onClick={onBack} className="mb-6 inline-flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={16} /> Back to events</button>
+      <button type="button" onClick={onBack} aria-label="Back to events" title="Back to events" className="mb-6 flex h-10 w-10 items-center justify-center rounded-full" style={{ color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={18} /></button>
       <p className="font-bold">{loading ? 'Loading event…' : 'Event not found'}</p>
       {!loading && <p className="mt-2 text-sm" style={{ color: 'var(--muted-foreground)' }}>This event may have been removed or you may not have access to it.</p>}
     </div>
   }
 
   const tiers = event.ticket_tiers ?? []
+  const eventTags = Array.isArray(event.tags)
+    ? event.tags
+    : typeof event.tags === 'string'
+      ? event.tags.split(',').map(tag => tag.trim()).filter(Boolean)
+      : []
   const eventOrders = orders.filter(order => order.event_id === event.id)
   const confirmedOrders = eventOrders.filter(order => order.status === 'confirmed')
   const eventTickets = tickets.filter(ticket => ticket.event_id === event.id)
@@ -205,7 +211,7 @@ export default function OrganizerEventViewPage({ event, orders, tickets, agentOr
   return <>
   <div className="mx-auto w-full max-w-6xl space-y-5 pb-10">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <button onClick={onBack} className="inline-flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-semibold transition hover:bg-white/5" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={16} /> All events</button>
+      <button type="button" onClick={onBack} aria-label="Back to all events" title="Back to all events" className="flex h-10 w-10 items-center justify-center rounded-xl border transition hover:bg-white/5" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={18} /></button>
       <div className="flex flex-wrap gap-2">
         {event.status === 'published' && <button onClick={() => navigate('event-detail', event)} className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition hover:bg-white/5" style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}>Preview public page</button>}
         {canCheckIn && event.status === 'published' && <button type="button" onClick={() => setCheckInOpen(true)} className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition hover:bg-white/5" style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}><CheckIcon size={15} /> Check in guests</button>}
@@ -296,7 +302,7 @@ export default function OrganizerEventViewPage({ event, orders, tickets, agentOr
             <Detail Icon={UsersIcon} label="Capacity" value={`${event.capacity.toLocaleString()} guests`} />
           </div>
           {event.description && <div className="mt-5 border-t pt-5" style={{ borderColor: 'var(--border)' }}><h3 className="text-sm font-bold">About this event</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-6" style={{ color: 'var(--muted-foreground)' }}>{event.description}</p></div>}
-          {!!event.tags?.length && <div className="mt-5 flex flex-wrap gap-2">{event.tags.map(tag => <span key={tag} className="rounded-full border px-3 py-1 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>#{tag}</span>)}</div>}
+          {!!eventTags.length && <div className="mt-5 flex flex-wrap gap-2">{eventTags.map(tag => <span key={tag} className="rounded-full border px-3 py-1 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>#{tag}</span>)}</div>}
         </section>
 
         <section className="rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>

@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { ArrowLeftIcon, CheckIcon, DownloadIcon, ShareIcon, TicketIcon } from '../components/Icon'
+import { ArrowLeftIcon, CheckIcon, DownloadIcon, ShareNodesIcon, TicketIcon } from '../components/Icon'
+import { hasEventEnded } from '../lib/eventTime'
+import { formatLocaleDate, formatLocaleDateTime } from '../lib/locale'
 
 type TicketInfo = { name: string; phone: string; email: string }
 type TicketData = { event: Record<string, unknown>; info: TicketInfo; tickets?: Array<{ qr_code: string; holder_name?: string | null; holder_email?: string | null; ticket_tier_id?: string; created_at?: string }>; ticket?: string | null; ticketStatus?: 'valid' | 'used' | 'cancelled'; ticketType?: string; ticketKind?: 'consumable' | 'non_consumable'; ticketPrice?: number; purchasedAt?: string; ticketExtraInfo?: string; ticketExpiry?: string; ticketGroupSize?: number; emailDelivery?: { sentCount: number; total: number; failedCount: number; reason?: string } }
@@ -20,11 +22,6 @@ async function imageDataUrl(url: string) {
   }
 }
 
-function eventHasEnded(date: string, time: string, endTime?: string | null) {
-  const timestamp = new Date(`${date}T${endTime || time || '23:59:59'}`).getTime()
-  return Number.isFinite(timestamp) && timestamp < Date.now()
-}
-
 export default function DigitalTicketPage({ data, navigate }: Props) {
   const { event, info } = data
   const [exporting, setExporting] = useState(false)
@@ -37,18 +34,18 @@ export default function DigitalTicketPage({ data, navigate }: Props) {
   const ticketNumber = data.ticket ?? ''
   const ticketType = data.ticketType ?? 'REGULAR'
   const ticketPrice = data.ticketPrice ?? 0
-  const purchasedAt = data.purchasedAt ? new Date(data.purchasedAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '—'
+  const purchasedAt = data.purchasedAt ? formatLocaleDateTime(data.purchasedAt, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
   const ticketExtraInfo = data.ticketExtraInfo?.trim() || ''
-  const ticketExpiry = data.ticketExpiry ? new Date(`${data.ticketExpiry}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
+  const ticketExpiry = data.ticketExpiry ? formatLocaleDate(`${data.ticketExpiry}T00:00:00`, { day: 'numeric', month: 'short', year: 'numeric' }) : ''
   const ticketGroupSize = data.ticketGroupSize && data.ticketGroupSize > 1 ? data.ticketGroupSize : null
-  const status = event.status === 'cancelled' || data.ticketStatus === 'cancelled' ? 'CANCELLED' : data.ticketStatus === 'used' ? 'USED' : eventHasEnded(date, time, event.end_time) ? 'EXPIRED' : 'VALID'
+  const status = event.status === 'cancelled' || data.ticketStatus === 'cancelled' ? 'CANCELLED' : data.ticketStatus === 'used' ? 'USED' : hasEventEnded(date, time, event.end_time) ? 'EXPIRED' : 'VALID'
   const statusColor = status === 'VALID' ? '#15803d' : '#b91c1c'
 
   const createPdf = async (ticketOverride?: { qr_code: string; holder_name?: string | null; holder_email?: string | null; created_at?: string }) => {
     const { jsPDF } = await import('jspdf')
     const pdfTicketNumber = ticketOverride?.qr_code ?? ticketNumber
     const pdfHolderName = ticketOverride?.holder_name ?? info.name
-    const pdfPurchasedAt = ticketOverride?.created_at ? new Date(ticketOverride.created_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : purchasedAt
+    const pdfPurchasedAt = ticketOverride?.created_at ? formatLocaleDateTime(ticketOverride.created_at, { dateStyle: 'medium', timeStyle: 'short' }) : purchasedAt
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [280, 140] })
     const cover = image ? await imageDataUrl(image) : null
     const qr = pdfTicketNumber ? await imageDataUrl(`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(pdfTicketNumber)}&size=420x420&format=png`) : null
@@ -176,8 +173,8 @@ export default function DigitalTicketPage({ data, navigate }: Props) {
     <div className="digital-ticket-page min-h-screen pt-24 pb-16 flex flex-col items-center justify-center px-4"
       style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
 
-      <button type="button" onClick={() => navigate('my-tickets')} className="digital-ticket-back flex items-center gap-2 text-sm font-semibold" aria-label="Back to my tickets">
-        <ArrowLeftIcon size={16} /> Back to my tickets
+      <button type="button" onClick={() => navigate('my-tickets')} className="digital-ticket-back mb-8 flex h-11 w-11 items-center justify-center rounded-full text-sm font-semibold" aria-label="Back to my tickets" title="Back to my tickets">
+        <ArrowLeftIcon size={18} />
       </button>
 
       {/* Success banner */}
@@ -275,7 +272,7 @@ export default function DigitalTicketPage({ data, navigate }: Props) {
       <div className="flex gap-3 mt-8 w-full max-w-sm">
         <button onClick={() => void sharePdf()} disabled={exporting} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold"
           style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: 'var(--muted-foreground)' }}>
-          <ShareIcon size={14} /> Share
+          <ShareNodesIcon size={14} /> Share
         </button>
         <button onClick={() => void downloadPdf()} disabled={exporting} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold"
           style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}>

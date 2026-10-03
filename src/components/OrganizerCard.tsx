@@ -1,5 +1,8 @@
-import { ArrowRightIcon, CheckIcon } from './Icon'
+import { useState } from 'react'
+import { ArrowRightIcon, CheckIcon, ShareNodesIcon } from './Icon'
 import type { Organizer } from '../lib/types'
+import { organizerShareUrl } from '../lib/share'
+import ShareDialog from './ShareDialog'
 
 export type OrganizerCardProps = {
   organizer: Organizer
@@ -10,19 +13,21 @@ export type OrganizerCardProps = {
 }
 
 export default function OrganizerCard({ organizer, eventCount, coverImage, onClick, directory = false }: OrganizerCardProps) {
+  const [shareOpen, setShareOpen] = useState(false)
   const name = organizer.profiles?.full_name?.trim() || organizer.name
   const initials = name.slice(0, 1).toUpperCase()
   const username = organizer.profiles?.username?.trim().replace(/^@/, '') || null
-  const avatar = organizer.profiles?.profile_image ?? organizer.profiles?.avatar_url ?? organizer.logo_url ?? null
-  const banner = coverImage ?? organizer.profiles?.cover_image ?? null
+  const avatar = organizer.profiles?.profile_image || organizer.profiles?.avatar_url || organizer.logo_url || null
+  const banner = coverImage || organizer.profiles?.cover_image || null
   const verified = organizer.verified || organizer.verification_status === 'verified'
 
   return (
-    <button
-      onClick={onClick}
+    <>
+    <article
       className={`home-organizer-card ${directory ? 'organizer-directory-card' : ''} group relative flex min-w-[300px] flex-1 flex-col overflow-visible rounded-2xl border text-left transition-all`}
       style={{ background: 'var(--card)', borderColor: 'var(--border)' }}
     >
+      <button type="button" onClick={onClick} aria-label={`View ${name} organizer profile`} className="organizer-card-main flex w-full flex-1 flex-col overflow-hidden rounded-[inherit] text-left">
       <span className="relative block h-32 w-full shrink-0 overflow-hidden rounded-t-2xl" style={{ background: 'var(--muted)' }}>
         {banner && <img src={banner} alt="" className="h-full w-full rounded-t-2xl object-cover opacity-75 transition-transform duration-300 group-hover:scale-105" />}
         <span className="absolute inset-0 rounded-t-2xl bg-gradient-to-t from-black/55 to-transparent" />
@@ -39,10 +44,16 @@ export default function OrganizerCard({ organizer, eventCount, coverImage, onCli
         <span className="min-w-0 flex-1">
           <span className="block truncate text-base font-semibold text-white">{name}</span>
           {username && <span className="mt-0.5 block truncate text-xs" style={{ color: 'var(--muted-foreground)' }}>@{username}</span>}
-          <span className="mt-2 block truncate text-xs" style={{ color: 'var(--muted-foreground)' }}>{eventCount} published event{eventCount === 1 ? '' : 's'}</span>
+          <span className="mt-2 block truncate text-xs" style={{ color: 'var(--muted-foreground)' }}>{`${eventCount} ${eventCount === 1 ? 'published event' : 'published events'}`}</span>
         </span>
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-transform group-hover:translate-x-0.5" style={{ borderColor: 'var(--border)', color: 'var(--primary-light)' }} aria-hidden="true"><ArrowRightIcon size={15} /></span>
       </span>
-    </button>
+      </button>
+      <button type="button" onClick={() => setShareOpen(true)} aria-label={`Share ${name}`} title={`Share ${name}`} className="share-action-button organizer-card-share absolute right-3 top-3 z-10">
+        <ShareNodesIcon size={15} />
+      </button>
+    </article>
+    <ShareDialog open={shareOpen} title={name} url={organizerShareUrl(organizer)} onClose={() => setShareOpen(false)} />
+    </>
   )
 }

@@ -82,7 +82,7 @@ export default function AboutPage({ navigate }: Props) {
 
       <section className="about-featured about-section-shell">
         <div className="about-featured-heading"><div><div className="about-section-label">Featured events</div><h2>What is happening<br /><span>right now.</span></h2></div></div>
-        {featuredLoading ? <div className="about-featured-row">{[1, 2, 3].map(item => <div className="about-featured-skeleton" key={item} />)}</div> : featuredEvents.length > 0 ? <div className="about-featured-row">{featuredEvents.map(event => <EventCard key={event.id} event={event} poster fullWidthMobile onClick={() => navigate('event-detail', event)} />)}</div> : <div className="about-featured-empty"><TicketIcon size={20} /><span>New experiences are coming soon.</span></div>}
+        {featuredLoading ? <div className="about-featured-row">{[1, 2, 3].map(item => <div className="about-featured-skeleton" key={item} />)}</div> : featuredEvents.length > 0 ? <div className="about-featured-row">{featuredEvents.map(event => <EventCard key={event.id} event={event} poster onClick={() => navigate('event-detail', event)} />)}</div> : <div className="about-featured-empty"><TicketIcon size={20} /><span>New experiences are coming soon.</span></div>}
         <div className="about-featured-action"><button onClick={() => navigate('discover')} className="about-glass-button">Browse all events <ArrowRightIcon size={15} /></button></div>
       </section>
 

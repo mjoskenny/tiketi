@@ -237,4 +237,4 @@ export const categories = [
   { label: 'Festivals', icon: '🔥', color: '#F0A500', image: 'https://images.unsplash.com/photo-1778847195158-18f3137a07a8?w=400&h=300&fit=crop&auto=format' },
 ]
 
-export const formatPrice = (n: number) => `${n.toLocaleString()} BIF`
+export const formatPrice = (n: number) => `${new Intl.NumberFormat(document.documentElement.lang === 'fr' ? 'fr-FR' : 'en-GB').format(n)} BIF`

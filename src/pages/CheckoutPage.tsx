@@ -18,6 +18,7 @@ type CheckoutSettings = {
   ticket_sales_enabled: boolean
   mobile_money_enabled: boolean
   card_payments_enabled: boolean
+  service_fee_percent: number
   checkout_notice: string | null
 }
 
@@ -25,6 +26,7 @@ const DEFAULT_CHECKOUT_SETTINGS: CheckoutSettings = {
   ticket_sales_enabled: true,
   mobile_money_enabled: true,
   card_payments_enabled: true,
+  service_fee_percent: 0,
   checkout_notice: null,
 }
 
@@ -59,7 +61,8 @@ export default function CheckoutPage({ data, navigate }: Props) {
 
   const { event, quantities, subtotal } = data
   const tiers: TicketTier[] = (event.ticket_tiers ?? []).filter(t => (quantities[t.name] ?? quantities[t.id] ?? 0) > 0)
-  const total = subtotal
+  const serviceFee = Math.round(subtotal * (checkoutSettings.service_fee_percent / 100))
+  const total = subtotal + serviceFee
 
   useEffect(() => {
     let isMounted = true
@@ -71,6 +74,7 @@ export default function CheckoutPage({ data, navigate }: Props) {
         ticket_sales_enabled: settings.ticket_sales_enabled ?? true,
         mobile_money_enabled: settings.mobile_money_enabled ?? true,
         card_payments_enabled: settings.card_payments_enabled ?? true,
+        service_fee_percent: Number(settings.service_fee_percent) || 0,
         checkout_notice: settings.checkout_notice ?? null,
       })
     }
@@ -174,7 +178,6 @@ export default function CheckoutPage({ data, navigate }: Props) {
       p_order_id: orderId,
       p_payment_method: payMethod === 'mobilemoney' ? 'mobile_money' : 'card',
     })
-
     if (confirmationError) {
       setError(`Test payment could not be confirmed: ${confirmationError.message}`)
       setLoading(false)
@@ -266,7 +269,7 @@ export default function CheckoutPage({ data, navigate }: Props) {
             {step === 2 && (
               <div>
                 <h2 className="text-2xl font-bold mb-6" style={{ fontFamily: 'Outfit, sans-serif' }}>Your information</h2>
-                <div className="space-y-4">
+                <div className="space-y-5">
                   {[
                     { key: 'name', label: 'Full name', type: 'text', placeholder: 'Jean Pierre Nzeyimana' },
                     { key: 'phone', label: 'Phone number', type: 'tel', placeholder: '+257 79 000 000' },
@@ -285,15 +288,15 @@ export default function CheckoutPage({ data, navigate }: Props) {
                   ))}
                 </div>
                 <p className="text-xs mt-3 mb-6" style={{ color: 'var(--muted-foreground)' }}>Tickets will be sent to this phone number and email.</p>
-                <div className="mt-6 space-y-3">
+                <div className="mt-8 space-y-4">
                   <h3 className="font-bold">Ticket holders</h3>
                   <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Add a different name for each ticket.</p>
-                  {holders.map((holder, index) => <label key={holder.id} className="block text-sm font-medium">{holder.tierName} ticket {index + 1}<input value={holder.name} onChange={event => setHolders(current => current.map(item => item.id === holder.id ? { ...item, name: event.target.value } : item))} placeholder="Ticket holder name" className="mt-1.5 w-full px-4 py-3.5 rounded-xl text-sm outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--foreground)' }} /></label>)}
+                  {holders.map((holder, index) => <label key={holder.id} className="block text-sm font-medium">{holder.tierName} ticket {index + 1}<input value={holder.name} onChange={event => setHolders(current => current.map(item => item.id === holder.id ? { ...item, name: event.target.value } : item))} placeholder="Ticket holder name" className="mt-2 w-full px-4 py-3.5 rounded-xl text-sm outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--foreground)' }} /></label>)}
                 </div>
-                <div className="flex gap-3">
-                  <button onClick={() => setCheckoutStep(1)} className="flex items-center gap-2 px-5 py-4 rounded-xl font-medium text-sm"
+                <div className="mt-8 flex gap-3">
+                  <button type="button" onClick={() => setCheckoutStep(1)} aria-label="Back to tickets" title="Back to tickets" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
                     style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>
-                    <ArrowLeftIcon size={14} /> Back
+                    <ArrowLeftIcon size={18} />
                   </button>
                   <button onClick={() => { const validationError = validateInfo(); if (validationError) { setError(validationError); return } setError(''); setCheckoutStep(3) }}
                     className="flex-1 py-4 rounded-xl font-bold text-sm transition-all"
@@ -342,12 +345,12 @@ export default function CheckoutPage({ data, navigate }: Props) {
                     <input type="tel" placeholder="+257 79 000 000" value={mobileMoneyPhone} onChange={e => setMobileMoneyPhone(e.target.value)}
                       className="w-full px-4 py-3 rounded-lg text-sm outline-none"
                       style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--foreground)' }} />
-                    <p className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>Test mode: no prompt or real payment will be sent.</p>
+                    <p className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>Placeholder only — no real Mobile Money payment will be requested.</p>
                   </div>
                 )}
 
                 <p className="mb-6 rounded-xl px-4 py-3 text-xs" style={{ background: 'rgba(200,169,110,0.08)', border: '1px solid rgba(200,169,110,0.2)', color: 'var(--accent)' }}>
-                  Test payment mode is active. Confirming this checkout creates a confirmed order and valid tickets without charging a real payment method.
+                  Payment placeholder mode is active. This test checkout does not charge a card or send a Mobile Money request.
                 </p>
 
                 <div className="flex items-center justify-center gap-6 mb-6">
@@ -363,15 +366,15 @@ export default function CheckoutPage({ data, navigate }: Props) {
                 </div>
 
                 <div className="flex gap-3">
-                  <button onClick={() => setCheckoutStep(2)}
-                    className="flex items-center gap-2 px-5 py-4 rounded-xl font-medium text-sm"
+                  <button type="button" onClick={() => setCheckoutStep(2)} aria-label="Back to your information" title="Back to your information"
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
                     style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>
-                    <ArrowLeftIcon size={14} />
+                    <ArrowLeftIcon size={18} />
                   </button>
                   <button onClick={handlePay} disabled={loading}
                     className="flex-1 py-4 rounded-xl font-bold text-sm transition-all"
                     style={{ background: 'var(--primary)', color: 'var(--primary-foreground)', opacity: loading ? 0.7 : 1 }}>
-                    {loading ? 'Confirming…' : `Confirm test payment ${fmtPrice(total)}`}
+                    {loading ? 'Confirming test checkout…' : `Confirm test payment ${fmtPrice(total)}`}
                   </button>
                 </div>
               </div>
@@ -393,7 +396,7 @@ export default function CheckoutPage({ data, navigate }: Props) {
                   <span>Subtotal</span><span>{fmtPrice(subtotal)}</span>
                 </div>
                 <div className="flex justify-between" style={{ color: 'var(--muted-foreground)' }}>
-                  <span>Service fee</span><span>No fee for customers</span>
+                  <span>Service fee ({checkoutSettings.service_fee_percent}%)</span><span>{fmtPrice(serviceFee)}</span>
                 </div>
                 <div className="flex justify-between font-bold text-base pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
                   <span>Total</span>

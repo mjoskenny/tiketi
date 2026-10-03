@@ -17,6 +17,8 @@ export type Organizer = {
   user_id: string
   name: string
   description: string | null
+  description_en?: string | null
+  description_fr?: string | null
   logo_url: string | null
   website: string | null
   phone: string | null

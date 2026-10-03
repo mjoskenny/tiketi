@@ -27,6 +27,7 @@ import { replaceFavoriteEventIds, setFavoriteUser } from './lib/favorites'
 import { supabase } from './lib/supabase'
 import { type Event, type Organizer } from './lib/types'
 import { FEATURES } from './lib/features'
+import { LanguageSwitcher } from './components/LocaleContent'
 
 type Page =
   | 'home'
@@ -59,6 +60,7 @@ type Page =
 const NO_NAV: Set<Page> = new Set(['auth-customer', 'auth-organizer', 'dashboard', 'agent-dashboard', 'admin-dashboard', 'agent-ticket'])
 const EVENTS_PLATFORM_PAGES: Set<Page> = new Set(['discover', 'events', 'event-detail', 'checkout', 'ticket', 'my-tickets', 'profile', 'notifications', 'favorites', 'organizer-profile'])
 const MARKETPLACE_PAGES: Set<Page> = new Set(['home', 'discover', 'events', 'event-detail', 'organizers', 'explore-organizers', 'organizer-profile'])
+const ATTENDEE_THEME_PAGES: Set<Page> = new Set([...EVENTS_PLATFORM_PAGES, ...MARKETPLACE_PAGES])
 
 type SocialLinkSetting = {
   platform: 'instagram' | 'facebook' | 'x' | 'tiktok' | 'whatsapp'
@@ -93,7 +95,7 @@ const DEFAULT_PUBLIC_PLATFORM_SETTINGS: PublicPlatformSettings = {
 
 const PAGE_PATHS: Record<Page, string> = {
   home: '/',
-  discover: '/discover-events',
+  discover: '/',
   events: '/events',
   'event-detail': '/event',
   checkout: '/checkout',
@@ -127,6 +129,7 @@ const PATH_PAGES = Object.entries(PAGE_PATHS).reduce<Record<string, Page>>((page
 
 function pageFromPath(pathname: string): Page {
   const normalizedPath = pathname.replace(/\/$/, '') || '/'
+  if (normalizedPath === '/') return 'discover'
   if (!FEATURES.refunds && normalizedPath === '/refunds') return 'home'
   if (normalizedPath === '/discover-events') return 'discover'
   if (normalizedPath === '/events') return 'events'
@@ -137,7 +140,7 @@ function pageFromPath(pathname: string): Page {
   if (normalizedPath === '/agent-dashboard' || normalizedPath.startsWith('/agent-dashboard/')) return 'agent-dashboard'
   if (normalizedPath === '/admin-dashboard' || normalizedPath.startsWith('/admin-dashboard/')) return 'admin-dashboard'
   if (normalizedPath === '/agent-ticket') return 'agent-ticket'
-  return PATH_PAGES[normalizedPath] ?? 'home'
+  return PATH_PAGES[normalizedPath] ?? 'discover'
 }
 
 function slugify(value: string) {
@@ -185,6 +188,12 @@ export default function App() {
     info: { name: string; phone: string; email: string }
     emailDelivery?: { sentCount: number; total: number; failedCount: number; reason?: string }
   } | null>(null)
+
+  useEffect(() => {
+    if (window.location.pathname === '/discover-events') {
+      window.history.replaceState({}, '', `/${window.location.search}${window.location.hash}`)
+    }
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -339,8 +348,8 @@ export default function App() {
   }
 
   // Auth pages — full screen, no nav
-  if (page === 'auth-customer') return <AuthPage defaultMode="customer" />
-  if (page === 'auth-organizer') return <AuthPage defaultMode="organizer" />
+  if (page === 'auth-customer') return <><LanguageSwitcher floating /><AuthPage defaultMode="customer" /></>
+  if (page === 'auth-organizer') return <><LanguageSwitcher floating /><AuthPage defaultMode="organizer" /></>
 
   const isPlatformAdmin = profile?.role === 'admin'
   const statusTitle = publicPlatformSettings.maintenance_mode ? 'We’ll be back shortly' : 'The marketplace is temporarily unavailable'
@@ -354,6 +363,7 @@ export default function App() {
   if (shouldShowPlatformStatus) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6 text-center" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+        <LanguageSwitcher floating />
         <div className="w-full max-w-lg rounded-3xl border p-8 shadow-2xl" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
           <p className="text-xs font-black uppercase tracking-[0.24em]" style={{ color: 'var(--primary)' }}>{publicPlatformSettings.platform_name}</p>
           <h1 className="mt-3 text-3xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>{statusTitle}</h1>
@@ -366,7 +376,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ background: 'var(--background)', minHeight: '100%' }}>
+    <div className={ATTENDEE_THEME_PAGES.has(page) ? 'attendee-theme' : undefined} style={{ background: 'var(--background)', minHeight: '100%' }}>
       {!NO_NAV.has(page) && page !== 'agent-ticket' && <Nav current={page} navigate={navigate} profile={profile} user={user} />}
       {EVENTS_PLATFORM_PAGES.has(page) && page !== 'agent-ticket' && <BottomNav current={page} navigate={navigate} />}
 
@@ -395,8 +405,7 @@ export default function App() {
         </div>
       )}
 
-      {page === 'home' && <AboutPage navigate={navigate} />}
-      {page === 'discover' && <HomePage navigate={navigate} />}
+      {(page === 'home' || page === 'discover') && <HomePage navigate={navigate} />}
       {page === 'events' && <EventsPage navigate={navigate} />}
       {page === 'event-detail' && eventDetail && <EventDetailPage event={eventDetail as any} navigate={navigate} onRequireAuth={requestAuth} />}
       {page === 'event-detail' && !eventDetail && (

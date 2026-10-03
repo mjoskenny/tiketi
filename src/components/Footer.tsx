@@ -90,7 +90,7 @@ export default function Footer({ navigate, publicPlatformSettings }: FooterProps
           <div>
             <h4 className="mb-4 text-xs font-semibold tracking-widest" style={{ color: 'var(--muted-foreground)', letterSpacing: '0.08em' }}>COMPANY</h4>
             {[
-              { label: 'Home', page: 'marketing' },
+              { label: 'Home', page: 'discover' },
               { label: 'About', page: 'about' },
             ].map(({ label, page }) => (
               <button key={label} onClick={() => navigate(page)} className="mb-3 block cursor-pointer text-left text-sm transition-colors"

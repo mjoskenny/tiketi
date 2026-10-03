@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext'
 import type { Ticket } from '../lib/types'
 import { TicketIcon } from '../components/Icon'
 import { FEATURES } from '../lib/features'
+import { getEventEndTimestamp, hasEventEnded } from '../lib/eventTime'
+import { formatLocaleDate } from '../lib/locale'
 
 type Props = { navigate: (p: string) => void }
 type Tab = 'upcoming' | 'past' | 'cancelled'
@@ -49,7 +51,7 @@ export default function MyTicketsPage({ navigate }: Props) {
 
         const { data, error: ticketsError } = await supabase
           .from('tickets')
-          .select('*, events(title, date, time, venue, cover_image, category, tags, status), ticket_tiers(name, price, description, ticket_type, extra_info, expires_at, group_size)')
+          .select('*, events(title, date, time, end_time, venue, cover_image, category, tags, status), ticket_tiers(name, price, description, ticket_type, extra_info, expires_at, group_size)')
           .in('order_id', orderIds)
         if (ticketsError) throw ticketsError
 
@@ -101,14 +103,11 @@ export default function MyTicketsPage({ navigate }: Props) {
   const now = Date.now()
   const eventHasEnded = (event: any) => {
     if (!event?.date) return false
-    const eventTime = event.end_time ? `${event.date}T${event.end_time}` : `${event.date}T23:59:59`
-    const timestamp = new Date(eventTime).getTime()
-    return Number.isFinite(timestamp) && timestamp < now
+    return hasEventEnded(event.date, event.time, event.end_time, now)
   }
   const eventTime = (event: any) => {
     if (!event?.date) return 0
-    const eventTimeValue = event.end_time ? `${event.date}T${event.end_time}` : `${event.date}T23:59:59`
-    return new Date(eventTimeValue).getTime()
+    return getEventEndTimestamp(event.date, event.time, event.end_time)
   }
   const sortTicketsByEventDate = (a: Ticket, b: Ticket) => {
     const aEvent = (a as any).events
@@ -242,7 +241,7 @@ export default function MyTicketsPage({ navigate }: Props) {
                       </div>
                       {ev && (
                         <p className="text-xs mb-1" style={{ color: 'var(--muted-foreground)' }}>
-                          {new Date(ev.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · {ev.venue}
+                          {formatLocaleDate(`${ev.date}T12:00:00`, { day: 'numeric', month: 'short', year: 'numeric' })} · {ev.venue}
                         </p>
                       )}
                       <p className="text-xs font-bold" style={{ color: 'var(--primary)' }}>{tier?.name ?? 'TICKET'} · {ticket.holder_name ?? 'Guest'}</p>

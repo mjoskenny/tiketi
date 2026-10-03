@@ -1,14 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
 import { signOut, supabase } from '../lib/supabase'
+import { fetchAllRows } from '../lib/supabasePagination'
 import { useAuth } from '../context/AuthContext'
 import { formatPrice } from '../data/events'
 import { BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, UsersIcon, UserIcon, KeyIcon, TagIcon, DollarSignIcon, TicketIcon, TrendingUpIcon, CheckIcon, ArrowLeftIcon, EyeIcon, LinkIcon } from '../components/Icon'
-import type { Event, Order, Customer, Transaction, OrganizerMember, OrganizerRole, Subscription, Ticket, AgentAssignment } from '../lib/types'
+import type { Event, Order, Customer, Transaction, OrganizerWithdrawal, OrganizerMember, OrganizerRole, Subscription, Ticket, AgentAssignment } from '../lib/types'
 import { FEATURES } from '../lib/features'
 import OrganizerEventViewPage from './OrganizerEventViewPage'
 import { sendOrderTicketEmails } from '../lib/ticketEmail'
+import { currentLocale, formatLocaleDate } from '../lib/locale'
+import { LanguageSwitcher } from '../components/LocaleContent'
+import StatusBadge from '../components/StatusBadge'
 
-type Section = 'overview' | 'events' | 'orders' | 'customers' | 'followers' | 'members' | 'roles' | 'subscriptions' | 'transactions' | 'refunds' | 'notifications'
+type Section = 'overview' | 'events' | 'orders' | 'customers' | 'followers' | 'members' | 'roles' | 'subscriptions' | 'transactions' | 'payouts' | 'refunds' | 'notifications'
 type AnalyticsRange = 'all' | 'day' | 'week' | 'month' | 'year' | 'custom'
 type NotificationFilter = 'all' | 'unread' | 'events' | 'sales' | 'followers' | 'team'
 type OrganizerNotification = { id: string; type: string; title: string; body: string; created_at: string; read_at: string | null; event_id?: string | null; recipient_scope?: string }
@@ -27,6 +31,7 @@ const NAV_ICONS: Record<Section, React.FC<{ size?: number }>> = {
   roles: KeyIcon,
   subscriptions: TagIcon,
   transactions: DollarSignIcon,
+  payouts: DollarSignIcon,
   refunds: DollarSignIcon,
   notifications: BellIcon,
 }
@@ -40,6 +45,7 @@ const NAV: { key: Section; label: string }[] = [
   { key: 'members', label: 'Members' },
   { key: 'roles', label: 'Roles' },
   { key: 'transactions', label: 'Transactions' },
+  { key: 'payouts', label: 'Payouts' },
   ...(FEATURES.refunds ? [{ key: 'refunds' as Section, label: 'Refund requests' }] : []),
   { key: 'notifications', label: 'Notifications' },
 ]
@@ -54,6 +60,7 @@ const SECTION_PATHS: Record<Section, string> = {
   roles: '/dashboard/roles',
   subscriptions: '/dashboard/subscriptions',
   transactions: '/dashboard/transactions',
+  payouts: '/dashboard/payouts',
   refunds: '/dashboard/refunds',
   notifications: '/dashboard/notifications',
 }
@@ -77,14 +84,7 @@ const STATUS_COLORS: Record<string, string> = {
   payment: 'var(--primary)', refund: '#ef4444', payout: 'var(--accent)', fee: '#888',
 }
 
-function Badge({ label, color }: { label: string; color: string }) {
-  return (
-    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold capitalize"
-      style={{ background: `${color}18`, color }}>
-      {label}
-    </span>
-  )
-}
+const Badge = StatusBadge
 
 function StatCard({ Icon, label, value, sub, color = 'var(--foreground)' }: { Icon: React.FC<{ size?: number }>; label: string; value: string; sub?: string; color?: string }) {
   return (
@@ -115,7 +115,7 @@ function RevenueTrendChart({ data }: { data: Array<{ day: string; revenue: numbe
 
   return (
     <div className="relative h-48 w-full min-w-[420px]">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full overflow-visible" role="img" aria-label="Revenue trend for the last seven days">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full overflow-visible" role="img" aria-label="Revenue trend by selected period">
         {[0, 1, 2, 3].map(gridline => {
           const y = padding.top + (gridline / 3) * (height - padding.top - padding.bottom)
           return <line key={gridline} x1={padding.left} x2={width - padding.right} y1={y} y2={y} stroke="rgba(255,255,255,0.08)" strokeDasharray="3 5" />
@@ -139,20 +139,19 @@ function RevenueTrendChart({ data }: { data: Array<{ day: string; revenue: numbe
   )
 }
 
-function EventPerformanceChart({ events, orders }: { events: Event[]; orders: Order[] }) {
+function EventPerformanceChart({ events, performance }: { events: Event[]; performance: Map<string, { tickets: number; revenue: number }> }) {
   const eventTitles = new Map(events.map(event => [event.id, event.title]))
-  const revenueByEvent = new Map<string, number>()
-  orders.forEach(order => revenueByEvent.set(order.event_id, (revenueByEvent.get(order.event_id) ?? 0) + order.total))
-  const data = [...revenueByEvent.entries()].map(([eventId, revenue]) => ({
+  const data = [...performance.entries()].map(([eventId, result]) => ({
+    id: eventId,
     title: eventTitles.get(eventId) ?? 'Unknown event',
-    revenue,
+    revenue: result.revenue,
   })).sort((a, b) => b.revenue - a.revenue).slice(0, 5)
   const max = Math.max(...data.map(event => event.revenue), 1)
 
   return (
     <div className="space-y-4">
       {data.map(event => (
-        <div key={event.title}>
+        <div key={event.id}>
           <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
             <span className="truncate font-medium">{event.title}</span>
             <span className="shrink-0 font-bold" style={{ color: 'var(--primary)' }}>{formatPrice(event.revenue)}</span>
@@ -185,17 +184,24 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const [roles, setRoles] = useState<OrganizerRole[]>([])
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [withdrawals, setWithdrawals] = useState<OrganizerWithdrawal[]>([])
+  const [commissions, setCommissions] = useState<Array<{ amount: number; status: string }>>([])
   const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([])
   const [checkinTickets, setCheckinTickets] = useState<Ticket[]>([])
   const [organizerNotifications, setOrganizerNotifications] = useState<OrganizerNotification[]>([])
   const [dataLoading, setDataLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-  const [analyticsRange, setAnalyticsRange] = useState<AnalyticsRange>('all')
+  const [analyticsRange, setAnalyticsRange] = useState<AnalyticsRange>('year')
   const [analyticsStart, setAnalyticsStart] = useState('')
   const [analyticsEnd, setAnalyticsEnd] = useState('')
   const [analyticsDayInterval, setAnalyticsDayInterval] = useState(2)
   const [analyticsMonthInterval, setAnalyticsMonthInterval] = useState(1)
   const [notificationFilter, setNotificationFilter] = useState<NotificationFilter>('all')
+  const [payoutAmount, setPayoutAmount] = useState('')
+  const [payoutMethod, setPayoutMethod] = useState<'mobile_money' | 'bank'>('mobile_money')
+  const [payoutReference, setPayoutReference] = useState('')
+  const [payoutSubmitting, setPayoutSubmitting] = useState(false)
+  const [payoutNotice, setPayoutNotice] = useState('')
 
   // Modals
   const [showNewEvent, setShowNewEvent] = useState(false)
@@ -213,7 +219,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const orgId = organizer?.id
   const isOwner = !!organizer && organizer.user_id === profile?.id
   const membershipPermissions = (teamMembership?.organizer_roles?.permissions ?? {}) as Record<string, boolean>
-  const canAccessSection = (key: Section) => isOwner || membershipPermissions.all === true || membershipPermissions[key] === true || (key === 'overview' && membershipPermissions.analytics === true) || (key === 'events' && (membershipPermissions.checkin === true || membershipPermissions.orders === true))
+  const canAccessSection = (key: Section) => key === 'payouts' ? isOwner : isOwner || membershipPermissions.all === true || membershipPermissions[key] === true || (key === 'overview' && membershipPermissions.analytics === true) || (key === 'events' && (membershipPermissions.checkin === true || membershipPermissions.orders === true))
   const canUseCalendar = isOwner || membershipPermissions.all === true || membershipPermissions.calendar === true
   const canViewEvents = isOwner || membershipPermissions.all === true || membershipPermissions.events === true || membershipPermissions.checkin === true || membershipPermissions.orders === true
   const canCheckIn = isOwner || membershipPermissions.all === true || membershipPermissions.checkin === true
@@ -323,51 +329,63 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     if (!orgId) return
     setDataLoading(true)
     setDashboardLoadError(false)
-    const [ev, ord, cust, mem, rol, sub, txn, tickets, agentSales, assignments, refunds] = await Promise.all([
-      supabase.from('events').select('*, tags, ticket_tiers(id, event_id, name, price, description, ticket_type, consumable_amount, extra_info, expires_at, group_size, quantity, sold, created_at)').eq('organizer_id', orgId).order('created_at', { ascending: false }),
-      supabase.from('orders').select('*, events(title), profiles(full_name, email)').eq('organizer_id', orgId).order('created_at', { ascending: false }),
-      supabase.from('customers').select('*').eq('organizer_id', orgId).order('total_spent', { ascending: false }),
+    try {
+    const [ev, ord, cust, mem, rol, sub, txn, tickets, agentSales, assignments, refunds, payoutRequests, commissionRows] = await Promise.all([
+      fetchAllRows((from, to) => supabase.from('events').select('*, tags, ticket_tiers(id, event_id, name, price, description, ticket_type, consumable_amount, extra_info, expires_at, group_size, quantity, sold, created_at)').eq('organizer_id', orgId).order('created_at', { ascending: false }).range(from, to)),
+      fetchAllRows((from, to) => supabase.from('orders').select('*, events(title), profiles(full_name, email)').eq('organizer_id', orgId).order('created_at', { ascending: false }).range(from, to)),
+      fetchAllRows((from, to) => supabase.from('customers').select('*').eq('organizer_id', orgId).order('total_spent', { ascending: false }).range(from, to)),
       supabase.from('organizer_members').select('*, profiles(full_name, email, username, profile_image, avatar_url), organizer_roles(name)').eq('organizer_id', orgId),
       supabase.from('organizer_roles').select('*').eq('organizer_id', orgId),
       supabase.from('subscriptions').select('*').eq('organizer_id', orgId).order('created_at', { ascending: false }),
-      supabase.from('transactions').select('*, orders(id)').eq('organizer_id', orgId).order('created_at', { ascending: false }).limit(50),
-      supabase.from('tickets').select('*, events(id, title, organizer_id)').eq('events.organizer_id', orgId).order('checked_in_at', { ascending: false }),
-      supabase.from('agent_sales').select('order_id, agent_user_id, payment_mode, status, quantity, profiles(full_name, email)').eq('organizer_id', orgId).order('created_at', { ascending: false }),
+      fetchAllRows((from, to) => supabase.from('transactions').select('*, orders(id)').eq('organizer_id', orgId).order('created_at', { ascending: false }).range(from, to)),
+      fetchAllRows((from, to) => supabase.from('tickets').select('*, events(id, title, organizer_id)').eq('events.organizer_id', orgId).order('checked_in_at', { ascending: false }).range(from, to)),
+      fetchAllRows((from, to) => supabase.from('agent_sales').select('order_id, agent_user_id, payment_mode, status, quantity, profiles(full_name, email)').eq('organizer_id', orgId).order('created_at', { ascending: false }).range(from, to)),
       supabase.from('agent_assignments').select('*, events(*, ticket_tiers(*)), profiles(full_name, email)').eq('organizer_id', orgId).order('created_at', { ascending: false }),
-      supabase.from('refund_requests').select('*, profiles!customer_id(full_name, email), events(title)').eq('organizer_id', orgId).order('created_at', { ascending: false }),
+      fetchAllRows((from, to) => supabase.from('refund_requests').select('*, profiles!customer_id(full_name, email), events(title)').eq('organizer_id', orgId).order('created_at', { ascending: false }).range(from, to)),
+      fetchAllRows((from, to) => supabase.from('organizer_withdrawals').select('*').eq('organizer_id', orgId).order('requested_at', { ascending: false }).range(from, to)),
+      fetchAllRows((from, to) => supabase.from('commissions').select('amount, status').eq('organizer_id', orgId).range(from, to)),
     ])
     const failedQueries = [
-      ['events', ev.error], ['orders', ord.error], ['customers', cust.error], ['team', mem.error], ['roles', rol.error],
-      ['subscriptions', sub.error], ['transactions', txn.error], ['tickets', tickets.error], ['agent sales', agentSales.error],
-      ['assignments', assignments.error], ['refunds', refunds.error],
+      ['team', mem.error], ['roles', rol.error],
+      ['subscriptions', sub.error],
+      ['assignments', assignments.error],
     ].filter(([, error]) => error).map(([name, error]) => `${name}: ${(error as { message: string }).message}`)
     if (failedQueries.length) {
       setDashboardLoadError(true)
       setActionError(`Some dashboard data could not be loaded. ${failedQueries.join(' | ')}`)
     }
-    const loadedOrders = (ord.data ?? []) as Order[]
-    const orderItemsResult = loadedOrders.length
-      ? await supabase.from('order_items').select('id, order_id, ticket_tier_id, quantity, unit_price, total_price').in('order_id', loadedOrders.map(order => order.id))
-      : { data: [], error: null }
+    const loadedOrders = ord as Order[]
+    const orderIds = loadedOrders.map(order => order.id)
+    const orderItemPages = await Promise.all(Array.from({ length: Math.ceil(orderIds.length / 250) }, (_, index) => {
+      const orderIdPage = orderIds.slice(index * 250, (index + 1) * 250)
+      return fetchAllRows((from, to) => supabase.from('order_items').select('id, order_id, ticket_tier_id, quantity, unit_price, total_price').in('order_id', orderIdPage).range(from, to))
+    }))
     const itemsByOrder = new Map<string, NonNullable<Order['order_items']>>()
-    ;(orderItemsResult.data ?? []).forEach(item => {
+    orderItemPages.flat().forEach(item => {
       const items = itemsByOrder.get(item.order_id) ?? []
       items.push(item)
       itemsByOrder.set(item.order_id, items)
     })
-    setEvents(ev.data ?? [])
+    setEvents(ev as Event[])
     setOrders(loadedOrders.map(order => ({ ...order, order_items: itemsByOrder.get(order.id) ?? [] })))
-    setAgentOrderMeta(Object.fromEntries(((agentSales.data ?? []) as AgentOrderMeta[]).map(item => [item.order_id, item])))
+    setAgentOrderMeta(Object.fromEntries((agentSales as AgentOrderMeta[]).map(item => [item.order_id, item])))
     setAgentAssignments((assignments.data ?? []) as AgentAssignment[])
-    setCustomers(cust.data ?? [])
+    setCustomers(cust as Customer[])
     setMembers(mem.data ?? [])
     setRoles(rol.data ?? [])
     setSubscriptions(sub.data ?? [])
-    setTransactions(txn.data ?? [])
-    setRefundRequests((refunds.data ?? []) as RefundRequest[])
-    setCheckinTickets((tickets.data ?? []) as Ticket[])
+    setTransactions(txn as Transaction[])
+    setWithdrawals(payoutRequests as OrganizerWithdrawal[])
+    setCommissions(commissionRows as Array<{ amount: number; status: string }>)
+    setRefundRequests(refunds as RefundRequest[])
+    setCheckinTickets(tickets as Ticket[])
     setLastUpdated(new Date())
     setDataLoading(false)
+    } catch (error) {
+      setActionError(`Analytics data could not be loaded: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      setDashboardLoadError(true)
+      setDataLoading(false)
+    }
   }, [orgId])
 
   useEffect(() => { load() }, [load])
@@ -387,12 +405,25 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_sales', filter: `organizer_id=eq.${orgId}` }, () => { void load() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'agent_assignments', filter: `organizer_id=eq.${orgId}` }, () => { void load() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `organizer_id=eq.${orgId}` }, () => { void load() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'organizer_withdrawals' }, () => { void load() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'commissions' }, () => { void load() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'refund_requests', filter: `organizer_id=eq.${orgId}` }, () => { void load() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'customers', filter: `organizer_id=eq.${orgId}` }, () => { void load() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'organizer_roles', filter: `organizer_id=eq.${orgId}` }, () => { void load() })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'organizer_members', filter: `organizer_id=eq.${orgId}` }, () => { void load() })
       .subscribe()
     return () => { void supabase.removeChannel(channel) }
+  }, [orgId, load])
+
+  useEffect(() => {
+    if (!orgId) return
+    const refresh = () => { void load() }
+    const interval = window.setInterval(refresh, 60_000)
+    window.addEventListener('focus', refresh)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('focus', refresh)
+    }
   }, [orgId, load])
 
   useEffect(() => {
@@ -430,7 +461,8 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     }, new Date(rangeEnd))
     rangeStart.setTime(firstOrderDate.getTime())
     rangeStart.setHours(0, 0, 0, 0)
-    rangeEnd.setHours(23, 59, 59, 999)
+    rangeStart.setDate(1)
+    rangeEnd.setTime(Date.now())
   } else if (analyticsRange === 'day') {
     rangeStart.setHours(0, 0, 0, 0)
     rangeEnd.setHours(23, 59, 59, 999)
@@ -438,8 +470,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     const daysFromMonday = (rangeEnd.getDay() + 6) % 7
     rangeStart.setDate(rangeEnd.getDate() - daysFromMonday)
     rangeStart.setHours(0, 0, 0, 0)
-    rangeEnd.setDate(rangeStart.getDate() + 6)
-    rangeEnd.setHours(23, 59, 59, 999)
+    rangeEnd.setTime(Date.now())
   } else if (analyticsRange === 'month') {
     rangeStart.setDate(1)
     rangeStart.setHours(0, 0, 0, 0)
@@ -448,8 +479,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   } else if (analyticsRange === 'year') {
     rangeStart.setMonth(0, 1)
     rangeStart.setHours(0, 0, 0, 0)
-    rangeEnd.setMonth(11, 31)
-    rangeEnd.setHours(23, 59, 59, 999)
+    rangeEnd.setTime(Date.now())
   }
   if (analyticsRange === 'custom') {
     if (analyticsStart) rangeStart.setTime(localDateStart(analyticsStart).getTime())
@@ -476,26 +506,43 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     const createdAt = new Date(order.created_at)
     return createdAt >= rangeStart && createdAt <= rangeEnd
   })
+  const orderStatusCounts = orders.reduce((counts, order) => {
+    counts[order.status] += 1
+    return counts
+  }, { confirmed: 0, pending: 0, cancelled: 0, refunded: 0 })
 
   // Keep every KPI on the same confirmed, net-sales basis as the revenue chart.
-  const refundedOrderIds = new Set(refundRequests
-    .filter(request => request.status === 'approved' || request.status === 'processed')
-    .map(request => request.order_id))
   const confirmedOrders = filteredOrders.filter(order => order.status === 'confirmed')
-  const netRevenueOrders = confirmedOrders.filter(order => !refundedOrderIds.has(order.id))
-  const totalRevenue = netRevenueOrders.reduce((s, o) => s + o.total, 0)
-  const refundedTicketCount = refundRequests.filter(request =>
-    (request.status === 'approved' || request.status === 'processed') && confirmedOrders.some(order => order.id === request.order_id),
-  ).length
-  const totalTicketsSold = Math.max(0, confirmedOrders.reduce((total, order) => total + (order.order_items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0), 0) - refundedTicketCount)
+  const confirmedOrderIds = new Set(confirmedOrders.map(order => order.id))
+  const processedRefundAmountByOrder = new Map<string, number>()
+  const processedRefundTicketIds = new Set<string>()
+  const processedRefundTicketsByEvent = new Map<string, number>()
+  refundRequests.filter(request => request.status === 'processed').forEach(request => {
+    if (!confirmedOrderIds.has(request.order_id)) return
+    const ticket = checkinTickets.find(item => item.id === request.ticket_id)
+    if (request.ticket_id && !processedRefundTicketIds.has(request.ticket_id)) {
+      processedRefundTicketIds.add(request.ticket_id)
+      if (ticket) processedRefundTicketsByEvent.set(ticket.event_id, (processedRefundTicketsByEvent.get(ticket.event_id) ?? 0) + 1)
+    }
+    const order = orders.find(item => item.id === request.order_id)
+    const orderItem = order?.order_items?.find(item => item.ticket_tier_id === ticket?.ticket_tier_id)
+    if (orderItem) processedRefundAmountByOrder.set(request.order_id, (processedRefundAmountByOrder.get(request.order_id) ?? 0) + orderItem.unit_price)
+  })
+  const revenueForOrder = (order: Order) => Math.max(0, order.total - (processedRefundAmountByOrder.get(order.id) ?? 0))
+  const totalRevenue = confirmedOrders.reduce((sum, order) => sum + revenueForOrder(order), 0)
+  const totalTicketsSold = Math.max(0, confirmedOrders.reduce((total, order) => total + (order.order_items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0), 0) - processedRefundTicketIds.size)
   const publishedEvents = events.filter(e => e.status === 'published').length
-  const avgOrderValue = netRevenueOrders.length ? Math.round(totalRevenue / netRevenueOrders.length) : 0
+  const avgOrderValue = confirmedOrders.length ? Math.round(totalRevenue / confirmedOrders.length) : 0
   const eventAnalytics = new Map<string, { tickets: number; revenue: number }>()
-  netRevenueOrders.forEach(order => {
+  confirmedOrders.forEach(order => {
     const current = eventAnalytics.get(order.event_id) ?? { tickets: 0, revenue: 0 }
     current.tickets += order.order_items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0
-    current.revenue += order.total
+    current.revenue += revenueForOrder(order)
     eventAnalytics.set(order.event_id, current)
+  })
+  processedRefundTicketsByEvent.forEach((count, eventId) => {
+    const performance = eventAnalytics.get(eventId)
+    if (performance) performance.tickets = Math.max(0, performance.tickets - count)
   })
 
   const chartData = (() => {
@@ -512,9 +559,9 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
           return time >= bucketFrom && time < bucketTo
         })
         buckets.push({
-          day: `${bucketFrom.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - ${bucketTo.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`,
-          revenue: bucketOrders.filter(order => netRevenueOrders.includes(order)).reduce((s, o) => s + o.total, 0),
-          count: bucketOrders.filter(order => netRevenueOrders.includes(order)).length,
+          day: `${bucketFrom.toLocaleTimeString(currentLocale(), { hour: 'numeric', minute: '2-digit' })} - ${bucketTo.toLocaleTimeString(currentLocale(), { hour: 'numeric', minute: '2-digit' })}`,
+          revenue: bucketOrders.filter(order => order.status === 'confirmed').reduce((sum, order) => sum + revenueForOrder(order), 0),
+          count: bucketOrders.filter(order => order.status === 'confirmed').length,
         })
       }
       return buckets
@@ -531,9 +578,9 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
           return time >= bucketFrom && time < bucketTo
         })
         return {
-          day: `${bucketFrom.toLocaleDateString('en', { month: 'short', day: 'numeric' })} - ${new Date(bucketTo.getTime() - 1).toLocaleDateString('en', { month: 'short', day: 'numeric' })}`,
-          revenue: bucketOrders.filter(order => netRevenueOrders.includes(order)).reduce((s, o) => s + o.total, 0),
-          count: bucketOrders.filter(order => netRevenueOrders.includes(order)).length,
+          day: `${bucketFrom.toLocaleDateString(currentLocale(), { month: 'short', day: 'numeric' })} - ${new Date(bucketTo.getTime() - 1).toLocaleDateString(currentLocale(), { month: 'short', day: 'numeric' })}`,
+          revenue: bucketOrders.filter(order => order.status === 'confirmed').reduce((sum, order) => sum + revenueForOrder(order), 0),
+          count: bucketOrders.filter(order => order.status === 'confirmed').length,
         }
       })
     }
@@ -551,9 +598,9 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
             return time >= bucketFrom && time < bucketTo
           })
           return {
-            day: bucketFrom.toLocaleDateString('en', { weekday: 'short' }),
-            revenue: bucketOrders.filter(order => netRevenueOrders.includes(order)).reduce((s, o) => s + o.total, 0),
-            count: bucketOrders.filter(order => netRevenueOrders.includes(order)).length,
+            day: bucketFrom.toLocaleDateString(currentLocale(), { weekday: 'short' }),
+            revenue: bucketOrders.filter(order => order.status === 'confirmed').reduce((sum, order) => sum + revenueForOrder(order), 0),
+            count: bucketOrders.filter(order => order.status === 'confirmed').length,
           }
         })
       }
@@ -573,8 +620,8 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
           })
           return {
             day: `Week ${index + 1}`,
-            revenue: bucketOrders.filter(order => netRevenueOrders.includes(order)).reduce((s, o) => s + o.total, 0),
-            count: bucketOrders.filter(order => netRevenueOrders.includes(order)).length,
+            revenue: bucketOrders.filter(order => order.status === 'confirmed').reduce((sum, order) => sum + revenueForOrder(order), 0),
+            count: bucketOrders.filter(order => order.status === 'confirmed').length,
           }
         })
       }
@@ -588,26 +635,37 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
           return time >= bucketFrom && time < bucketTo
         })
         return {
-          day: bucketFrom.toLocaleDateString('en', { month: 'short', year: 'numeric' }),
-          revenue: bucketOrders.filter(order => netRevenueOrders.includes(order)).reduce((s, o) => s + o.total, 0),
-          count: bucketOrders.filter(order => netRevenueOrders.includes(order)).length,
+          day: bucketFrom.toLocaleDateString(currentLocale(), { month: 'short', year: 'numeric' }),
+          revenue: bucketOrders.filter(order => order.status === 'confirmed').reduce((sum, order) => sum + revenueForOrder(order), 0),
+          count: bucketOrders.filter(order => order.status === 'confirmed').length,
         }
       })
     }
 
-    const bucketCount = analyticsRange === 'week' ? 7 : 12
+    const bucketCount = analyticsRange === 'week'
+      ? 7
+      : analyticsRange === 'all'
+        ? Math.max(1, (rangeEnd.getFullYear() - rangeStart.getFullYear()) * 12 + rangeEnd.getMonth() - rangeStart.getMonth() + 1)
+        : 12
     return Array.from({ length: bucketCount }, (_, index) => {
       const bucket = new Date(rangeStart)
       if (analyticsRange === 'week') bucket.setDate(rangeStart.getDate() + index)
-      else bucket.setMonth(rangeStart.getMonth() + index)
+      else {
+        bucket.setDate(1)
+        bucket.setMonth(rangeStart.getMonth() + index)
+      }
       const nextBucket = new Date(bucket)
       if (analyticsRange === 'week') nextBucket.setDate(bucket.getDate() + 1)
       else nextBucket.setMonth(bucket.getMonth() + 1)
       const bucketOrders = filteredOrders.filter(order => { const time = new Date(order.created_at); return time >= bucket && time < nextBucket })
       return {
-        day: analyticsRange === 'week' ? bucket.toLocaleDateString('en', { weekday: 'long' }) : bucket.toLocaleDateString('en', { month: 'long' }),
-        revenue: bucketOrders.filter(order => netRevenueOrders.includes(order)).reduce((s, o) => s + o.total, 0),
-        count: bucketOrders.filter(order => netRevenueOrders.includes(order)).length,
+        day: analyticsRange === 'week'
+          ? bucket.toLocaleDateString(currentLocale(), { weekday: 'long' })
+          : analyticsRange === 'all' && rangeStart.getFullYear() !== rangeEnd.getFullYear()
+            ? bucket.toLocaleDateString(currentLocale(), { month: 'short', year: 'numeric' })
+            : bucket.toLocaleDateString(currentLocale(), { month: 'long' }),
+        revenue: bucketOrders.filter(order => order.status === 'confirmed').reduce((sum, order) => sum + revenueForOrder(order), 0),
+        count: bucketOrders.filter(order => order.status === 'confirmed').length,
       }
     })
   })()
@@ -686,6 +744,43 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
       ? await supabase.from('subscriptions').update({ tier, price, status: 'active' }).eq('id', current.id).select().single()
       : await supabase.from('subscriptions').insert({ organizer_id: orgId, tier, price, status: 'active' }).select().single()
     if (result.error) { setActionError(result.error.message); return }
+    await load()
+  }
+
+  const availablePayoutBalance = Math.max(0, transactions.reduce((balance, transaction) => {
+    if (transaction.type === 'payment' && transaction.status === 'completed') return balance + transaction.amount
+    if ((transaction.type === 'fee' || transaction.type === 'refund') && transaction.status === 'completed') return balance - transaction.amount
+    if (transaction.type === 'payout' && (transaction.status === 'pending' || transaction.status === 'completed')) return balance - transaction.amount
+    return balance
+  }, 0) - commissions.filter(commission => ['pending', 'available', 'paid'].includes(commission.status)).reduce((sum, commission) => sum + commission.amount, 0))
+
+  const submitPayoutRequest = async () => {
+    setPayoutNotice('')
+    setActionError('')
+    const amount = Number(payoutAmount)
+    if (!Number.isInteger(amount) || amount <= 0) { setActionError('Enter a whole-number payout amount greater than zero.'); return }
+    if (!payoutReference.trim()) { setActionError('Enter the Mobile Money phone number or bank account reference.'); return }
+    if (amount > availablePayoutBalance) { setActionError(`Amount exceeds your available balance of ${formatPrice(availablePayoutBalance)}.`); return }
+    setActionError('')
+    setPayoutSubmitting(true)
+    const { error } = await supabase.rpc('request_organizer_withdrawal', {
+      p_amount: amount,
+      p_payment_method: payoutMethod,
+      p_payment_reference: payoutReference.trim(),
+    })
+    setPayoutSubmitting(false)
+    if (error) { setActionError(error.message); return }
+    setPayoutAmount('')
+    setActionError('')
+    setPayoutNotice('Payout request submitted. It will appear below while the platform team processes the transfer.')
+    await load()
+  }
+
+  const cancelPayoutRequest = async (withdrawal: OrganizerWithdrawal) => {
+    if (withdrawal.status !== 'requested') return
+    setActionError('')
+    const { error } = await supabase.rpc('cancel_organizer_withdrawal', { p_withdrawal_id: withdrawal.id })
+    if (error) { setActionError(error.message); return }
     await load()
   }
 
@@ -796,11 +891,11 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
         )
       })()}
       {actionError && (
-        <div className="fixed top-4 right-4 z-[70] max-w-sm rounded-xl px-4 py-3 text-left text-xs font-semibold shadow-2xl" style={{ background: '#3a1717', border: '1px solid #ef4444', color: '#fecaca' }}>
+        <div className="fixed top-4 right-4 z-[70] max-w-sm rounded-xl px-4 py-3 text-left text-xs font-semibold shadow-2xl" style={{ background: actionError.startsWith('Payout request submitted') ? '#12301e' : '#3a1717', border: `1px solid ${actionError.startsWith('Payout request submitted') ? '#22c55e' : '#ef4444'}`, color: actionError.startsWith('Payout request submitted') ? '#bbf7d0' : '#fecaca' }}>
           <p>{actionError}</p>
           <div className="mt-3 flex items-center gap-3">
             {dashboardLoadError && <button onClick={() => void load()} className="rounded-lg px-3 py-1.5 font-bold" style={{ background: 'var(--primary)', color: '#000' }}>Retry dashboard</button>}
-            <button onClick={() => { setActionError(''); setDashboardLoadError(false) }} className="font-semibold" style={{ color: '#fecaca' }}>Dismiss</button>
+            <button onClick={() => { setActionError(''); setDashboardLoadError(false) }} className="font-semibold" style={{ color: actionError.startsWith('Payout request submitted') ? '#bbf7d0' : '#fecaca' }}>Dismiss</button>
           </div>
         </div>
       )}
@@ -851,8 +946,8 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
         {/* Bottom */}
         <div className="p-4 border-t space-y-2" style={{ borderColor: 'rgba(255,255,255,0.09)' }}>
-          <a href="/" onClick={event => { event.preventDefault(); navigate('home') }} className="flex w-full items-center justify-center gap-2 py-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>
-            <ArrowLeftIcon size={14} /> Back to site
+          <a href="/" onClick={event => { event.preventDefault(); navigate('home') }} aria-label="Back to site" title="Back to site" className="mx-auto flex h-10 w-10 items-center justify-center rounded-full" style={{ color: 'var(--muted-foreground)' }}>
+            <ArrowLeftIcon size={18} />
           </a>
         </div>
       </aside>
@@ -880,6 +975,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
           </div>
           <div className="flex items-center gap-2">
             {utilityPopup && <button className="fixed inset-0 z-10 cursor-default" aria-label="Close popup" onClick={() => setUtilityPopup(null)} />}
+            <LanguageSwitcher bare />
             <div className="relative z-20">
               <button onClick={() => setUtilityPopup(current => current === 'notifications' ? null : 'notifications')} aria-label="Notifications" title="Notifications" className="relative flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: utilityPopup === 'notifications' ? 'rgba(200,169,110,0.14)' : 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}>
                 <BellIcon size={18} />
@@ -978,14 +1074,14 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                     </div>
                     {analyticsRange === 'custom' && <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--muted-foreground)' }}><label>From<input type="date" value={analyticsStart} onChange={event => setAnalyticsStart(event.target.value)} className="ml-1 rounded-lg border px-2 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.035)', borderColor: 'rgba(255,255,255,0.14)', color: 'var(--foreground)', backdropFilter: 'blur(18px)' }} /></label><label>To<input type="date" value={analyticsEnd} onChange={event => setAnalyticsEnd(event.target.value)} className="ml-1 rounded-lg border px-2 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.035)', borderColor: 'rgba(255,255,255,0.14)', color: 'var(--foreground)', backdropFilter: 'blur(18px)' }} /></label></div>}
                   </div>
-                  <div className="flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                  {verificationStatus !== 'verified' && <div className="flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
                     <div><p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Organizer verification</p><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>{verificationStatus === 'verified' ? 'Your organizer profile is verified.' : verificationStatus === 'pending' ? 'Your verification request is awaiting review.' : 'Verify your profile to show a trusted badge on organizer cards and profiles.'}</p></div>
                     <button onClick={requestVerification} disabled={verificationStatus !== 'unverified'} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: verificationStatus === 'unverified' ? 'var(--primary)' : 'var(--muted)', color: verificationStatus === 'unverified' ? '#000' : 'var(--muted-foreground)' }}>{verificationStatus === 'verified' ? 'Verified' : verificationStatus === 'pending' ? 'Pending review' : 'Request verification'}</button>
-                  </div>
+                  </div>}
                   {/* KPI grid */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <StatCard Icon={TicketIcon} label="Tickets Sold" value={totalTicketsSold.toLocaleString()} />
-                    <StatCard Icon={DollarSignIcon} label="Total Revenue" value={formatPrice(totalRevenue)} />
+                    <StatCard Icon={DollarSignIcon} label="Net Ticket Revenue" value={formatPrice(totalRevenue)} sub="Confirmed sales less processed refunds" />
                     <StatCard Icon={CalendarIcon} label="Published Events" value={publishedEvents.toString()} />
                     <StatCard Icon={UsersIcon} label="Customers" value={customers.length.toString()}
                       sub={`Avg order: ${avgOrderValue > 0 ? formatPrice(avgOrderValue) : '—'}`} />
@@ -996,7 +1092,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                     {/* Revenue chart */}
                     <div className="lg:col-span-2 rounded-2xl p-5" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
                       <div className="mb-5 flex items-start justify-between gap-3">
-                        <div><h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Revenue by period</h2><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{analyticsRangeLabel} · confirmed orders</p></div>
+                        <div><h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Revenue by period</h2><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{analyticsRangeLabel} · confirmed sales · updated {lastUpdated?.toLocaleTimeString() ?? 'loading'}</p></div>
                         <div className="text-right"><p className="text-sm font-bold" style={{ color: 'var(--primary)' }}>{formatPrice(totalRevenue)}</p><p className="text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{filteredOrders.filter(o => o.status === 'confirmed').length} orders</p></div>
                       </div>
                       <div className="space-y-3">
@@ -1014,7 +1110,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                     <div className="rounded-2xl p-5" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
                       <div className="mb-5 flex items-start justify-between gap-3">
                         <div><h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Orders by period</h2><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{analyticsRangeLabel} · confirmed net sales</p></div>
-                        <p className="text-sm font-bold" style={{ color: 'var(--accent)' }}>{netRevenueOrders.length}</p>
+                        <p className="text-sm font-bold" style={{ color: 'var(--accent)' }}>{confirmedOrders.length}</p>
                       </div>
                       <div className="space-y-3">
                         {chartData.map(({ day, count }) => (
@@ -1065,7 +1161,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                         <div><h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Event performance</h2><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Revenue by event</p></div>
                         <BarChartIcon size={17} style={{ color: 'var(--accent)' }} />
                       </div>
-                      <EventPerformanceChart events={events} orders={netRevenueOrders} />
+                        <EventPerformanceChart events={events} performance={eventAnalytics} />
                     </div>
                   </div>
 
@@ -1226,8 +1322,17 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
               {/* ── ORDERS ── */}
               {section === 'orders' && (
                 <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                  <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
-                    <h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>{orders.length} Orders</h2>
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}>
+                    <div>
+                      <h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>{orders.length.toLocaleString()} Orders</h2>
+                      <p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>
+                        {orderStatusCounts.confirmed} confirmed · {orderStatusCounts.pending} pending · {orderStatusCounts.cancelled} cancelled · {orderStatusCounts.refunded} refunded
+                        {lastUpdated && ` · Updated ${lastUpdated.toLocaleTimeString()}`}
+                      </p>
+                    </div>
+                    <button type="button" onClick={() => void load()} disabled={dataLoading} className="rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-50" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>
+                      {dataLoading ? 'Refreshing…' : 'Refresh orders'}
+                    </button>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -1537,6 +1642,62 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                   </div>
                 </div>
               )}
+
+              {section === 'payouts' && isOwner && (
+                <div className="mx-auto max-w-5xl space-y-5">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--primary)' }}>Organizer wallet</p>
+                    <h2 className="mt-1 text-2xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Payouts</h2>
+                    <p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>Request a transfer of settled earnings to your Mobile Money number or bank account.</p>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-2xl border p-5" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+                      <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Available to request</p>
+                      <p className="mt-2 text-3xl font-black" style={{ fontFamily: 'Outfit, sans-serif', color: 'var(--primary)' }}>{formatPrice(availablePayoutBalance)}</p>
+                      <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>Calculated from completed payment, fee, refund, and payout ledger entries, less agent commissions. Pending requests reserve funds.</p>
+                    </div>
+                    <div className="rounded-2xl border p-5" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+                      <div className="mb-4"><h3 className="font-bold">Request a payout</h3><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>The platform team reviews requests and updates their status after processing.</p></div>
+                      {payoutNotice && <p role="status" className="mb-3 rounded-xl border px-3 py-2 text-xs" style={{ background: 'rgba(34,197,94,.1)', borderColor: 'rgba(34,197,94,.25)', color: '#86efac' }}>{payoutNotice}</p>}
+                      <div className="space-y-3">
+                        <label className="block text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Amount (BIF)
+                          <input type="number" min="1" step="1" max={availablePayoutBalance} inputMode="numeric" value={payoutAmount} onChange={event => setPayoutAmount(event.target.value)} placeholder="Enter a whole amount" className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
+                        </label>
+                        <label className="block text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Payment method
+                          <select value={payoutMethod} onChange={event => setPayoutMethod(event.target.value as 'mobile_money' | 'bank')} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
+                            <option value="mobile_money">Mobile Money</option>
+                            <option value="bank">Bank transfer</option>
+                          </select>
+                        </label>
+                        <label className="block text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{payoutMethod === 'mobile_money' ? 'Receiving phone number' : 'Bank account reference'}
+                          <input type="text" autoComplete="off" value={payoutReference} onChange={event => setPayoutReference(event.target.value)} placeholder={payoutMethod === 'mobile_money' ? '+257 79 000 000' : 'Account holder / account number'} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
+                        </label>
+                        <button type="button" onClick={() => void submitPayoutRequest()} disabled={payoutSubmitting || !isOwner || availablePayoutBalance <= 0} className="w-full rounded-xl px-4 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50" style={{ background: 'var(--primary)', color: '#000' }}>
+                          {payoutSubmitting ? 'Submitting request…' : availablePayoutBalance <= 0 ? 'No available balance' : 'Submit payout request'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="overflow-hidden rounded-2xl border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+                    <div className="border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}>
+                      <h3 className="font-bold">Payout request history</h3>
+                      <p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{withdrawals.length.toLocaleString()} request{withdrawals.length === 1 ? '' : 's'} · updated {lastUpdated?.toLocaleTimeString() ?? 'loading'}</p>
+                    </div>
+                    {withdrawals.length === 0 ? <p className="px-5 py-12 text-center text-sm" style={{ color: 'var(--muted-foreground)' }}>No payout requests yet. Your submitted requests will appear here.</p> : <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+                      {withdrawals.map(withdrawal => <div key={withdrawal.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2"><p className="font-bold">{formatPrice(withdrawal.amount)}</p><Badge label={withdrawal.status} color={STATUS_COLORS[withdrawal.status] ?? '#888'} /></div>
+                          <p className="mt-1 text-xs capitalize" style={{ color: 'var(--muted-foreground)' }}>{withdrawal.payment_method === 'mobile_money' ? 'Mobile Money' : 'Bank transfer'} · {withdrawal.payment_reference}</p>
+                          <p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Requested {new Date(withdrawal.requested_at).toLocaleString()}{withdrawal.note ? ` · ${withdrawal.note}` : ''}</p>
+                        </div>
+                        {withdrawal.status === 'requested' && <button type="button" onClick={() => void cancelPayoutRequest(withdrawal)} className="self-start rounded-lg px-3 py-2 text-xs font-bold sm:self-auto" style={{ background: 'rgba(239,68,68,.1)', color: '#fca5a5' }}>Cancel request</button>}
+                      </div>)}
+                    </div>}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -1566,6 +1727,7 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
   const [coverPreview, setCoverPreview] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const endTimeIsBeforeStart = Boolean(form.end_time && form.time && form.end_time.slice(0, 5) <= form.time.slice(0, 5))
 
   const createCoverDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
@@ -1592,6 +1754,10 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
     const venue = form.venue.trim()
     const capacity = Number.parseInt(form.capacity, 10)
     if (!title || !form.date || !venue) { setError('Event title, date, and venue are required.'); return }
+    if (form.end_time && form.time && form.end_time.slice(0, 5) <= form.time.slice(0, 5)) {
+      setError('Event ending time must be later than the start time on the selected event date.')
+      return
+    }
     if (!Number.isInteger(capacity) || capacity < 1) { setError('Event capacity must be a positive whole number.'); return }
     if (!tiers.length) { setError('Add at least one ticket tier.'); return }
     const normalizedTierNames = new Set<string>()
@@ -1809,8 +1975,10 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
             </div>
             <div>
               <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Event ending time</label>
-              <input type="time" value={form.end_time} onChange={e => f('end_time', e.target.value)} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} />
-              <p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>The event is marked ended when this time is reached.</p>
+              <input type="time" value={form.end_time} min={form.time || undefined} aria-invalid={endTimeIsBeforeStart} onChange={e => f('end_time', e.target.value)} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: `1px solid ${endTimeIsBeforeStart ? '#ef4444' : 'var(--border)'}`, color: '#fff' }} />
+              {endTimeIsBeforeStart
+                ? <p role="alert" className="mt-1 text-[10px]" style={{ color: '#fca5a5' }}>Ending time must be later than the start time on the selected event date.</p>
+                : <p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Must be later than the start time. The event date above applies to both times.</p>}
             </div>
           </div>
           <div>
@@ -1891,7 +2059,7 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
             ))}
           </div>
 
-          <button onClick={handleSubmit} disabled={saving} className="w-full py-3.5 rounded-xl font-black" style={{ background: 'var(--primary)', color: '#000', opacity: saving ? 0.7 : 1 }}>
+          <button onClick={handleSubmit} disabled={saving || endTimeIsBeforeStart} className="w-full py-3.5 rounded-xl font-black disabled:cursor-not-allowed" style={{ background: 'var(--primary)', color: '#000', opacity: saving || endTimeIsBeforeStart ? 0.55 : 1 }}>
             {saving ? (event ? 'Saving...' : 'Creating...') : event ? 'Save event changes' : 'Create Event (Draft)'}
           </button>
         </div>

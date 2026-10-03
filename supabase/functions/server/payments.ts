@@ -293,7 +293,9 @@ export function createPaymentAdapter(env: Record<string, string | undefined> = D
   const provider = env.PAYMENT_PROVIDER?.trim().toLowerCase()
   if (!provider) return new UnconfiguredPaymentAdapter()
   if (provider === 'demo' || provider === 'test') return new DemoPaymentAdapter()
-  if (provider === 'unipesa' || provider === 'unipesa_pay' || provider === 'uni_pesa') return new UnipesaPaymentAdapter(env)
+  if (provider === 'unipesa' || provider === 'unipesa_pay' || provider === 'uni_pesa') {
+    throw new Error('Unipesa payments are disabled until provider-side webhook verification is configured. Use dpo_pay for verified live payments.')
+  }
   if (provider === 'dpo_pay' || provider === 'dpo') return new DpoPayAdapter(env)
   throw new Error(`Payment provider "${provider}" has no adapter implementation yet.`)
 }

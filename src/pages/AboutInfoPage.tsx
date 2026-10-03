@@ -1,4 +1,4 @@
-import { ArrowRightIcon, CheckIcon, MapPinIcon, SparkleIcon, TicketIcon, UsersIcon } from '../components/Icon'
+import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, MapPinIcon, SparkleIcon, TicketIcon, UsersIcon } from '../components/Icon'
 
 type Props = { navigate: (page: string) => void }
 
@@ -7,7 +7,7 @@ export default function AboutInfoPage({ navigate }: Props) {
     <main className="about-company-page">
       <section className="about-company-hero">
         <div className="about-company-hero-inner">
-          <button onClick={() => navigate('home')} className="about-company-back">Back to Tiketi</button>
+          <button type="button" onClick={() => navigate('home')} className="about-company-back" aria-label="Back to Tiketi" title="Back to Tiketi"><ArrowLeftIcon size={18} /></button>
           <p className="about-company-eyebrow"><span /> About Tiketi</p>
           <h1>Making events feel <em>closer.</em></h1>
           <p>Tiketi is building the home for the moments that bring Bujumbura together, from the first discovery to the last song of the night.</p>

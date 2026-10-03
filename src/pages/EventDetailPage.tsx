@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { ArrowLeftIcon, CalendarIcon, CheckIcon, ClockIcon, FacebookIcon, HeartIcon, InstagramIcon, LinkIcon, MinusIcon, PlusIcon, ShareIcon, TwitterXIcon, UserIcon, WhatsAppIcon, XIcon } from '../components/Icon'
+import { ArrowLeftIcon, CalendarIcon, CheckIcon, ClockIcon, FacebookIcon, HeartIcon, InstagramIcon, LinkIcon, MinusIcon, PlusIcon, ShareNodesIcon, TwitterXIcon, UserIcon, WhatsAppIcon, XIcon } from '../components/Icon'
 import EventCard from '../components/EventCard'
 import type { Event, TicketTier } from '../lib/types'
 import { isFavoriteEvent, toggleFavoriteEvent } from '../lib/favorites'
+import { getEventEndTimestamp, hasEventEnded } from '../lib/eventTime'
+import { formatLocaleDate } from '../lib/locale'
+import i18n from '../lib/i18n'
 
 type Props = { event: Event; navigate: (p: string, extra?: unknown) => void; onRequireAuth?: (title: string, message: string, mode?: 'customer' | 'organizer') => void }
 
@@ -21,19 +24,24 @@ const DEFAULT_CHECKOUT_SETTINGS: CheckoutSettings = {
 const FALLBACK = 'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=1600&h=500&fit=crop&auto=format'
 
 function formatDate(value: string) {
-  return new Date(`${value}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  return formatLocaleDate(`${value}T00:00:00`, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+function formatEventTime(value?: string | null) {
+  const start = value?.match(/^(\d{1,2}:\d{2})/)?.[1]
+  return start || 'TBA'
 }
 
 function formatPrice(value: number) { return value === 0 ? 'Free' : `BIF ${value.toLocaleString()}` }
 
 function eventHasEnded(event: Event) {
-  return new Date(`${event.date}T${event.end_time || '23:59:59'}`).getTime() < Date.now()
+  return hasEventEnded(event.date, event.time, event.end_time)
 }
 
 function sortUpcomingFirst(events: Event[]) {
   return [...events].sort((a, b) => {
-    const aTime = new Date(`${a.date}T${a.end_time || a.time || '23:59:59'}`).getTime()
-    const bTime = new Date(`${b.date}T${b.end_time || b.time || '23:59:59'}`).getTime()
+    const aTime = getEventEndTimestamp(a.date, a.time, a.end_time)
+    const bTime = getEventEndTimestamp(b.date, b.time, b.end_time)
     const aUpcoming = aTime >= Date.now()
     const bUpcoming = bTime >= Date.now()
 
@@ -51,7 +59,11 @@ function countdownParts(event: Event) {
 export default function EventDetailPage({ event, navigate, onRequireAuth }: Props) {
   const { user } = useAuth()
   const tiers: TicketTier[] = event.ticket_tiers ?? []
-  const [eventTags, setEventTags] = useState<string[]>(event.tags ?? [])
+  const [eventTags, setEventTags] = useState<string[]>(() => {
+    if (Array.isArray(event.tags)) return event.tags
+    const legacyTags = event.tags as unknown
+    return typeof legacyTags === 'string' ? legacyTags.split(',').map(tag => tag.trim()).filter(Boolean) : []
+  })
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [related, setRelated] = useState<Event[]>([])
   const [relatedError, setRelatedError] = useState('')
@@ -200,25 +212,25 @@ export default function EventDetailPage({ event, navigate, onRequireAuth }: Prop
   return (
     <main className={`sinc-event-page ${ended ? 'sinc-ended-page' : ''}`} style={{ '--event-cover-image': `url(${event.cover_image || FALLBACK})` } as React.CSSProperties}>
       <section className="sinc-event-cover" style={{ backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.7)), url(${event.cover_image || FALLBACK})` }}>
-        <button className="sinc-cover-back" onClick={() => navigate('events')} aria-label="Back to events"><ArrowLeftIcon size={18} /></button>
+        <button type="button" className="sinc-cover-back" onClick={() => navigate('events')} aria-label="Back to events" title="Back to events"><ArrowLeftIcon size={18} /></button>
       </section>
 
       <section className="sinc-event-identity">
-        <div className="sinc-event-toolbar"><div className="sinc-event-actions"><button onClick={() => void toggleFavorite()} aria-label={liked ? 'Remove event from favorites' : 'Save event'} aria-pressed={liked}><HeartIcon size={18} filled={liked} /></button><span className="sinc-share-wrap"><button onClick={() => setShareOpen(value => !value)} aria-label="Share event" aria-expanded={shareOpen}>{copied ? <CheckIcon size={17} /> : <ShareIcon size={17} />}</button>{shareOpen && <><button className="sinc-share-backdrop" aria-label="Close share sheet" onClick={() => setShareOpen(false)} /><div className="sinc-share-popover"><div className="sinc-share-heading"><div><strong>Share this event</strong><small>Send it to someone who would love it.</small></div><button className="sinc-share-close" onClick={() => setShareOpen(false)} aria-label="Close share sheet"><XIcon size={17} /></button></div><div className="sinc-share-options"><a href={`https://wa.me/?text=${shareTitle}%20${shareUrl}`} target="_blank" rel="noreferrer"><WhatsAppIcon size={22} /><span>WhatsApp</span></a><a href={`https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`} target="_blank" rel="noreferrer"><FacebookIcon size={22} /><span>Facebook</span></a><a href="https://www.instagram.com/" target="_blank" rel="noreferrer"><InstagramIcon size={22} /><span>Instagram</span></a><a href={`https://twitter.com/intent/tweet?text=${shareTitle}&url=${shareUrl}`} target="_blank" rel="noreferrer"><TwitterXIcon size={20} /><span>X</span></a><button onClick={copyLink}><LinkIcon size={21} /><span>{copied ? 'Copied' : 'Copy link'}</span></button></div></div></>}</span></div></div>
+        <div className="sinc-event-toolbar"><div className="sinc-event-actions"><button onClick={() => void toggleFavorite()} aria-label={liked ? 'Remove event from favorites' : 'Save event'} aria-pressed={liked}><HeartIcon size={18} filled={liked} /></button><span className="sinc-share-wrap"><button onClick={() => setShareOpen(value => !value)} aria-label="Share event" aria-expanded={shareOpen}>{copied ? <CheckIcon size={17} /> : <ShareNodesIcon size={17} />}</button>{shareOpen && <><button className="sinc-share-backdrop" aria-label="Close share sheet" onClick={() => setShareOpen(false)} /><div className="sinc-share-popover"><div className="sinc-share-heading"><div><strong>Share this event</strong><small>Send it to someone who would love it.</small></div><button className="sinc-share-close" onClick={() => setShareOpen(false)} aria-label="Close share sheet"><XIcon size={17} /></button></div><div className="sinc-share-options"><a href={`https://wa.me/?text=${shareTitle}%20${shareUrl}`} target="_blank" rel="noreferrer"><WhatsAppIcon size={22} /><span>WhatsApp</span></a><a href={`https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`} target="_blank" rel="noreferrer"><FacebookIcon size={22} /><span>Facebook</span></a><a href="https://www.instagram.com/" target="_blank" rel="noreferrer"><InstagramIcon size={22} /><span>Instagram</span></a><a href={`https://twitter.com/intent/tweet?text=${shareTitle}&url=${shareUrl}`} target="_blank" rel="noreferrer"><TwitterXIcon size={20} /><span>X</span></a><button onClick={copyLink}><LinkIcon size={21} /><span>{copied ? 'Copied' : 'Copy link'}</span></button></div></div></>}</span></div></div>
         {eventTags.length > 0 && <div className="sinc-event-chip-row">{eventTags.map((tag) => <span key={tag} className="sinc-chip">#{tag}</span>)}</div>}
         <div className="sinc-countdown"><p><span /> STARTS IN</p><div>{countdown.map((value, index) => <span key={index}><strong>{String(value).padStart(2, '0')}</strong><small>{['Days', 'Hrs', 'Min', 'Sec'][index]}</small></span>)}</div></div>
-        <div className="sinc-title-row"><h1>{event.title}</h1>{ended && <span className="sinc-ended-badge">Event ended</span>}</div>
+        <div className="sinc-title-row"><h1 data-locale-ignore>{event.title}</h1>{ended && <span className="sinc-ended-badge">Event ended</span>}</div>
         <div className="sinc-organizer">
           <span className="sinc-organizer-logo"><span className="sinc-organizer-logo-image">{organizerAvatar ? <img src={organizerAvatar} alt={organizerName} /> : organizerName.slice(0, 1).toUpperCase()}</span>{organizerIsVerified && <span className="verified-profile-badge sinc-organizer-verified" aria-label="Verified organizer"><CheckIcon size={10} /></span>}</span>
-          <span><small>Organizer</small><b>{organizerUsername ? `@${organizerUsername}` : organizerName}</b></span>
+          <span><small>Organizer</small><b data-locale-ignore>{organizerUsername ? `@${organizerUsername}` : organizerName}</b></span>
         </div>
-        <div className="sinc-profile-actions"><button onClick={() => event.organizers && navigate('organizer-profile', event.organizers)}>View Profile</button><button onClick={user?.id === event.organizers?.user_id ? () => navigate('profile') : toggleOrganizerFollow} disabled={followBusy}>{user?.id === event.organizers?.user_id ? 'Your profile' : isFollowingOrganizer ? 'Following' : 'Follow'}</button></div>{followError && <p className="text-xs mt-2" style={{ color: '#fca5a5' }}>{followError}</p>}
-        <section className="sinc-details-section sinc-details-under-actions"><h2>Event details</h2><div className="sinc-detail-grid"><div><CalendarIcon size={17} /><span><small>Date</small><b>{formatDate(event.date)}</b></span></div><div><ClockIcon size={17} /><span><small>Time</small><b>{event.time?.slice(0, 5) || 'TBA'}</b></span></div><div><UserIcon size={17} /><span><small>Organizer</small><b>{organizerName}</b></span></div></div><div className="sinc-policy-row"><CheckIcon size={15} /> {event.refund_policy || 'Tickets are non-refundable'} <CheckIcon size={15} /> {event.entry_policy || 'Valid ID required at entry'}</div></section>
+        <div className="sinc-profile-actions"><button onClick={() => event.organizers && navigate('organizer-profile', event.organizers)}>View Profile</button><button className={isFollowingOrganizer ? 'is-following' : ''} onClick={user?.id === event.organizers?.user_id ? () => navigate('profile') : toggleOrganizerFollow} disabled={followBusy} aria-pressed={user?.id !== event.organizers?.user_id ? isFollowingOrganizer : undefined}>{user?.id === event.organizers?.user_id ? 'Your profile' : followBusy ? 'Saving…' : isFollowingOrganizer ? 'Following' : 'Follow'}</button></div>{followError && <p className="text-xs mt-2" style={{ color: '#fca5a5' }}>{followError}</p>}
+        <section className="sinc-details-section sinc-details-under-actions"><h2>Event details</h2><div className="sinc-detail-grid"><div><CalendarIcon size={17} /><span><small>Date</small><b>{formatDate(event.date)}</b></span></div><div><ClockIcon size={17} /><span><small>Time</small><b><time dir="ltr" data-locale-ignore style={{ display: 'inline-block', whiteSpace: 'nowrap' }}>{formatEventTime(event.time)}</time></b></span></div><div><UserIcon size={17} /><span><small>Organizer</small><b>{organizerName}</b></span></div></div><div className="sinc-policy-row"><CheckIcon size={15} /> {event.refund_policy || 'Tickets are non-refundable'} <CheckIcon size={15} /> {event.entry_policy || 'Valid ID required at entry'}</div></section>
       </section>
 
       <section className="sinc-event-body">
         <div className="sinc-event-description"><h2>About this event</h2><p>{event.description || 'Join us for an unforgettable experience.'}</p></div>
-        <section className="sinc-ticket-section"><div className="sinc-ticket-heading"><h2>Get tickets</h2></div><div className="sinc-ticket-content"><p>Choose your ticket type to continue</p><div className="sinc-ticket-list">{tiers.length === 0 && <div className="sinc-empty-tickets">Tickets will be available soon.</div>}{tiers.map(tier => { const remaining = Math.max(0, tier.quantity - tier.sold); const soldOut = remaining === 0; const tierType = tier.ticket_type === 'non_consumable' ? 'Non-consumable' : 'Consumable'; const expiry = tier.expires_at ? `Expires ${new Date(`${tier.expires_at}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : null; return <div className={`sinc-ticket-row ${soldOut || ended ? 'is-sold-out' : ''}`} key={tier.id}><div className="sinc-ticket-copy"><strong>{tier.name}</strong><span>{tier.price === 0 ? 'Free' : formatPrice(tier.price)}</span><small>{[tier.description, tier.extra_info, tierType, (tier.group_size ?? 1) > 1 ? `${tier.group_size} tickets per purchase` : null, expiry].filter(Boolean).join(' · ')}</small></div>{ended ? <span className="sinc-ended-row-label">EVENT ENDED</span> : soldOut ? <span className="sinc-sold-stamp">SOLD OUT</span> : <div className="sinc-ticket-quantity"><button onClick={() => changeQuantity(tier, -1)} aria-label={`Remove ${tier.name}`}><MinusIcon size={14} /></button><b>{quantities[tier.id] || 0}</b><button onClick={() => changeQuantity(tier, 1)} aria-label={`Add ${tier.name}`}><PlusIcon size={14} /></button></div>}</div> })}</div><p className="sinc-contact-note">{ended ? 'This event has ended and tickets are no longer available.' : <>Questions about tickets? <span>Contact the organizer.</span></>}</p>{subtotal > 0 && <div className="sinc-total-row"><span>Total <small>{totalTickets} ticket{totalTickets === 1 ? '' : 's'} · no customer service fee</small></span><strong>{formatPrice(total)}</strong></div>}<button className="sinc-continue-button" onClick={checkout} disabled={ended || !totalTickets}>{ended ? 'Event ended' : 'Continue'}</button></div></section>
+        <section className="sinc-ticket-section"><div className="sinc-ticket-heading"><h2>Get tickets</h2></div><div className="sinc-ticket-content"><p>Choose your ticket type to continue</p><div className="sinc-ticket-list">{tiers.length === 0 && <div className="sinc-empty-tickets">Tickets will be available soon.</div>}{tiers.map(tier => { const remaining = Math.max(0, tier.quantity - tier.sold); const soldOut = remaining === 0; const tierType = i18n.t(tier.ticket_type === 'non_consumable' ? 'Non-consumable' : 'Consumable'); const expiry = tier.expires_at ? `${i18n.t('Expires')} ${formatLocaleDate(`${tier.expires_at}T00:00:00`, { day: 'numeric', month: 'short', year: 'numeric' })}` : null; return <div className={`sinc-ticket-row ${soldOut || ended ? 'is-sold-out' : ''}`} key={tier.id}><div className="sinc-ticket-copy"><strong>{tier.name}</strong><span>{tier.price === 0 ? 'Free' : formatPrice(tier.price)}</span><small>{[tier.description ? i18n.t(tier.description) : null, tier.extra_info ? i18n.t(tier.extra_info) : null, tierType, (tier.group_size ?? 1) > 1 ? `${tier.group_size} ${i18n.t('tickets per purchase')}` : null, expiry].filter(Boolean).join(' · ')}</small></div>{ended ? <span className="sinc-ended-row-label">EVENT ENDED</span> : soldOut ? <span className="sinc-sold-stamp">SOLD OUT</span> : <div className="sinc-ticket-quantity"><button onClick={() => changeQuantity(tier, -1)} aria-label={`Remove ${tier.name}`}><MinusIcon size={14} /></button><b>{quantities[tier.id] || 0}</b><button onClick={() => changeQuantity(tier, 1)} aria-label={`Add ${tier.name}`}><PlusIcon size={14} /></button></div>}</div> })}</div><p className="sinc-contact-note">{ended ? 'This event has ended and tickets are no longer available.' : <>Questions about tickets? <span>Contact the organizer.</span></>}</p>{subtotal > 0 && <div className="sinc-total-row"><span>Total <small>{totalTickets} ticket{totalTickets === 1 ? '' : 's'} · no customer service fee</small></span><strong>{formatPrice(total)}</strong></div>}<button className="sinc-continue-button" onClick={checkout} disabled={ended || !totalTickets}>{ended ? 'Event ended' : 'Continue'}</button></div></section>
 
         <section className="sinc-location-section"><div className="sinc-section-title"><h2>Location</h2><a href={venueMapUrl} target="_blank" rel="noreferrer">View on map</a></div><p>{event.venue}</p><div className="sinc-map"><iframe title={`${event.venue} map`} src={`https://www.google.com/maps?q=${encodeURIComponent(venueMapQuery)}&output=embed`} loading="lazy" referrerPolicy="no-referrer-when-downgrade" /></div></section>
 

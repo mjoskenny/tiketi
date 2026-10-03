@@ -20,6 +20,15 @@ export const HeartIcon = ({ size = 18, filled = false, className, style }: IconP
   </svg>
 )
 export const ShareIcon = base(['M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13'])
+export const ShareNodesIcon = ({ size = 18, className, style }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
+    <circle cx="18" cy="5" r="3" />
+    <circle cx="6" cy="12" r="3" />
+    <circle cx="18" cy="19" r="3" />
+    <path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98" />
+  </svg>
+)
 export const DownloadIcon = base(['M12 3v12M7 10l5 5 5-5M5 21h14'])
 export const MailIcon = base(['M3 5h18v14H3z', 'M3 6l9 7 9-7'])
 export const ChevronRightIcon = base('M9 18l6-6-6-6')

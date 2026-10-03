@@ -3,6 +3,7 @@ import { ArrowLeftIcon, CheckIcon, CameraIcon, XIcon } from '../components/Icon'
 import { supabase } from '../lib/supabase'
 import { BrowserQRCodeReader, type IScannerControls } from '@zxing/browser'
 import type { Ticket } from '../lib/types'
+import { formatLocaleDateTime } from '../lib/locale'
 
 type Props = { eventId: string; eventTitle: string; tickets: Ticket[]; onTicketsChanged: () => void; onClose: () => void }
 type ScanResult = 'valid' | 'used' | 'invalid' | 'declined' | 'error' | null
@@ -114,9 +115,9 @@ export default function CheckInPanel({ eventId, eventTitle, tickets, onTicketsCh
     <div className="fixed inset-0 z-[85] flex min-h-screen flex-col overflow-y-auto" style={{ background: '#060606', color: '#fff' }}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
-        <button onClick={onClose} className="flex items-center gap-2 text-sm"
+        <button type="button" onClick={onClose} aria-label="Back to event details" title="Back to event details" className="flex h-10 w-10 items-center justify-center rounded-full"
           style={{ color: 'var(--muted-foreground)' }}>
-          <ArrowLeftIcon size={14} /> Event details
+          <ArrowLeftIcon size={18} />
         </button>
         <p className="font-black text-lg" style={{ fontFamily: 'Outfit, sans-serif', color: 'var(--primary)' }}>Event check-in</p>
         <div className="text-right">
@@ -227,7 +228,7 @@ export default function CheckInPanel({ eventId, eventTitle, tickets, onTicketsCh
                   <div style={{ color: '#ef4444' }}><AlertIcon size={28} /></div>
                 </div>
                 <h2 className="text-3xl font-bold mb-1" style={{ fontFamily: 'Outfit, sans-serif', color: '#ef4444' }}>Already Used</h2>
-                <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.5)' }}>Originally checked in: {resultData.checked_in_at ? new Date(resultData.checked_in_at).toLocaleString() : 'Previously'}</p>
+                <p className="text-sm mb-6" style={{ color: 'rgba(255,255,255,0.5)' }}>Originally checked in: {resultData.checked_in_at ? formatLocaleDateTime(resultData.checked_in_at) : 'Previously'}</p>
                 <div className="rounded-2xl p-4 text-left" style={{ background: 'rgba(255,255,255,0.04)' }}>
                   <div className="flex justify-between mb-2">
                     <span className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>Name</span>

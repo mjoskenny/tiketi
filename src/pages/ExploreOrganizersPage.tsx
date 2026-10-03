@@ -40,14 +40,14 @@ export default function ExploreOrganizersPage({ navigate }: Props) {
 
       setOrganizers(organizerData.filter(organizer => organizer.verified || organizer.verification_status === 'verified').map(organizer => ({
         ...organizer,
-        cover_image: organizer.profiles?.cover_image ?? ORGANIZER_COVER_PLACEHOLDER,
-        logo_url: organizer.profiles?.profile_image ?? organizer.profiles?.avatar_url ?? organizer.logo_url ?? null,
+        cover_image: organizer.profiles?.cover_image || ORGANIZER_COVER_PLACEHOLDER,
+        logo_url: organizer.profiles?.profile_image || organizer.profiles?.avatar_url || organizer.logo_url || null,
         profiles: {
           ...(organizer.profiles ?? {}),
           username: organizer.profiles?.username ?? null,
-          profile_image: organizer.profiles?.profile_image ?? organizer.profiles?.avatar_url ?? organizer.logo_url ?? null,
-          avatar_url: organizer.profiles?.profile_image ?? organizer.profiles?.avatar_url ?? organizer.logo_url ?? null,
-          cover_image: organizer.profiles?.cover_image ?? ORGANIZER_COVER_PLACEHOLDER,
+          profile_image: organizer.profiles?.profile_image || organizer.profiles?.avatar_url || organizer.logo_url || null,
+          avatar_url: organizer.profiles?.profile_image || organizer.profiles?.avatar_url || organizer.logo_url || null,
+          cover_image: organizer.profiles?.cover_image || ORGANIZER_COVER_PLACEHOLDER,
         },
       event_count: covers.get(organizer.id)?.count ?? 0,
       })))
@@ -84,7 +84,7 @@ export default function ExploreOrganizersPage({ navigate }: Props) {
     <main className="explore-organizers-page min-h-screen" style={{ color: 'var(--foreground)' }}>
       <section className="explore-organizers-hero">
         <div className="mx-auto max-w-7xl px-4 pb-12 pt-28 sm:px-6 md:pb-16">
-          <button onClick={() => navigate('home')} className="explore-organizers-back mb-8 flex items-center gap-2 text-sm font-medium"><ArrowLeftIcon size={16} />Back to events</button>
+          <button type="button" onClick={() => navigate('home')} className="explore-organizers-back mb-8 flex h-10 w-10 items-center justify-center rounded-full" aria-label="Back to events" title="Back to events"><ArrowLeftIcon size={18} /></button>
           <div className="mb-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="organizer-eyebrow mb-3"><SparkleIcon size={14} /> The people behind the plans</p>
@@ -92,8 +92,8 @@ export default function ExploreOrganizersPage({ navigate }: Props) {
             <p className="max-w-xl text-base" style={{ color: 'var(--muted-foreground)' }}>Follow the teams shaping the city&apos;s best nights, gatherings and ideas.</p>
           </div>
           <div className="explore-organizers-search relative w-full md:max-w-xs">
-            <SearchIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: 'var(--muted-foreground)' }} />
-            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search organizers" className="w-full rounded-xl py-3 pl-11 pr-4 text-sm outline-none" />
+            <SearchIcon size={16} className="attendee-control-icon pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2" style={{ color: 'var(--muted-foreground)' }} />
+            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search organizers" aria-label="Search organizers" className="attendee-search-input w-full rounded-full py-3.5 pl-11 pr-4 text-sm outline-none" />
           </div>
         </div>
         </div>

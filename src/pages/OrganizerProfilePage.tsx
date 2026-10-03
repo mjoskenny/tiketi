@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeftIcon, CheckIcon, UserIcon, CalendarIcon, MapPinIcon, UsersIcon } from '../components/Icon'
+import { ArrowLeftIcon, CheckIcon, UserIcon, CalendarIcon, MailIcon, MapPinIcon, ShareNodesIcon, UsersIcon } from '../components/Icon'
 import EventCard from '../components/EventCard'
+import ShareDialog from '../components/ShareDialog'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import type { Event, Organizer } from '../lib/types'
 import { ORGANIZER_COVER_PLACEHOLDER } from '../lib/profileMedia'
+import { getEventEndTimestamp, hasEventEnded } from '../lib/eventTime'
+import { organizerShareUrl } from '../lib/share'
+import { currentLocale, formatLocaleDate } from '../lib/locale'
+import i18n from '../lib/i18n'
 
 type Props = { organizer: Organizer; navigate: (p: string, extra?: unknown) => void }
 
 function formatEventDate(date: string) {
-  return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })
+  return formatLocaleDate(date, { day: 'numeric', month: 'short', year: '2-digit' })
 }
 
 function formatPrice(value: number) {
@@ -23,8 +28,7 @@ function getMinPrice(event: Event) {
 }
 
 function getEventPhase(date: string, time: string, endTime?: string | null) {
-  const target = new Date(`${date}T${endTime || '23:59:59'}`)
-  return target.getTime() >= Date.now() ? 'active' : 'past'
+  return hasEventEnded(date, time, endTime) ? 'past' : 'active'
 }
 
 export default function OrganizerProfilePage({ organizer: initialOrganizer, navigate }: Props) {
@@ -38,6 +42,18 @@ export default function OrganizerProfilePage({ organizer: initialOrganizer, navi
   const [isFollowing, setIsFollowing] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
   const [followError, setFollowError] = useState('')
+  const [shareOpen, setShareOpen] = useState(false)
+  const [locale, setLocale] = useState(currentLocale())
+  const displayName = organizer.profiles?.full_name?.trim() || organizer.name
+  const localizedDescription = locale === 'fr-FR'
+    ? organizer.description_fr || organizer.description
+    : organizer.description_en || organizer.description
+
+  useEffect(() => {
+    const updateLocale = () => setLocale(currentLocale())
+    i18n.on('languageChanged', updateLocale)
+    return () => { i18n.off('languageChanged', updateLocale) }
+  }, [])
 
   useEffect(() => {
     if (!organizer.id) return
@@ -69,18 +85,31 @@ export default function OrganizerProfilePage({ organizer: initialOrganizer, navi
     } else setFollowError(result.error.code === '23505' ? 'You are already following this organizer.' : result.error.message)
     setFollowBusy(false)
   }
+
+  const emailOrganizer = () => {
+    const recipient = organizer.profiles?.email
+    if (!recipient) return
+    const composeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipient)}`
+    const composeWindow = window.open(composeUrl, '_blank')
+    if (composeWindow) composeWindow.opener = null
+    if (!composeWindow) window.location.assign(composeUrl)
+  }
   useEffect(() => {
     if (!organizer.user_id) return
 
     const loadOrganizerProfile = async () => {
-      const { data: profile } = await supabase
+      const [{ data: profile }, { data: localizedBio }] = await Promise.all([supabase
         .from('profiles')
-        .select('id, full_name, username, avatar_url, cover_image, email')
+        .select('id, full_name, username, profile_image, avatar_url, cover_image, email')
         .eq('id', organizer.user_id)
-        .maybeSingle()
+        .maybeSingle(), supabase
+        .from('organizers')
+        .select('description, description_en, description_fr')
+        .eq('id', organizer.id)
+        .maybeSingle()])
 
-      if (profile) {
-        setOrganizer(current => ({ ...current, profiles: profile }))
+      if (profile || localizedBio) {
+        setOrganizer(current => ({ ...current, ...(localizedBio ?? {}), profiles: profile ?? current.profiles }))
       }
     }
 
@@ -122,7 +151,7 @@ export default function OrganizerProfilePage({ organizer: initialOrganizer, navi
 
       const { data, error } = await supabase
         .from('events')
-        .select('*, organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles!organizers_user_id_fkey(id, full_name, username, avatar_url, cover_image, email))')
+        .select('*, organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email))')
         .eq('organizer_id', organizer.id)
         .eq('status', 'published')
         .order('date', { ascending: true })
@@ -167,14 +196,13 @@ export default function OrganizerProfilePage({ organizer: initialOrganizer, navi
       void supabase.removeChannel(channel)
     }
   }, [organizer.id, eventsRetryToken])
-  const displayName = organizer.profiles?.full_name?.trim() || organizer.name
   const organizerUsername = organizer.profiles?.username?.trim().replace(/^@/, '') || null
-  const organizerCover = organizer.profiles?.cover_image ?? ORGANIZER_COVER_PLACEHOLDER
-  const organizerAvatar = organizer.profiles?.profile_image ?? organizer.profiles?.avatar_url ?? organizer.logo_url ?? null
+  const organizerCover = organizer.profiles?.cover_image || ORGANIZER_COVER_PLACEHOLDER
+  const organizerAvatar = organizer.profiles?.profile_image || organizer.profiles?.avatar_url || organizer.logo_url || null
   const initials = displayName.slice(0, 1).toUpperCase()
   const sortedEvents = [...events].sort((a, b) => {
-    const aTime = new Date(`${a.date}T${a.end_time || a.time || '23:59:59'}`).getTime()
-    const bTime = new Date(`${b.date}T${b.end_time || b.time || '23:59:59'}`).getTime()
+    const aTime = getEventEndTimestamp(a.date, a.time, a.end_time)
+    const bTime = getEventEndTimestamp(b.date, b.time, b.end_time)
     const aUpcoming = aTime >= Date.now()
     const bUpcoming = bTime >= Date.now()
 
@@ -195,20 +223,24 @@ export default function OrganizerProfilePage({ organizer: initialOrganizer, navi
         <div className="sinc-organizer-cover-content">
           <div className="sinc-organizer-avatar"><span className="sinc-organizer-avatar-image">{organizerAvatar ? <img src={organizerAvatar} alt={displayName} /> : initials}</span>{(organizer.verified || organizer.verification_status === 'verified') && <span className="verified-profile-badge sinc-organizer-verified" aria-label="Verified organizer"><CheckIcon size={13} /></span>}</div>
           <div className="sinc-organizer-actions">
-            <button type="button" onClick={user?.id === organizer.user_id ? () => navigate('profile') : toggleFollow} disabled={followBusy}>{user?.id === organizer.user_id ? 'Your profile' : isFollowing ? 'Following' : 'Follow'}</button>
+            <button type="button" className="share-action-button sinc-organizer-action-icon" onClick={() => setShareOpen(true)} aria-label={`Share ${displayName}`} title="Share organizer">
+              <ShareNodesIcon size={16} />
+            </button>
+            {organizer.profiles?.email && <button type="button" className="share-action-button sinc-organizer-action-icon" onClick={emailOrganizer} aria-label={`Email ${displayName}`} title={user?.email ? `Email ${displayName} from your mail app` : 'Sign in to email this organizer'}><MailIcon size={16} /></button>}
+            <button type="button" className={`sinc-organizer-follow ${isFollowing ? 'is-following' : ''}`} onClick={user?.id === organizer.user_id ? () => navigate('profile') : toggleFollow} disabled={followBusy} aria-pressed={user?.id !== organizer.user_id ? isFollowing : undefined}>{user?.id === organizer.user_id ? 'Your profile' : followBusy ? 'Saving…' : isFollowing ? 'Following' : 'Follow'}</button>
           </div>
         </div>
         <div className="sinc-organizer-identities">
-          <p className="sinc-organizer-kicker">Organizer profile</p><h1>{displayName}</h1>
+          <p className="sinc-organizer-kicker">Organizer profile</p><h1 data-locale-ignore>{displayName}</h1>
           {organizerUsername && <p style={{ color: 'var(--accent)' }}>@{organizerUsername}</p>}
-          <div className="sinc-organizer-profile-meta"><span><UsersIcon size={14} /> {followerCount} follower{followerCount === 1 ? '' : 's'}</span><span><CalendarIcon size={14} /> {events.length} published event{events.length === 1 ? '' : 's'}</span>{organizer.city && <span><MapPinIcon size={14} /> {organizer.city}</span>}</div>
-          {organizer.description && <p className="sinc-organizer-description">{organizer.description}</p>}
+          <div className="sinc-organizer-profile-meta"><span><UsersIcon size={14} /> {`${followerCount} ${followerCount === 1 ? 'follower' : 'followers'}`}</span><span><CalendarIcon size={14} /> {`${events.length} ${events.length === 1 ? 'published event' : 'published events'}`}</span>{organizer.city && <span><MapPinIcon size={14} /> {organizer.city}</span>}</div>
+          {localizedDescription && <p className="sinc-organizer-description" data-locale-ignore>{localizedDescription}</p>}
           {followError && <p style={{ color: '#fca5a5' }}>{followError}</p>}
         </div>
       </section>
 
       <section className="sinc-organizer-content">
-        <div className="sinc-organizer-events-heading"><div><p className="sinc-organizer-kicker">What&apos;s on</p><h2 className="sinc-organizer-events-title">Events</h2></div><span>{activeEvents.length} upcoming</span></div>
+        <div className="sinc-organizer-events-heading"><div><p className="sinc-organizer-kicker">What&apos;s on</p><h2 className="sinc-organizer-events-title">Events</h2></div><span>{`${activeEvents.length} upcoming`}</span></div>
 
         <div className="sinc-organizer-event-list">
           {activeEvents.length > 0 && (
@@ -242,6 +274,7 @@ export default function OrganizerProfilePage({ organizer: initialOrganizer, navi
         </div>
 
       </section>
+      <ShareDialog open={shareOpen} title={displayName} url={organizerShareUrl(organizer)} onClose={() => setShareOpen(false)} />
     </main>
   )
 }

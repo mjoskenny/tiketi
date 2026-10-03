@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { signOut, supabase } from '../lib/supabase'
+import { fetchAllRows } from '../lib/supabasePagination'
 import { formatPrice } from '../data/events'
 import { BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, DollarSignIcon, TicketIcon, UserIcon, ArrowLeftIcon, EyeIcon } from '../components/Icon'
 import type { Event, TicketTier } from '../lib/types'
 import { sendOrderTicketEmails } from '../lib/ticketEmail'
+import { hasEventEnded } from '../lib/eventTime'
+import { currentLocale, formatLocaleDate } from '../lib/locale'
+import { LanguageSwitcher } from '../components/LocaleContent'
 
 type Section = 'overview' | 'events' | 'sell' | 'sales' | 'commissions' | 'wallet' | 'withdrawals' | 'notifications' | 'profile'
 type AgentSale = {
@@ -168,8 +172,7 @@ function price(value: number) {
 
 function eventHasEnded(event?: Event | null) {
   if (!event?.date) return false
-  const timestamp = new Date(`${event.date}T${event.end_time || event.time || '23:59:59'}`).getTime()
-  return Number.isFinite(timestamp) && timestamp < Date.now()
+  return hasEventEnded(event.date, event.time, event.end_time)
 }
 
 function Badge({ label, color }: { label: string; color: string }) {
@@ -260,6 +263,7 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
   const [notifications, setNotifications] = useState<AgentNotification[]>([])
   const [tickets, setTickets] = useState<AgentTicket[]>([])
   const [loading, setLoading] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -294,55 +298,43 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
   const loadAgentData = useCallback(async () => {
     if (!user) return
     setLoading(true)
+    try {
+      const { error: releaseError } = await supabase.rpc('release_matured_agent_commissions')
+      if (releaseError) throw releaseError
 
-    await supabase.rpc('release_matured_agent_commissions')
+      const [nextSales, nextCommissions, nextLedger, nextWithdrawals, notificationResult] = await Promise.all([
+        fetchAllRows((from, to) => supabase
+          .from('agent_sales')
+          .select('*, orders(id, total, status, holder_name, holder_email, holder_phone, created_at, event_id, events(title, date)), assignments:agent_assignments(id, commission_rate, event_id, events(title, date))')
+          .eq('agent_user_id', user.id)
+          .order('created_at', { ascending: false })
+          .range(from, to)),
+        fetchAllRows((from, to) => supabase.from('commissions').select('*').eq('agent_user_id', user.id).order('created_at', { ascending: false }).range(from, to)),
+        fetchAllRows((from, to) => supabase.from('commission_ledger').select('*').eq('agent_user_id', user.id).order('created_at', { ascending: false }).range(from, to)),
+        fetchAllRows((from, to) => supabase.from('agent_withdrawals').select('*').eq('agent_user_id', user.id).order('requested_at', { ascending: false }).range(from, to)),
+        supabase.from('notifications').select('id, type, title, body, read_at, created_at, event_id, recipient_scope').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
+      ])
+      if (notificationResult.error) throw notificationResult.error
 
-    const [salesResult, commissionResult, ledgerResult, withdrawalResult, notificationResult] = await Promise.all([
-      supabase
-        .from('agent_sales')
-        .select('*, orders(id, total, status, holder_name, holder_email, holder_phone, created_at, event_id, events(title, date)), assignments:agent_assignments(id, commission_rate, event_id, events(title, date))')
-        .eq('agent_user_id', user.id)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('commissions')
-        .select('*')
-        .eq('agent_user_id', user.id)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('commission_ledger')
-        .select('*')
-        .eq('agent_user_id', user.id)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('agent_withdrawals')
-        .select('*')
-        .eq('agent_user_id', user.id)
-        .order('requested_at', { ascending: false }),
-      supabase
-        .from('notifications')
-        .select('id, type, title, body, read_at, created_at, event_id, recipient_scope')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(50),
-    ])
+      const saleOrderIds = (nextSales as AgentSale[]).map(sale => sale.order_id)
+      const ticketPages = await Promise.all(Array.from({ length: Math.ceil(saleOrderIds.length / 250) }, (_, index) => {
+        const orderIdPage = saleOrderIds.slice(index * 250, (index + 1) * 250)
+        return fetchAllRows((from, to) => supabase.from('tickets').select('*, events(title, date, time, venue, cover_image, category, status), ticket_tiers(name, price, description, ticket_type, extra_info, expires_at, group_size)').in('order_id', orderIdPage).order('created_at', { ascending: false }).range(from, to))
+      }))
 
-    if (salesResult.error) {
-      setError(`Sales could not be loaded: ${salesResult.error.message}`)
+      setSales(nextSales as AgentSale[])
+      setCommissions(nextCommissions as CommissionRow[])
+      setWalletLedger(nextLedger as WalletEntry[])
+      setWithdrawals(nextWithdrawals as WithdrawalRow[])
+      setNotifications((notificationResult.data ?? []) as AgentNotification[])
+      setTickets(ticketPages.flat() as AgentTicket[])
+      setError('')
+      setLastUpdated(new Date())
+    } catch (loadError) {
+      setError(`Agent analytics could not be loaded: ${loadError instanceof Error ? loadError.message : 'Unknown error'}`)
+    } finally {
+      setLoading(false)
     }
-
-    const nextSales = (salesResult.data ?? []) as AgentSale[]
-    const saleOrderIds = nextSales.map(sale => sale.order_id)
-    const { data: ticketData } = saleOrderIds.length
-      ? await supabase.from('tickets').select('*, events(title, date, time, venue, cover_image, category, status), ticket_tiers(name, price, description, ticket_type, extra_info, expires_at, group_size)').in('order_id', saleOrderIds).order('created_at', { ascending: false })
-      : { data: [] }
-
-    setSales(nextSales)
-    setCommissions((commissionResult.data ?? []) as CommissionRow[])
-    setWalletLedger((ledgerResult.data ?? []) as WalletEntry[])
-    setWithdrawals((withdrawalResult.data ?? []) as WithdrawalRow[])
-    setNotifications((notificationResult.data ?? []) as AgentNotification[])
-    setTickets((ticketData ?? []) as AgentTicket[])
-    setLoading(false)
   }, [user])
 
   useEffect(() => {
@@ -370,6 +362,17 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
       .subscribe()
 
     return () => { void supabase.removeChannel(channel) }
+  }, [loadAgentData, user])
+
+  useEffect(() => {
+    if (!user) return
+    const refresh = () => { void loadAgentData() }
+    const interval = window.setInterval(refresh, 60_000)
+    window.addEventListener('focus', refresh)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('focus', refresh)
+    }
   }, [loadAgentData, user])
 
   const respond = async (id: string, accept: boolean) => {
@@ -494,19 +497,19 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
     setWithdrawAmount('50000')
   }
 
-  const totalRevenue = sales.reduce((sum, sale) => {
-    const isRevenueSale = sale.status === 'paid' || sale.orders?.status === 'confirmed'
-    return isRevenueSale ? sum + (sale.orders?.total ?? 0) : sum
-  }, 0)
+  const isRevenueSale = (sale: AgentSale) => sale.status === 'paid' && sale.orders?.status === 'confirmed'
+  const totalRevenue = sales.reduce((sum, sale) => sum + (isRevenueSale(sale) ? sale.orders?.total ?? 0 : 0), 0)
   const totalCommission = commissions.reduce((sum, row) => sum + row.amount, 0)
   const availableCommission = commissions.filter(item => item.status === 'available').reduce((sum, row) => sum + row.amount, 0)
   const pendingCommission = commissions.filter(item => item.status === 'pending').reduce((sum, row) => sum + row.amount, 0)
   const paidCommission = commissions.filter(item => item.status === 'paid').reduce((sum, row) => sum + row.amount, 0)
 
+  const today = new Date()
+  const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7))
   const chartData = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date()
-    date.setHours(0, 0, 0, 0)
-    date.setDate(date.getDate() - (6 - index))
+    const date = new Date(weekStart)
+    date.setDate(weekStart.getDate() + index)
     const nextDate = new Date(date)
     nextDate.setDate(date.getDate() + 1)
     const daySales = sales.filter(sale => {
@@ -514,10 +517,9 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
       return createdAt >= date && createdAt < nextDate
     })
     return {
-      label: date.toLocaleDateString('en', { weekday: 'short' }),
+      label: date.toLocaleDateString(currentLocale(), { weekday: 'short' }),
       revenue: daySales.reduce((sum, sale) => {
-        const isRevenueSale = sale.status === 'paid' || sale.orders?.status === 'confirmed'
-        return isRevenueSale ? sum + (sale.orders?.total ?? 0) : sum
+        return sum + (isRevenueSale(sale) ? sale.orders?.total ?? 0 : 0)
       }, 0),
       count: daySales.length,
     }
@@ -525,7 +527,7 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
 
   const eventPerformance = agentAssignments.map(assignment => ({
     title: assignment.events?.title ?? 'Assigned event',
-    revenue: sales.filter(sale => sale.assignment_id === assignment.id && (sale.status === 'paid' || sale.orders?.status === 'confirmed')).reduce((sum, sale) => sum + (sale.orders?.total ?? 0), 0),
+    revenue: sales.filter(sale => sale.assignment_id === assignment.id && isRevenueSale(sale)).reduce((sum, sale) => sum + (sale.orders?.total ?? 0), 0),
   })).sort((a, b) => b.revenue - a.revenue).slice(0, 5)
 
   const handleSignOut = async () => {
@@ -580,7 +582,7 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
     return (
       <main className="min-h-screen px-4 py-10" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
         <div className="mx-auto max-w-2xl">
-          <button onClick={() => navigate('home')} className="mb-8 text-sm font-bold" style={{ color: 'var(--muted-foreground)' }}>Back to Tiketi</button>
+          <button type="button" onClick={() => navigate('home')} aria-label="Back to Tiketi" title="Back to Tiketi" className="mb-8 flex h-10 w-10 items-center justify-center rounded-full" style={{ color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={18} /></button>
           <h1 className="text-4xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Agent invitations</h1>
           <p className="mt-2 text-sm" style={{ color: 'var(--muted-foreground)' }}>Choose whether to accept each assigned sales opportunity.</p>
           {agentInvitations.map(invitation => (
@@ -608,7 +610,7 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
           <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--primary)' }}>System status</p>
           <h1 className="mt-3 text-4xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>No active agent assignments</h1>
           <p className="mt-3 text-sm leading-6" style={{ color: 'var(--muted-foreground)' }}>This account is active, but no organizer has assigned event inventory for sales yet.</p>
-          <button onClick={() => navigate('home')} className="mt-6 rounded-xl px-5 py-3 text-sm font-bold" style={{ background: 'var(--primary)', color: '#000' }}>Back to Tiketi</button>
+          <button type="button" onClick={() => navigate('home')} aria-label="Back to Tiketi" title="Back to Tiketi" className="mt-6 flex h-12 w-12 items-center justify-center rounded-full" style={{ background: 'var(--primary)', color: '#000' }}><ArrowLeftIcon size={20} /></button>
         </div>
       </main>
     )
@@ -653,8 +655,8 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
         </nav>
 
         <div className="space-y-2 border-t p-4" style={{ borderColor: 'rgba(255,255,255,0.09)' }}>
-          <button type="button" onClick={() => navigate('home')} className="flex w-full items-center justify-center gap-2 py-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>
-            <ArrowLeftIcon size={14} /> Back to site
+          <button type="button" onClick={() => navigate('home')} aria-label="Back to site" title="Back to site" className="mx-auto flex h-10 w-10 items-center justify-center rounded-full" style={{ color: 'var(--muted-foreground)' }}>
+            <ArrowLeftIcon size={18} />
           </button>
         </div>
       </aside>
@@ -676,7 +678,11 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={() => navigate('home')} className="flex items-center gap-2 rounded-xl border px-2 py-2 text-xs font-bold sm:px-3" style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'var(--foreground)' }}>
+              <EyeIcon size={14} /><span className="hidden sm:inline">View site</span>
+            </button>
             {utilityPopup && <button className="fixed inset-0 z-10 cursor-default" aria-label="Close popup" onClick={() => setUtilityPopup(null)} />}
+            <LanguageSwitcher bare />
             <div className="relative z-20">
               <button onClick={() => setUtilityPopup(current => current === 'notifications' ? null : 'notifications')} aria-label="Notifications" title="Notifications" className="relative flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: utilityPopup === 'notifications' ? 'rgba(200,169,110,0.14)' : 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}>
                 <BellIcon size={18} />
@@ -730,7 +736,7 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
                   <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
                     <div className="rounded-2xl border p-5 lg:col-span-2" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
                       <div className="mb-5 flex items-start justify-between gap-3">
-                        <div><h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Revenue by period</h2><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Last seven days · paid agent sales</p></div>
+                        <div><h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Revenue by period</h2><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Monday–Sunday · paid agent sales · Updated {lastUpdated?.toLocaleTimeString() ?? 'loading'}</p></div>
                         <div className="text-right"><p className="text-sm font-bold" style={{ color: 'var(--primary)' }}>{price(totalRevenue)}</p><p className="text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{sales.filter(item => item.status === 'paid').length} paid sales</p></div>
                       </div>
                       <RevenueChart data={chartData} />
@@ -770,7 +776,7 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
                             <div className="flex items-start justify-between gap-3">
                               <div>
                                 <p className="text-xl font-black">{assignment.events?.title ?? 'Assigned event'}</p>
-                                <p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>{assignment.events?.date ? new Date(assignment.events.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Event date'}</p>
+                                <p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>{assignment.events?.date ? formatLocaleDate(`${assignment.events.date}T12:00:00`, { day: 'numeric', month: 'short', year: 'numeric' }) : 'Event date'}</p>
                               </div>
                               <Badge label={eventHasEnded(assignment.events) ? 'Ended' : `${assignment.commission_rate}% commission`} color={eventHasEnded(assignment.events) ? '#ef4444' : STATUS_COLORS.active || '#22c55e'} />
                             </div>
@@ -819,7 +825,7 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <p className="text-xl font-black">{assignment.events?.title ?? 'Assigned event'}</p>
-                            <p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>{assignment.events?.date ? new Date(assignment.events.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Event date'}</p>
+                            <p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>{assignment.events?.date ? formatLocaleDate(`${assignment.events.date}T12:00:00`, { day: 'numeric', month: 'short', year: 'numeric' }) : 'Event date'}</p>
                           </div>
                           <Badge label={eventHasEnded(assignment.events) ? 'Ended' : `${assignment.commission_rate}% commission`} color={eventHasEnded(assignment.events) ? '#ef4444' : STATUS_COLORS.active || '#22c55e'} />
                         </div>
@@ -849,7 +855,7 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
                       <div className="absolute inset-0 flex flex-col justify-end p-5 sm:p-6">
                         <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--primary)' }}>Assigned event</p>
                         <h3 className="mt-2 max-w-xl text-2xl font-black text-white sm:text-3xl" style={{ fontFamily: 'Outfit, sans-serif' }}>{activeAssignment?.events?.title ?? 'Choose an event'}</h3>
-                        <p className="mt-2 text-xs text-white/70">{activeAssignment?.events?.date ? new Date(activeAssignment.events.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Event date'} · {activeAssignment?.events?.venue ?? 'Venue'}</p>
+                        <p className="mt-2 text-xs text-white/70">{activeAssignment?.events?.date ? formatLocaleDate(`${activeAssignment.events.date}T12:00:00`, { day: 'numeric', month: 'long', year: 'numeric' }) : 'Event date'} · {activeAssignment?.events?.venue ?? 'Venue'}</p>
                       </div>
                     </div>
                     <div className="border-b p-4 sm:p-5" style={{ borderColor: 'var(--border)' }}>
@@ -1078,7 +1084,7 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
                       <p className="mt-2 text-xl font-black">{user?.email ?? 'agent@tiketi.app'}</p>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => navigate('home')} className="flex-1 rounded-xl px-4 py-3 text-sm font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>Back to Tiketi</button>
+                      <button type="button" onClick={() => navigate('home')} aria-label="Back to Tiketi" title="Back to Tiketi" className="flex h-12 w-12 items-center justify-center rounded-full" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}><ArrowLeftIcon size={18} /></button>
                       <button onClick={() => navigate('auth-customer')} className="flex-1 rounded-xl px-4 py-3 text-sm font-bold" style={{ background: 'var(--primary)', color: '#000' }}>Edit profile</button>
                     </div>
                   </div>

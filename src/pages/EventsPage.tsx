@@ -4,13 +4,14 @@ import { categories } from '../data/events'
 import { CATEGORY_ICONS, SearchIcon, XIcon, FilterIcon, SortIcon } from '../components/Icon'
 import EventCard from '../components/EventCard'
 import type { Event } from '../lib/types'
+import { getEventEndTimestamp } from '../lib/eventTime'
 
 type Props = { navigate: (p: string, extra?: unknown) => void }
 
 function sortUpcomingFirst(events: Event[]) {
   return [...events].sort((a, b) => {
-    const aDate = new Date(`${a.date}T${a.end_time || a.time || '23:59:59'}`).getTime()
-    const bDate = new Date(`${b.date}T${b.end_time || b.time || '23:59:59'}`).getTime()
+    const aDate = getEventEndTimestamp(a.date, a.time, a.end_time)
+    const bDate = getEventEndTimestamp(b.date, b.time, b.end_time)
     const aIsUpcoming = aDate >= Date.now()
     const bIsUpcoming = bDate >= Date.now()
 
@@ -127,11 +128,11 @@ export default function EventsPage({ navigate }: Props) {
   const activeFilters = [search, category !== 'All' ? category : '', priceFilter !== 'any' ? priceFilter : ''].filter(Boolean).length
 
   return (
-    <div style={{ background: 'var(--background)', color: 'var(--foreground)', minHeight: '100vh' }}>
+    <div className="attendee-events-page" style={{ background: 'var(--background)', color: 'var(--foreground)', minHeight: '100vh' }}>
 
       {/* Blurred header */}
       <div className="relative overflow-hidden" style={{ paddingTop: 64 }}>
-        <div className="absolute inset-0 -top-8">
+        <div className="events-page-hero-bg absolute inset-0 -top-8">
           <img src={headerImg} alt="" className="w-full h-full object-cover"
             style={{ filter: 'blur(60px) saturate(0.4) brightness(0.2)', transform: 'scale(1.1)' }} aria-hidden />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(9,9,11,0.5) 0%, rgba(9,9,11,0.9) 70%, rgba(9,9,11,1) 100%)' }} />
@@ -146,7 +147,7 @@ export default function EventsPage({ navigate }: Props) {
           {/* Search + filter row */}
           <div className="events-filter-row flex min-w-0 gap-3">
             <div className="relative min-w-0 flex-1 max-w-xl">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: 'var(--muted-foreground)' }}>
+              <div className="attendee-control-icon absolute left-4 top-1/2 -translate-y-1/2">
                 <SearchIcon size={16} />
               </div>
               <input
@@ -154,13 +155,12 @@ export default function EventsPage({ navigate }: Props) {
                 placeholder="Search events, artists, venues…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full pl-11 pr-10 py-3.5 rounded-xl text-sm outline-none"
-                style={{ background: 'rgba(12,12,12,0.62)', border: '0', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.14)', backdropFilter: 'blur(16px)', color: '#fff' }}
+                className="attendee-search-input w-full pl-11 pr-10 py-3.5 rounded-xl text-sm outline-none"
                 onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)')}
                 onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)')}
               />
               {search && (
-                <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--muted-foreground)' }}>
+                <button onClick={() => setSearch('')} className="attendee-control-icon absolute right-3 top-1/2 -translate-y-1/2">
                   <XIcon size={14} />
                 </button>
               )}
@@ -168,19 +168,13 @@ export default function EventsPage({ navigate }: Props) {
 
             <button
               onClick={() => setShowFilters(v => !v)}
-              className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium flex-shrink-0 relative"
-              style={{
-                background: showFilters ? 'rgba(249,112,21,0.2)' : 'rgba(255,255,255,0.07)',
-                border: '0',
-                backdropFilter: 'blur(16px)',
-                color: showFilters ? '#ffad78' : 'rgba(255,255,255,0.8)',
-              }}
+              className="attendee-filter-button flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium flex-shrink-0 relative"
+              data-active={showFilters}
             >
-              <FilterIcon size={15} />
+              <FilterIcon size={15} className="attendee-control-icon" />
               <span className="hidden sm:inline">Filters</span>
               {activeFilters > 0 && (
-                <span className="w-4 h-4 text-xs font-bold rounded-full flex items-center justify-center absolute -top-1 -right-1"
-                  style={{ background: 'var(--accent)', color: 'var(--accent-foreground)' }}>
+                <span className="attendee-filter-count w-4 h-4 text-xs font-bold rounded-full flex items-center justify-center absolute -top-1 -right-1">
                   {activeFilters}
                 </span>
               )}
@@ -189,8 +183,7 @@ export default function EventsPage({ navigate }: Props) {
             <select
               value={sort}
               onChange={e => setSort(e.target.value)}
-              className="px-4 py-3 rounded-xl text-sm outline-none flex-shrink-0 hidden sm:block"
-              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(16px)', color: 'rgba(255,255,255,0.8)' }}
+              className="attendee-filter-select px-4 py-3 rounded-xl text-sm outline-none flex-shrink-0 hidden sm:block"
             >
               {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
@@ -198,7 +191,7 @@ export default function EventsPage({ navigate }: Props) {
 
           {/* Expanded filters */}
           {showFilters && (
-            <div className="events-filter-panel mt-4 w-full min-w-0 box-border rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)' }}>
+            <div className="events-filter-panel attendee-filter-panel mt-4 w-full min-w-0 box-border rounded-2xl p-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs font-semibold mb-2" style={{ color: 'var(--muted-foreground)', letterSpacing: '0.06em' }}>PRICE RANGE</p>
@@ -211,8 +204,8 @@ export default function EventsPage({ navigate }: Props) {
                       { v: 'over50k', l: '50K+ BIF' },
                     ].map(({ v, l }) => (
                       <button key={v} onClick={() => setPriceFilter(v)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium"
-                        style={{ background: priceFilter === v ? 'var(--primary)' : 'rgba(255,255,255,0.07)', color: priceFilter === v ? 'var(--primary-foreground)' : 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        className="attendee-filter-chip px-3 py-1.5 rounded-lg text-xs font-medium"
+                        data-active={priceFilter === v}>
                         {l}
                       </button>
                     ))}
@@ -223,8 +216,8 @@ export default function EventsPage({ navigate }: Props) {
                   <div className="flex flex-wrap gap-2">
                     {SORT_OPTIONS.map(o => (
                       <button key={o.value} onClick={() => setSort(o.value)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium"
-                        style={{ background: sort === o.value ? 'var(--primary)' : 'rgba(255,255,255,0.07)', color: sort === o.value ? 'var(--primary-foreground)' : 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        className="attendee-filter-chip px-3 py-1.5 rounded-lg text-xs font-medium"
+                        data-active={sort === o.value}>
                         {o.label}
                       </button>
                     ))}
@@ -237,8 +230,8 @@ export default function EventsPage({ navigate }: Props) {
           {/* Category strip */}
           <div className="flex gap-2 overflow-x-auto mt-5 pb-1 -mb-1" style={{ scrollbarWidth: 'none' }}>
             <button onClick={() => setCategory('All')}
-              className="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium"
-              style={{ background: category === 'All' ? 'var(--primary)' : 'rgba(255,255,255,0.07)', color: category === 'All' ? 'var(--primary-foreground)' : 'rgba(255,255,255,0.7)', border: '1px solid', borderColor: category === 'All' ? 'transparent' : 'rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)' }}>
+              className="attendee-filter-chip flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium"
+              data-active={category === 'All'}>
               All
             </button>
             {categories.map(cat => {
@@ -246,9 +239,9 @@ export default function EventsPage({ navigate }: Props) {
               const active = category === cat.label
               return (
                 <button key={cat.label} onClick={() => setCategory(active ? 'All' : cat.label)}
-                  className="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium"
-                  style={{ background: active ? 'var(--primary)' : 'rgba(255,255,255,0.07)', color: active ? 'var(--primary-foreground)' : 'rgba(255,255,255,0.7)', border: '1px solid', borderColor: active ? 'transparent' : 'rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)' }}>
-                  {CatIcon && <CatIcon size={13} />}
+                  className="attendee-filter-chip flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium"
+                  data-active={active}>
+                  {CatIcon && <CatIcon size={13} className="attendee-control-icon" />}
                   {cat.label}
                 </button>
               )
@@ -272,15 +265,15 @@ export default function EventsPage({ navigate }: Props) {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="rounded-2xl animate-pulse" style={{ background: 'var(--muted)', height: 320 }} />
+              <div key={i} className="aspect-[4/5] rounded-[2rem] animate-pulse" style={{ background: 'var(--muted)' }} />
             ))}
           </div>
         ) : filtered.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             {visibleEvents.map(ev => (
-              <EventCard key={ev.id} event={ev} poster fullWidthMobile onClick={() => navigate('event-detail', ev)} />
+              <EventCard key={ev.id} event={ev} poster fullWidthMobile listing onClick={() => navigate('event-detail', ev)} />
             ))}
           </div>
         ) : null}

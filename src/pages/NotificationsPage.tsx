@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { BellIcon, TicketIcon, CalendarIcon, DollarSignIcon, TagIcon, UsersIcon } from '../components/Icon'
+import { formatLocaleDateTime } from '../lib/locale'
 
 type Props = { navigate: (p: string) => void }
 type NotifTab = 'all' | 'tickets' | 'events' | 'payments' | 'promotions' | 'team'
@@ -39,7 +40,7 @@ export default function NotificationsPage({ navigate }: Props) {
         .order('created_at', { ascending: false })
       if (error) { setLoadError('Notifications are not available yet. Apply the notifications database migration.'); return }
       setLoadError('')
-      setNotifs((data ?? []).map(item => ({ id: item.id, type: item.type as Notif['type'], title: item.title, body: item.body, time: new Date(item.created_at).toLocaleString(), createdAt: item.created_at, read: !!item.read_at, eventId: item.event_id ?? null, ticketId: item.ticket_id ?? null, recipientScope: item.recipient_scope === 'organizer' ? 'organizer' : 'attendee' })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()))
+      setNotifs((data ?? []).map(item => ({ id: item.id, type: item.type as Notif['type'], title: item.title, body: item.body, time: formatLocaleDateTime(item.created_at), createdAt: item.created_at, read: !!item.read_at, eventId: item.event_id ?? null, ticketId: item.ticket_id ?? null, recipientScope: item.recipient_scope === 'organizer' ? 'organizer' : 'attendee' })).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()))
     }
     void loadNotifications()
     const channel = supabase.channel(`notifications:${user.id}`)
@@ -163,7 +164,7 @@ export default function NotificationsPage({ navigate }: Props) {
             {filtered.map(n => {
               const Icon = n.type === 'ticket' ? TicketIcon : n.type === 'event' ? CalendarIcon : n.type === 'payment' ? DollarSignIcon : n.type === 'team' || n.type === 'follower' ? UsersIcon : TagIcon
               return (
-                <button key={n.id} type="button" onClick={() => void openNotification(n)} className="w-full flex items-start gap-4 p-4 rounded-2xl text-left transition-all"
+                <button key={n.id} type="button" onClick={() => void openNotification(n)} className="notification-card w-full flex items-start gap-4 p-4 rounded-2xl text-left transition-all"
                   style={{ background: n.read ? 'var(--card)' : 'rgba(249,112,21,0.08)', border: `1px solid ${n.read ? 'var(--border)' : 'rgba(249,112,21,0.22)'}` }}>
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                     style={{ background: 'rgba(249,112,21,0.12)', color: 'var(--accent)' }}>

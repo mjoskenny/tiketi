@@ -2,7 +2,7 @@ import { Hono, type Context } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
 import * as kv from "./kv_store.tsx";
-import { createPaymentAdapter, type CreatePaymentInput } from "./payments.ts";
+import { createPaymentAdapter } from "./payments.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2.49.8";
 import { jsPDF } from "npm:jspdf@4.2.1";
 const app = new Hono();
@@ -210,7 +210,8 @@ app.get("/make-server-4880c4b3/health", (c) => {
 app.get("/make-server-4880c4b3/payments/health", (c) => {
   try {
     const adapter = createPaymentAdapter();
-    return c.json({ configured: true, provider: adapter.name });
+    const configured = adapter.name !== 'unconfigured';
+    return c.json({ configured, provider: adapter.name }, configured ? 200 : 503);
   } catch (error) {
     return c.json({ configured: false, error: error instanceof Error ? error.message : "Payment provider unavailable" }, 503);
   }
@@ -218,18 +219,84 @@ app.get("/make-server-4880c4b3/payments/health", (c) => {
 
 async function initializePayment(c: Parameters<typeof app.post>[1]) {
   try {
-    const input = await c.req.json() as CreatePaymentInput;
-    if (!input.orderId || !input.amount || !input.currency || !input.method || !input.customer?.email) {
-      return c.json({ error: "orderId, amount, currency, method, and customer.email are required" }, 400);
+    const authorization = c.req.header('Authorization');
+    if (!authorization) return c.json({ error: 'Sign in is required to start a payment' }, 401);
+    const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authorization } },
+    });
+    const accessToken = authorization.replace(/^Bearer\s+/i, '');
+    const { data: { user }, error: authError } = await userClient.auth.getUser(accessToken);
+    if (authError || !user) return c.json({ error: 'Your session is invalid or expired' }, 401);
+
+    const input = await c.req.json() as { orderId?: string; method?: 'card' | 'mobile_money'; paymentPhone?: string };
+    if (!input.orderId || !['card', 'mobile_money'].includes(input.method ?? '')) {
+      return c.json({ error: 'orderId and a supported payment method are required' }, 400);
     }
 
-    const webhookUrl = Deno.env.get('PAYMENT_WEBHOOK_URL') || input.webhookUrl;
+    const db = admin();
+    const { data: order, error: orderReadError } = await db.from('orders')
+      .select('id, customer_id, status, total, holder_name, holder_email, holder_phone')
+      .eq('id', input.orderId)
+      .maybeSingle();
+    if (orderReadError || !order || order.customer_id !== user.id) return c.json({ error: 'Order not found' }, 404);
+    if (order.status !== 'pending') return c.json({ error: 'This order is not awaiting payment' }, 409);
+
+    const { data: settings } = await db.from('platform_settings')
+      .select('ticket_sales_enabled, card_payments_enabled, mobile_money_enabled')
+      .eq('id', true)
+      .maybeSingle();
+    if (!settings?.ticket_sales_enabled) return c.json({ error: 'Ticket sales are currently paused' }, 409);
+    if (input.method === 'card' && !settings.card_payments_enabled) return c.json({ error: 'Card payments are currently unavailable' }, 409);
+    if (input.method === 'mobile_money' && !settings.mobile_money_enabled) return c.json({ error: 'Mobile Money payments are currently unavailable' }, 409);
+
+    const paymentPhone = input.method === 'mobile_money' ? (input.paymentPhone?.trim() || order.holder_phone || '') : order.holder_phone || '';
+    if (input.method === 'mobile_money' && !/^\+?[0-9 ()-]{8,20}$/.test(paymentPhone)) {
+      return c.json({ error: 'A valid Mobile Money phone number is required' }, 400);
+    }
+
+    const appBaseUrl = Deno.env.get('APP_BASE_URL') || c.req.header('Origin');
+    if (!appBaseUrl) return c.json({ error: 'APP_BASE_URL is not configured for payment returns' }, 503);
+    const appUrl = new URL(appBaseUrl);
+    if (appUrl.protocol !== 'https:' && appUrl.hostname !== 'localhost' && appUrl.hostname !== '127.0.0.1') {
+      return c.json({ error: 'Payment return URL must use HTTPS' }, 400);
+    }
+    const returnUrl = new URL('/payment-return', appUrl);
+    returnUrl.searchParams.set('order_id', order.id);
+    const webhookUrl = Deno.env.get('PAYMENT_WEBHOOK_URL') || `${Deno.env.get('SUPABASE_URL')}/functions/v1/server/make-server-4880c4b3/payments/webhook`;
     const adapter = createPaymentAdapter();
-    const session = await adapter.createPayment({ ...input, webhookUrl });
-    const { error: orderError } = await admin().from('orders').update({ payment_provider: session.provider, payment_reference: session.reference, payment_checkout_url: session.checkoutUrl, payment_expires_at: session.expiresAt, payment_method: input.method === 'mobile_money' ? 'mobile_money' : 'card' }).eq('id', input.orderId).eq('status', 'pending');
+    const method = input.method!;
+    const session = await adapter.createPayment({
+      orderId: order.id,
+      amount: Number(order.total),
+      currency: 'BIF',
+      method,
+      customer: { name: order.holder_name || 'Tiketi Customer', email: order.holder_email || '', phone: paymentPhone },
+      returnUrl: returnUrl.toString(),
+      webhookUrl,
+    });
+    const { error: attemptError } = await db.from('payment_attempts').insert({
+      order_id: order.id,
+      provider: session.provider,
+      provider_reference: session.reference,
+      method,
+      amount: Number(order.total),
+      currency: 'BIF',
+      status: 'pending',
+      checkout_url: session.checkoutUrl,
+    });
+    if (attemptError) throw attemptError;
+    const { data: updatedOrder, error: orderError } = await db.from('orders')
+      .update({ payment_provider: session.provider, payment_reference: session.reference, payment_checkout_url: session.checkoutUrl, payment_expires_at: session.expiresAt, payment_method: method })
+      .eq('id', order.id)
+      .eq('customer_id', user.id)
+      .eq('status', 'pending')
+      .select('id')
+      .maybeSingle();
     if (orderError) throw orderError;
+    if (!updatedOrder) return c.json({ error: 'This order is no longer awaiting payment' }, 409);
     return c.json(session, 201);
   } catch (error) {
+    console.error('Payment initialization failed', error);
     return c.json({ error: error instanceof Error ? error.message : "Unable to initialize payment" }, 503);
   }
 }
@@ -279,9 +346,19 @@ app.post("/make-server-4880c4b3/tickets/send-order", sendOrderTickets);
 app.post("/make-server-4880c4b3/payments/demo/complete", async (c) => {
   try {
     if ((Deno.env.get('PAYMENT_PROVIDER') || '').trim().toLowerCase() !== 'demo') return c.json({ error: 'Demo payments are not enabled' }, 404);
+    const authorization = c.req.header('Authorization');
+    if (!authorization) return c.json({ error: 'Sign in is required' }, 401);
+    const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authorization } },
+    });
+    const accessToken = authorization.replace(/^Bearer\s+/i, '');
+    const { data: { user }, error: authError } = await userClient.auth.getUser(accessToken);
+    if (authError || !user) return c.json({ error: 'Your session is invalid or expired' }, 401);
     const { orderId } = await c.req.json() as { orderId?: string };
     if (!orderId) return c.json({ error: 'orderId is required' }, 400);
     const db = admin();
+    const { data: order } = await db.from('orders').select('id, customer_id, status').eq('id', orderId).maybeSingle();
+    if (!order || order.customer_id !== user.id || order.status !== 'pending') return c.json({ error: 'Pending order not found' }, 404);
     const { data: tickets, error } = await db.rpc('confirm_paid_ticket_order', { p_order_id: orderId, p_payment_reference: `demo-${orderId}`, p_provider: 'demo' });
     if (error) throw error;
     const delivery = await sendIssuedOrderEmails(db, orderId);
@@ -296,12 +373,42 @@ app.post("/make-server-4880c4b3/payments/webhook", async (c) => {
     const adapter = createPaymentAdapter();
     const webhook = await adapter.verifyWebhook(c.req.raw);
     console.log('Verified payment webhook', { provider: webhook.provider, reference: webhook.reference, status: webhook.status });
-    if (webhook.status === 'succeeded' && webhook.orderId) {
+    if (webhook.orderId && webhook.status !== 'succeeded') {
       const db = admin();
-      const { data: tickets, error } = await db.rpc('confirm_paid_ticket_order', { p_order_id: webhook.orderId, p_payment_reference: webhook.reference, p_provider: webhook.provider });
+      const attemptStatus = webhook.status === 'cancelled' ? 'cancelled' : webhook.status === 'failed' ? 'failed' : 'pending';
+      await db.from('payment_attempts').update({ status: attemptStatus, provider_reference: webhook.reference })
+        .eq('order_id', webhook.orderId).eq('provider', webhook.provider);
+    }
+    if (webhook.status === 'succeeded') {
+      if (!webhook.orderId || webhook.amount === undefined || !webhook.currency) throw new Error('Verified payment is missing order, amount, or currency details');
+      const db = admin();
+      const { data: order, error: orderError } = await db.from('orders')
+        .select('id, status, total, payment_provider, payment_method')
+        .eq('id', webhook.orderId)
+        .maybeSingle();
+      if (orderError || !order) throw new Error('Payment order not found');
+      if (order.payment_provider !== webhook.provider) throw new Error('Payment provider does not match the order');
+      if (Math.abs(Number(order.total) - webhook.amount) >= 0.01 || webhook.currency.toUpperCase() !== 'BIF') {
+        throw new Error('Verified payment amount or currency does not match the order');
+      }
+      const { data: attempts, error: attemptError } = await db.from('payment_attempts')
+        .select('provider_reference')
+        .eq('order_id', webhook.orderId)
+        .eq('provider', webhook.provider);
+      if (attemptError || !attempts?.some(attempt => attempt.provider_reference === webhook.reference || webhook.reference === order.id)) {
+        throw new Error('Payment reference does not match an initialized attempt');
+      }
+      const wasPending = order.status === 'pending';
+      if (!wasPending && order.status !== 'confirmed') throw new Error('Order is not eligible for payment confirmation');
+      const { error } = await db.rpc('confirm_paid_ticket_order', { p_order_id: webhook.orderId, p_payment_reference: webhook.reference, p_provider: webhook.provider });
       if (error) throw error;
-      const emailDelivery = await sendIssuedOrderEmails(db, webhook.orderId);
-      console.log('Payment confirmed', { orderId: webhook.orderId, ...emailDelivery });
+      await db.from('orders').update({ payment_method: order.payment_method || 'card' }).eq('id', webhook.orderId);
+      await db.from('payment_attempts').update({ status: 'succeeded', provider_reference: webhook.reference })
+        .eq('order_id', webhook.orderId).eq('provider', webhook.provider);
+      if (wasPending) {
+        const emailDelivery = await sendIssuedOrderEmails(db, webhook.orderId);
+        console.log('Payment confirmed', { orderId: webhook.orderId, ...emailDelivery });
+      }
     }
     return c.body('<?xml version="1.0" encoding="utf-8"?><API3G><Response>OK</Response></API3G>', 200, { 'Content-Type': 'application/xml; charset=utf-8' });
   } catch (error) {

@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { signOut, supabase } from '../lib/supabase'
 import { projectId } from '../../utils/supabase/info'
 import { UserIcon, SettingsIcon, TicketIcon, BellIcon, HeartIcon, LogOutIcon, ShieldIcon, EditIcon } from '../components/Icon'
+import { currentLocale } from '../lib/locale'
 
 type Props = { navigate: (p: string) => void }
 
@@ -22,7 +23,7 @@ function profileStoragePath(url: string | null | undefined) {
 export default function ProfilePage({ navigate }: Props) {
   const { user, profile, organizer, teamMembership, refreshProfile } = useAuth()
   const [tab, setTab] = useState<'account' | 'preferences' | 'security'>('account')
-  const [accountForm, setAccountForm] = useState({ full_name: '', username: '', email: '', phone: '', organizer_bio: '' })
+  const [accountForm, setAccountForm] = useState({ full_name: '', username: '', email: '', phone: '', organizer_bio_en: '', organizer_bio_fr: '' })
   const [preferences, setPreferences] = useState<Record<string, boolean>>({ email_notifications: true, event_reminders: true, promotions: false, nearby_events: true })
   const [passwordForm, setPasswordForm] = useState({ password: '', confirm: '' })
   const [mediaModalOpen, setMediaModalOpen] = useState(false)
@@ -119,7 +120,8 @@ export default function ProfilePage({ navigate }: Props) {
       username: profile?.username ?? user.user_metadata?.username ?? '',
       email: profile?.email ?? user.email ?? '',
       phone: profile?.phone ?? '',
-      organizer_bio: organizer?.description ?? '',
+      organizer_bio_en: organizer?.description_en ?? (currentLocale() === 'en-GB' ? organizer?.description ?? '' : ''),
+      organizer_bio_fr: organizer?.description_fr ?? (currentLocale() === 'fr-FR' ? organizer?.description ?? '' : ''),
     })
     setPreferences({ email_notifications: true, event_reminders: true, promotions: false, nearby_events: true, ...(profile?.preferences ?? {}) })
   }, [profile, user, organizer?.description])
@@ -172,6 +174,9 @@ export default function ProfilePage({ navigate }: Props) {
       if (authError) { setError(authError.message); setSaving(false); return }
     }
 
+    const bioEn = accountForm.organizer_bio_en.trim() || null
+    const bioFr = accountForm.organizer_bio_fr.trim() || null
+    const legacyBio = currentLocale() === 'fr-FR' ? bioFr || bioEn : bioEn || bioFr
     const nextProfile = {
       id: user.id,
       full_name: accountForm.full_name.trim() || user.user_metadata?.full_name || null,
@@ -191,14 +196,14 @@ export default function ProfilePage({ navigate }: Props) {
         const { data: organizerRow } = await supabase.from('organizers').select('*, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email)').eq('user_id', user.id).maybeSingle()
         const organizerName = nextProfile.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Organizer'
         if (organizerRow) {
-          const { error: organizerError } = await supabase.from('organizers').update({ name: organizerName, logo_url: nextProfile.avatar_url, description: accountForm.organizer_bio.trim() || null }).eq('id', organizerRow.id)
+          const { error: organizerError } = await supabase.from('organizers').update({ name: organizerName, logo_url: nextProfile.avatar_url, description: legacyBio, description_en: bioEn, description_fr: bioFr }).eq('id', organizerRow.id)
           if (organizerError) organizerUpdateError = organizerError.message
         } else {
-          const { error: organizerError } = await supabase.from('organizers').insert({ user_id: user.id, name: organizerName, logo_url: nextProfile.avatar_url, description: accountForm.organizer_bio.trim() || null, website: null, phone: null, city: 'Bujumbura', verified: false, subscription_tier: 'free' })
+          const { error: organizerError } = await supabase.from('organizers').insert({ user_id: user.id, name: organizerName, logo_url: nextProfile.avatar_url, description: legacyBio, description_en: bioEn, description_fr: bioFr, website: null, phone: null, city: 'Bujumbura', verified: false, subscription_tier: 'free' })
           if (organizerError) organizerUpdateError = organizerError.message
         }
       } else if (organizer?.id) {
-        const { error: organizerError } = await supabase.from('organizers').update({ description: accountForm.organizer_bio.trim() || null }).eq('id', organizer.id)
+        const { error: organizerError } = await supabase.from('organizers').update({ description: legacyBio, description_en: bioEn, description_fr: bioFr }).eq('id', organizer.id)
         if (organizerError) organizerUpdateError = organizerError.message
       }
 
@@ -375,7 +380,7 @@ export default function ProfilePage({ navigate }: Props) {
               {isTeamMember && <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--primary-light)' }}>{teamMembership.organizer?.name ?? 'Organizer'} team</p>}
               {username && <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--primary-light)' }}>@{username.replace(/^@/, '')}</p>}
             </div>
-            <button className="p-2 rounded-xl transition-all" style={{ background: 'var(--muted)', color: 'var(--muted-foreground)', border: '1px solid var(--border)' }}
+            <button className="profile-media-edit-button p-2 rounded-xl transition-all" style={{ background: 'var(--muted)', color: 'var(--muted-foreground)', border: '1px solid var(--border)' }}
               onMouseEnter={e => (e.currentTarget.style.color = 'var(--foreground)')}
               onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted-foreground)')}
               onClick={() => setMediaModalOpen(true)} aria-label="Edit profile images">
@@ -408,7 +413,7 @@ export default function ProfilePage({ navigate }: Props) {
             ...(role === 'organizer' ? [{ Icon: SettingsIcon, label: 'Dashboard', page: 'dashboard', desc: 'Manage events' }] : []),
           ].map(({ Icon, label, page, desc }) => (
             <button key={page} onClick={() => navigate(page)}
-              className="flex items-center gap-3 p-4 rounded-xl text-left transition-all"
+              className="profile-quick-link flex items-center gap-3 p-4 rounded-xl text-left transition-all"
               style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(249,112,21,0.38)')}
               onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
@@ -433,7 +438,7 @@ export default function ProfilePage({ navigate }: Props) {
         <div className="flex gap-1 p-1 rounded-xl mb-5" style={{ background: 'var(--muted)' }}>
           {TABS.map(({ key, label, Icon }) => (
             <button key={key} onClick={() => setTab(key)}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all"
+              className="profile-tab-button flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all"
               style={{ background: tab === key ? 'var(--card)' : 'transparent', color: tab === key ? 'var(--foreground)' : 'var(--muted-foreground)', border: tab === key ? '1px solid var(--border)' : '1px solid transparent' }}>
               <Icon size={14} /> {label}
             </button>
@@ -461,11 +466,13 @@ export default function ProfilePage({ navigate }: Props) {
                 </div>
               ))}
               {organizer && <div className="w-full">
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Organizer bio</label>
-                <textarea value={accountForm.organizer_bio} onChange={e => setAccountField('organizer_bio', e.target.value)} placeholder="Tell attendees about your organization" rows={4}
-                  className="block w-full resize-none px-4 py-3 rounded-xl text-sm outline-none"
-                  style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: 'var(--foreground)' }} />
-                <p className="mt-1 text-[11px]" style={{ color: 'var(--muted-foreground)' }}>This bio appears on your public organizer profile.</p>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Organizer bio — English</label>
+                <textarea value={accountForm.organizer_bio_en} onChange={e => setAccountField('organizer_bio_en', e.target.value)} placeholder="Tell attendees about your organization in English" rows={3}
+                  className="w-full px-4 py-3 rounded-xl text-sm outline-none resize-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: 'var(--foreground)' }} />
+                <label className="mt-4 block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Organizer bio — Français</label>
+                <textarea value={accountForm.organizer_bio_fr} onChange={e => setAccountField('organizer_bio_fr', e.target.value)} placeholder="Présentez votre organisation en français" rows={3}
+                  className="w-full px-4 py-3 rounded-xl text-sm outline-none resize-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: 'var(--foreground)' }} />
+                <p className="mt-1 text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Add each language version; your public profile shows the bio matching the visitor&apos;s language.</p>
               </div>}
               <button className="w-full py-3 rounded-xl text-sm font-bold mt-2"
                 style={{ background: 'var(--primary)', color: '#fff', opacity: saving ? 0.7 : 1 }} onClick={handleAccountSave} disabled={saving}>

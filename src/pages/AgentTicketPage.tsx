@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { ArrowLeftIcon, BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, DownloadIcon, ShareIcon, TicketIcon, UserIcon } from '../components/Icon'
+import { ArrowLeftIcon, BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, DownloadIcon, ShareNodesIcon, TicketIcon, UserIcon } from '../components/Icon'
+import { hasEventEnded } from '../lib/eventTime'
+import { formatLocaleDate, formatLocaleDateTime } from '../lib/locale'
+import { LanguageSwitcher } from '../components/LocaleContent'
 
 type AgentTicketData = {
   event: Record<string, any>
@@ -32,11 +35,6 @@ async function imageDataUrl(url: string) {
   }
 }
 
-function eventHasEnded(date: string, time: string, endTime?: string | null) {
-  const timestamp = new Date(`${date}T${endTime || time || '23:59:59'}`).getTime()
-  return Number.isFinite(timestamp) && timestamp < Date.now()
-}
-
 export default function AgentTicketPage({ data, navigate }: Props) {
   const { user, profile } = useAuth()
   const [message, setMessage] = useState('')
@@ -50,11 +48,11 @@ export default function AgentTicketPage({ data, navigate }: Props) {
   const venue = (event.venue ?? '') as string
   const ticketType = data.ticketType ?? 'REGULAR'
   const ticketPrice = data.ticketPrice ?? 0
-  const purchasedAt = data.purchasedAt ? new Date(data.purchasedAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '—'
+  const purchasedAt = data.purchasedAt ? formatLocaleDateTime(data.purchasedAt, { dateStyle: 'medium', timeStyle: 'short' }) : '—'
   const ticketExtraInfo = data.ticketExtraInfo?.trim() || ''
-  const ticketExpiry = data.ticketExpiry ? new Date(`${data.ticketExpiry}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
+  const ticketExpiry = data.ticketExpiry ? formatLocaleDate(`${data.ticketExpiry}T00:00:00`, { day: 'numeric', month: 'short', year: 'numeric' }) : ''
   const ticketGroupSize = data.ticketGroupSize && data.ticketGroupSize > 1 ? data.ticketGroupSize : null
-  const status = event.status === 'cancelled' || data.ticketStatus === 'cancelled' ? 'CANCELLED' : data.ticketStatus === 'used' ? 'USED' : eventHasEnded(date, time, event.end_time) ? 'EXPIRED' : 'VALID'
+  const status = event.status === 'cancelled' || data.ticketStatus === 'cancelled' ? 'CANCELLED' : data.ticketStatus === 'used' ? 'USED' : hasEventEnded(date, time, event.end_time) ? 'EXPIRED' : 'VALID'
 
   const createPdf = async () => {
     const { jsPDF } = await import('jspdf')
@@ -173,17 +171,17 @@ export default function AgentTicketPage({ data, navigate }: Props) {
             </button>
           ))}
         </nav>
-        <div className="border-t p-4" style={{ borderColor: 'rgba(255,255,255,0.09)' }}><button type="button" onClick={() => navigate('home')} className="flex w-full items-center justify-center gap-2 py-2 text-xs" style={{ color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={14} /> Back to site</button></div>
+        <div className="border-t p-4" style={{ borderColor: 'rgba(255,255,255,0.09)' }}><button type="button" onClick={() => navigate('home')} aria-label="Back to site" title="Back to site" className="mx-auto flex h-10 w-10 items-center justify-center rounded-full" style={{ color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={18} /></button></div>
       </aside>
       {sidebarOpen && <button type="button" aria-label="Close sidebar" className="fixed inset-0 z-30 bg-black/60 lg:hidden" onClick={() => setSidebarOpen(false)} />}
       <main className="min-h-screen min-w-0 flex-1 lg:pl-64">
         <header className="sticky top-0 z-20 flex items-center justify-between border-b px-5 py-3.5" style={{ background: 'rgba(11,12,12,0.88)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255,255,255,0.09)' }}>
           <div className="flex items-center gap-3"><button type="button" className="rounded-lg p-1.5 lg:hidden" style={{ background: 'var(--muted)' }} onClick={() => setSidebarOpen(value => !value)}><svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><rect y="2" width="16" height="1.5" rx="1" /><rect y="7" width="16" height="1.5" rx="1" /><rect y="12" width="16" height="1.5" rx="1" /></svg></button><div><div className="flex items-center gap-2"><h1 className="text-base font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Sales</h1><span className="hidden rounded-md px-2 py-1 text-[10px] font-mono sm:inline" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--muted-foreground)' }}>agent dashboard</span></div><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {profile?.full_name?.split(' ')[0] ?? 'Agent'} 👋</p></div></div>
-          <div className="flex items-center gap-2"><button type="button" aria-label="Notifications" title="Notifications" className="relative flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}><BellIcon size={18} /></button><button type="button" aria-label="Profile menu" title="Profile menu" onClick={() => navigate('agent-dashboard')} className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}>{profile?.profile_image || profile?.avatar_url ? <img src={profile.profile_image || profile.avatar_url || ''} alt={profile.full_name || 'Agent'} className="h-7 w-7 rounded-full object-cover" /> : <UserIcon size={18} />}</button></div>
+          <div className="flex items-center gap-2"><button type="button" aria-label="Notifications" title="Notifications" className="relative flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}><BellIcon size={18} /></button><LanguageSwitcher bare /><button type="button" aria-label="Profile menu" title="Profile menu" onClick={() => navigate('agent-dashboard')} className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}>{profile?.profile_image || profile?.avatar_url ? <img src={profile.profile_image || profile.avatar_url || ''} alt={profile.full_name || 'Agent'} className="h-7 w-7 rounded-full object-cover" /> : <UserIcon size={18} />}</button></div>
         </header>
         <div className="min-h-screen px-4 pb-10 pt-6 sm:px-6">
         <div className="mx-auto max-w-3xl">
-        <button onClick={() => navigate('agent-dashboard')} className="mb-6 inline-flex items-center gap-2 text-sm font-bold" style={{ color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={15} /> Back to agent sales</button>
+        <button type="button" onClick={() => navigate('agent-dashboard')} aria-label="Back to agent sales" title="Back to agent sales" className="mb-6 flex h-10 w-10 items-center justify-center rounded-full" style={{ color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={18} /></button>
         <div className="mb-5 flex items-end justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--primary)' }}>Agent ticket management</p><h1 className="mt-1 text-3xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Issued ticket</h1><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>Manage delivery for this customer from your sales workspace.</p></div><span className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest" style={{ background: status === 'VALID' ? 'rgba(34,197,94,.12)' : status === 'USED' ? 'rgba(96,165,250,.12)' : 'rgba(239,68,68,.12)', color: status === 'VALID' ? '#22c55e' : status === 'USED' ? '#60a5fa' : '#ef4444' }}>{status}</span></div>
 
         <section className="overflow-hidden rounded-2xl border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
@@ -198,7 +196,7 @@ export default function AgentTicketPage({ data, navigate }: Props) {
               <div className="grid gap-3 sm:grid-cols-2"><div className="rounded-xl border p-4" style={{ borderColor: 'var(--border)' }}><p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--muted-foreground)' }}>Customer</p><p className="mt-2 font-bold">{data.info.name || 'Guest'}</p><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{data.info.phone || data.info.email || 'No contact details'}</p></div><div className="rounded-xl border p-4" style={{ borderColor: 'var(--border)' }}><p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--muted-foreground)' }}>Ticket</p><p className="mt-2 font-bold">{data.ticketType ?? 'Ticket'}</p><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{data.ticketPrice ? `${data.ticketPrice.toLocaleString()} BIF` : 'Paid'}</p></div></div>
               <div className="mt-4 rounded-xl border p-4" style={{ borderColor: 'var(--border)' }}><p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--muted-foreground)' }}>Ticket code</p><p className="mt-2 break-all font-mono text-sm font-bold">{ticketCode || 'Unavailable'}</p><p className="mt-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>Purchased {data.purchasedAt ? new Date(data.purchasedAt).toLocaleString() : 'just now'}</p></div>
               {message && <p className="mt-4 rounded-xl px-3 py-3 text-xs" style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>{message}</p>}
-              <div className="mt-5 grid gap-2 sm:grid-cols-3"><button onClick={() => void downloadTicket()} className="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-xs font-bold" style={{ background: 'var(--primary)', color: '#000' }}><DownloadIcon size={14} /> Download PDF</button><button onClick={() => void shareTicket()} className="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}><ShareIcon size={14} /> Share PDF</button><button onClick={() => void copyTicket()} className="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}><ClipboardIcon size={14} /> Copy details</button></div>
+              <div className="mt-5 grid gap-2 sm:grid-cols-3"><button onClick={() => void downloadTicket()} className="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-xs font-bold" style={{ background: 'var(--primary)', color: '#000' }}><DownloadIcon size={14} /> Download PDF</button><button onClick={() => void shareTicket()} className="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}><ShareNodesIcon size={14} /> Share PDF</button><button onClick={() => void copyTicket()} className="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}><ClipboardIcon size={14} /> Copy details</button></div>
             </div>
             <div className="flex flex-col items-center justify-center rounded-2xl border p-4" style={{ borderColor: 'var(--border)', background: '#fff' }}><img src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(ticketCode)}&size=240x240&format=svg`} alt="Ticket QR code" className="h-44 w-44" /><p className="mt-3 text-center text-[10px] font-bold uppercase tracking-widest" style={{ color: '#333' }}>Scan to enter</p></div>
           </div>

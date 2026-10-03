@@ -93,7 +93,7 @@ export default function InfoPage({ kind, navigate }: Props) {
     <main className="info-page">
       <section className="info-hero">
         <div className="info-hero-inner">
-          <button onClick={() => navigate('home')} className="info-back"><ArrowLeftIcon size={16} /> Back to Tiketi</button>
+          <button type="button" onClick={() => navigate('home')} className="info-back" aria-label="Back to Tiketi" title="Back to Tiketi"><ArrowLeftIcon size={18} /></button>
           <p className="info-eyebrow"><span /> {page.eyebrow}</p>
           <h1>{page.title}</h1>
           <p>{page.intro}</p>

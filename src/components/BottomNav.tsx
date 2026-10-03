@@ -72,16 +72,15 @@ export default function BottomNav({ current, navigate }: Props) {
   const hasFloatingCenter = items.length % 2 === 1 && items.length >= 5
 
   return (
-    <nav className="fixed bottom-3 left-1/2 z-50 md:hidden safe-area-bottom transition-all duration-300"
+    <nav className="fixed bottom-3 left-[50vw] z-50 md:hidden safe-area-bottom transition-transform duration-300"
       style={{
-        width: 'calc(100vw - 16px)',
-        maxWidth: '420px',
-        opacity: visible ? 1 : 0,
+        width: 'min(420px, calc(100vw - 32px))',
+        boxSizing: 'border-box',
         transform: `translateX(-50%) ${visible ? 'translateY(0)' : 'translateY(140%)'}`,
         pointerEvents: visible ? 'auto' : 'none',
       }}>
       <div className="relative">
-        <div aria-hidden="true" className="absolute inset-0 rounded-[26px] border shadow-2xl"
+        <div aria-hidden="true" className="attendee-bottom-nav-surface absolute inset-0 rounded-[26px] border shadow-2xl"
         style={{
           background: 'rgba(16,16,16,0.86)',
           borderColor: 'rgba(255,255,255,0.08)',
@@ -101,7 +100,7 @@ export default function BottomNav({ current, navigate }: Props) {
             <button
               key={key}
               onClick={() => user || key === 'discover' || key === 'events' ? navigate(key) : navigate('auth-customer')}
-              className={`relative flex flex-col items-center gap-1 rounded-2xl px-3 py-2 transition-all ${isCenter ? 'z-10 -translate-y-7 justify-self-center' : ''}`}
+              className={`attendee-bottom-nav-item relative flex flex-col items-center gap-1 rounded-2xl px-3 py-2 transition-all ${isCenter ? 'attendee-bottom-nav-center z-10 -translate-y-7 justify-self-center' : ''}`}
               style={{
                 color: isCenter || active ? '#fff' : 'rgba(255,255,255,0.6)',
                 background: isCenter ? 'linear-gradient(145deg, #ff9a3d 0%, var(--primary) 72%)' : active ? 'linear-gradient(135deg, rgba(249,112,21,0.2), rgba(249,112,21,0.08))' : 'transparent',
