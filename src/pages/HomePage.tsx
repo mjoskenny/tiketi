@@ -11,6 +11,8 @@ import { hasEventEnded, getEventEndTimestamp, getEventPhase } from '../lib/event
 type Props = { navigate: (p: string, extra?: unknown) => void }
 type QuickFilter = 'all' | 'today' | 'tomorrow' | 'weekend'
 
+const HOME_EVENT_SELECT = '*, tags, ticket_tiers(id, event_id, name, price, description, quantity, sold, created_at), organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email))'
+
 function isToday(d: string) {
   const today = new Date(); const ed = new Date(d)
   return ed.toDateString() === today.toDateString()
@@ -26,6 +28,14 @@ function isWeekend(d: string) {
   const sat = new Date(now); sat.setDate(now.getDate() + daysUntilSat)
   const sun = new Date(sat); sun.setDate(sat.getDate() + 1)
   return ed.toDateString() === sat.toDateString() || ed.toDateString() === sun.toDateString()
+}
+
+function upcomingBeforePast(events: Event[], now: number) {
+  return [...events].sort((a, b) => {
+    const aUpcoming = getEventEndTimestamp(a.date, a.time, a.end_time) >= now
+    const bUpcoming = getEventEndTimestamp(b.date, b.time, b.end_time) >= now
+    return aUpcoming === bUpcoming ? 0 : aUpcoming ? -1 : 1
+  })
 }
 
 const TIME_FILTERS: { key: QuickFilter; label: string }[] = [
@@ -61,6 +71,7 @@ function EmptySection({ message = 'No events available' }: { message?: string })
 
 export default function HomePage({ navigate }: Props) {
   const [events, setEvents] = useState<Event[]>([])
+  const [trendingEvents, setTrendingEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [timeFilter, setTimeFilter] = useState<QuickFilter>('all')
@@ -76,30 +87,53 @@ export default function HomePage({ navigate }: Props) {
 
   useEffect(() => {
     const loadEvents = async () => {
-      const { data } = await supabase.from('events').select('*, tags, ticket_tiers(id, event_id, name, price, description, quantity, sold, created_at), organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email))').eq('status', 'published').order('created_at', { ascending: false }).limit(24)
+      const { data } = await supabase.from('events').select(HOME_EVENT_SELECT).eq('status', 'published').order('created_at', { ascending: false }).limit(24)
       setEvents(data ?? [])
       setLoading(false)
     }
+    let trendingRequest = 0
+    const loadTrendingEvents = async () => {
+      const request = ++trendingRequest
+      const { data: rankedRows, error: rankingError } = await supabase.rpc('get_trending_event_ids', { p_limit: 6 })
+      if (request !== trendingRequest) return
+      if (rankingError) {
+        console.error('Unable to load trending events', rankingError)
+        setTrendingEvents([])
+        return
+      }
+      const rankedIds = ((rankedRows ?? []) as Array<{ event_id: string }>).map(row => row.event_id)
+      if (!rankedIds.length) { setTrendingEvents([]); return }
+
+      const { data } = await supabase.from('events').select(HOME_EVENT_SELECT).eq('status', 'published').in('id', rankedIds)
+      if (request !== trendingRequest) return
+      const eventsById = new Map(((data ?? []) as Event[]).map(event => [event.id, event]))
+      setTrendingEvents(rankedIds.flatMap(id => {
+        const event = eventsById.get(id)
+        return event ? [event] : []
+      }))
+    }
     void loadEvents()
+    void loadTrendingEvents()
 
     // Subscribe to real-time updates for events
     const eventsChannel = supabase
       .channel('public-events')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'events', filter: 'status=eq.published' }, () => { void loadEvents() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events', filter: 'status=eq.published' }, () => { void loadEvents(); void loadTrendingEvents() })
       .subscribe()
 
     // Subscribe to real-time updates for organizer profiles
     const profilesChannel = supabase
       .channel('public-profiles')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => { void loadEvents() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => { void loadEvents(); void loadTrendingEvents() })
       .subscribe()
 
     const ticketTiersChannel = supabase
       .channel('public-ticket-tier-sales')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_tiers' }, () => { void loadEvents() })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_tiers' }, () => { void loadTrendingEvents() })
       .subscribe()
 
     return () => {
+      trendingRequest += 1
       void supabase.removeChannel(eventsChannel)
       void supabase.removeChannel(profilesChannel)
       void supabase.removeChannel(ticketTiersChannel)
@@ -120,24 +154,9 @@ export default function HomePage({ navigate }: Props) {
     .sort((a, b) => getEventEndTimestamp(a.date, a.time, a.end_time) - getEventEndTimestamp(b.date, b.time, b.end_time))
     .slice(0, 12)
   const liveEvents = filtered.filter(e => !hasEventEnded(e.date, e.time, e.end_time))
-  const trendingEvents = [...liveEvents.filter(e => getEventPhase(e.date, e.time, e.end_time, currentTime) === 'Upcoming')]
-    .sort((a, b) => {
-      const soldA = a.ticket_tiers?.reduce((total, tier) => total + tier.sold, 0) ?? 0
-      const soldB = b.ticket_tiers?.reduce((total, tier) => total + tier.sold, 0) ?? 0
-      if (soldA !== soldB) return soldB - soldA
-
-      const capacityA = a.ticket_tiers?.reduce((total, tier) => total + tier.quantity, 0) ?? 0
-      const capacityB = b.ticket_tiers?.reduce((total, tier) => total + tier.quantity, 0) ?? 0
-      const soldRatioA = capacityA > 0 ? soldA / capacityA : 0
-      const soldRatioB = capacityB > 0 ? soldB / capacityB : 0
-      if (soldRatioA !== soldRatioB) return soldRatioB - soldRatioA
-
-      return getEventEndTimestamp(a.date, a.time, a.end_time) - getEventEndTimestamp(b.date, b.time, b.end_time)
-    })
-    .slice(0, 6)
-  const freeEvents = filtered.filter(e => !e.ticket_tiers?.length || Math.min(...e.ticket_tiers.map(t => t.price)) === 0).slice(0, 4)
+  const freeEvents = upcomingBeforePast(filtered.filter(e => !e.ticket_tiers?.length || Math.min(...e.ticket_tiers.map(t => t.price)) === 0), currentTime).slice(0, 4)
   const activeEvents = liveEvents.slice(0, 6)
-  const homeAllEvents = filtered.slice(0, 8)
+  const homeAllEvents = upcomingBeforePast(filtered, currentTime).slice(0, 8)
   const organizers = Array.from(
     events.reduce((groups, event) => {
       if (!event.organizers || !(event.organizers.verified || event.organizers.verification_status === 'verified')) return groups

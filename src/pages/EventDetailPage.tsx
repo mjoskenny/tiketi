@@ -168,7 +168,7 @@ export default function EventDetailPage({ event, navigate, onRequireAuth }: Prop
   const totalTickets = Object.values(quantities).reduce((sum, quantity) => sum + quantity, 0)
   const subtotal = useMemo(() => tiers.reduce((sum, tier) => sum + (quantities[tier.id] || 0) * tier.price, 0), [quantities, tiers])
   const total = subtotal
-  const organizerName = event.organizers?.profiles?.full_name?.trim() || event.organizers?.name || 'Tiketi events'
+  const organizerName = event.organizers?.profiles?.full_name?.trim() || event.organizers?.name || 'QPassa events'
   const organizerUsername = event.organizers?.profiles?.username?.trim().replace(/^@/, '') || null
   const organizerAvatar = event.organizers?.profiles?.profile_image ?? event.organizers?.profiles?.avatar_url ?? event.organizers?.logo_url ?? null
   const organizerIsVerified = event.organizers?.verified || event.organizers?.verification_status === 'verified'

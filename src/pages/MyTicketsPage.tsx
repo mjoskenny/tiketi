@@ -251,7 +251,7 @@ export default function MyTicketsPage({ navigate }: Props) {
                   {FEATURES.refunds && refund && <div className="mx-4 mb-3 rounded-xl px-3 py-2.5 text-xs" style={{ background: refund.status === 'rejected' ? 'rgba(239,68,68,0.1)' : refund.status === 'approved' ? 'rgba(34,197,94,0.1)' : 'rgba(249,112,21,0.1)', color: refund.status === 'rejected' ? '#fca5a5' : refund.status === 'approved' ? '#86efac' : 'var(--accent)', border: `1px solid ${refund.status === 'rejected' ? 'rgba(239,68,68,0.2)' : refund.status === 'approved' ? 'rgba(34,197,68,0.2)' : 'rgba(249,112,21,0.2)'}` }}>
                     <p className="font-bold">Refund request: {refund.status === 'pending' ? 'Under review' : refund.status === 'approved' ? 'Approved for processing' : refund.status === 'processed' ? 'Processed' : 'Declined'}</p>
                     {refund.organizer_note && <p className="mt-1">{refund.organizer_note}</p>}
-                    {refund.status === 'approved' && <p className="mt-1 opacity-80">Tiketi support still needs to complete the payment-provider step.</p>}
+                    {refund.status === 'approved' && <p className="mt-1 opacity-80">QPassa support still needs to complete the payment-provider step.</p>}
                   </div>}
 
                   <div className="px-4 pb-4 flex items-center justify-between border-t pt-3" style={{ borderColor: 'var(--border)' }}>

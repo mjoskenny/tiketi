@@ -90,8 +90,8 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
 
           <button onClick={() => navigate('home')} className="flex items-center gap-2 text-xl font-bold tracking-tight"
             style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', color: 'var(--foreground)', letterSpacing: '-0.04em' }}>
-            <span className="flex items-center justify-center w-8 h-8 rounded-[0.7rem] text-sm font-black" style={{ background: 'var(--primary)', color: '#17100a', boxShadow: '0 0 22px rgba(249,112,21,0.28)' }}>t</span>
-            tiketi
+            <span className="flex items-center justify-center w-8 h-8 rounded-[0.7rem] text-sm font-black" style={{ background: 'var(--primary)', color: '#17100a', boxShadow: '0 0 22px rgba(249,112,21,0.28)' }}>Q</span>
+            QPassa
           </button>
 
           <div className="hidden md:flex items-center gap-7">

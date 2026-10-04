@@ -65,7 +65,7 @@ export default function EventCard({ event, onClick, size = 'md', compact = false
   const sold = event.ticket_tiers?.reduce((total, tier) => total + tier.sold, 0) ?? 0
   const capacity = event.ticket_tiers?.reduce((total, tier) => total + tier.quantity, 0) ?? 0
   const highDemand = capacity > 0 && sold / capacity >= 0.7 && status !== 'Ended'
-  const organizerName = event.organizers?.profiles?.full_name?.trim() || event.organizers?.name || 'Tiketi events'
+  const organizerName = event.organizers?.profiles?.full_name?.trim() || event.organizers?.name || 'QPassa events'
   const organizerAvatar = event.organizers?.profiles?.profile_image || event.organizers?.profiles?.avatar_url || event.organizers?.logo_url || null
   const organizerVerified = event.organizers?.verified || event.organizers?.verification_status === 'verified'
   const dateTime = new Date(`${event.date}T${event.time || '00:00'}`)

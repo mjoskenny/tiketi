@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import i18n from '../lib/i18n'
 
-const localizedAttributes = ['placeholder', 'title', 'aria-label', 'aria-description']
+const localizedAttributes = ['placeholder', 'title', 'aria-label', 'aria-description', 'href']
 const protectedContent = [
   '[data-locale-ignore]',
   '.sinc-event-description p',
@@ -13,8 +13,18 @@ const protectedContent = [
 
 function translateStaticText(value: string) {
   const key = value.trim()
-  const directTranslation = i18n.t(key)
-  if (directTranslation !== key || !i18n.resolvedLanguage?.startsWith('fr')) return directTranslation
+  const directMatch = i18n.t(key)
+  const legacyBrandKey = key
+    .replace(/(^|[^A-Za-z0-9_@/-])QPASSA(?=$|[^A-Za-z0-9_@/-])/g, '$1TIKETI')
+    .replace(/(^|[^A-Za-z0-9_@/-])QPassa(?=$|[^A-Za-z0-9_@/-])/g, '$1Tiketi')
+  const directTranslation = directMatch === key && legacyBrandKey !== key
+    ? i18n.t(legacyBrandKey)
+    : directMatch
+  const brandedTranslation = directTranslation
+    .replaceAll('tiketi.events', 'qpassa.events')
+    .replace(/(^|[^A-Za-z0-9_@/-])(?:TIKETI|TIKE)(?=$|[^A-Za-z0-9_@/-])/g, '$1QPASSA')
+    .replace(/(^|[^A-Za-z0-9_@/-])(?:Tiketi|Tike)(?=$|[^A-Za-z0-9_@/-])/g, '$1QPassa')
+  if (brandedTranslation !== key || !i18n.resolvedLanguage?.startsWith('fr')) return brandedTranslation
 
   let partiallyTranslated = key
   const composableLabels: Array<[RegExp, string]> = [
@@ -93,7 +103,7 @@ function translateStaticText(value: string) {
     const match = key.match(pattern)
     if (match) return translate(match)
   }
-  return directTranslation
+  return brandedTranslation
 }
 
 /** Bridges existing English JSX copy into the i18next catalog while pages are migrated to use t(). */

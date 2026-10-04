@@ -88,6 +88,10 @@ export default function EventsPage({ navigate }: Props) {
       return matchCat && matchSearch && matchPrice
     })
   ).sort((a, b) => {
+      const aIsUpcoming = getEventEndTimestamp(a.date, a.time, a.end_time) >= Date.now()
+      const bIsUpcoming = getEventEndTimestamp(b.date, b.time, b.end_time) >= Date.now()
+      if (aIsUpcoming !== bIsUpcoming) return aIsUpcoming ? -1 : 1
+
       if (sort === 'price-asc') {
         const ap = a.ticket_tiers?.length ? Math.min(...a.ticket_tiers.map(t => t.price)) : 0
         const bp = b.ticket_tiers?.length ? Math.min(...b.ticket_tiers.map(t => t.price)) : 0

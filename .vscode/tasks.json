@@ -37,7 +37,7 @@
 			"group": "build"
 		},
 		{
-			"label": "Build Tiketi production bundle",
+			"label": "Build QPassa production bundle",
 			"type": "shell",
 			"command": "npm.cmd",
 			"args": [
@@ -49,7 +49,7 @@
 			"group": "build"
 		},
 		{
-			"label": "Build Tiketi production bundle",
+			"label": "Build QPassa production bundle",
 			"type": "shell",
 			"command": "npm.cmd",
 			"args": [

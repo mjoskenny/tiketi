@@ -299,7 +299,7 @@ const dashboardFr: Record<string, string> = {
   'No active agent assignments': 'Aucune affectation d’agent active',
   'This account is active, but no organizer has assigned event inventory for sales yet.': 'Ce compte est actif, mais aucun organisateur ne lui a encore attribué de billets à vendre.',
   'Sales could not be loaded:': 'Impossible de charger les ventes :', 'Select an assigned event and a valid ticket tier.': 'Sélectionnez un événement attribué et une catégorie de billets valide.',
-  'This event has ended. Tickets can no longer be sold.': 'Cet événement est terminé. Il n’est plus possible de vendre des billets.',
+  'This event has ended. Tickets can no longer be sold.': 'Cet événénement est terminé. Il n’est plus possible de vendre des billets.',
   'Could not create the sale.': 'Impossible de créer la vente.', 'Cash sale saved. The organizer must confirm payment before tickets and commission are recorded.': 'Vente en espèces enregistrée. L’organisateur doit confirmer le paiement avant l’enregistrement des billets et de la commission.',
   'Test payment could not be completed.': 'Impossible de finaliser le paiement de test.',
   'The assigned event could not be loaded.': 'Impossible de charger l’événement attribué.',

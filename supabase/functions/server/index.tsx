@@ -128,14 +128,14 @@ async function pdfAttachment(ticket: {
   }
   pdf.setTextColor(130, 130, 130);
   pdf.setFontSize(5);
-  pdf.text('Powered by Tiketi', 244, 114);
+  pdf.text('Powered by QPassa', 244, 114);
   return pdf.output('arraybuffer');
 }
 
 async function sendConfirmationEmail(to: string, title: string, ticketPdf: ArrayBuffer): Promise<{ sent: boolean; reason?: string }> {
   if (!to || !to.includes('@')) return { sent: false, reason: 'Ticket holder has no valid email address' };
   const apiKey = Deno.env.get('RESEND_API_KEY');
-  const from = Deno.env.get('EMAIL_FROM') || 'Tiketi <onboarding@resend.dev>';
+  const from = Deno.env.get('EMAIL_FROM') || 'QPassa <onboarding@resend.dev>';
   if (!apiKey) return { sent: false, reason: 'Email delivery is not configured: RESEND_API_KEY is missing' };
   const escapeHtml = (value: string) => value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character] ?? character);
   try {
@@ -147,7 +147,7 @@ async function sendConfirmationEmail(to: string, title: string, ticketPdf: Array
     }
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: [to], subject: `Your Tiketi ticket for ${title}`, html: `<p>Hello,</p><p>Your ticket for <strong>${escapeHtml(title)}</strong> is confirmed. Your downloadable ticket PDF is attached.</p><p>Please present the QR code on the ticket at the event entrance.</p>`, attachments: [{ filename: 'tiketi-ticket.pdf', content: btoa(ticketPdfBinary) }] }),
+      body: JSON.stringify({ from, to: [to], subject: `Your QPassa ticket for ${title}`, html: `<p>Hello,</p><p>Your ticket for <strong>${escapeHtml(title)}</strong> is confirmed. Your downloadable ticket PDF is attached.</p><p>Please present the QR code on the ticket at the event entrance.</p>`, attachments: [{ filename: 'qpassa-ticket.pdf', content: btoa(ticketPdfBinary) }] }),
     });
     if (!response.ok) {
       const providerError = await response.json().catch(() => null) as { message?: string; error?: string } | null;
@@ -270,7 +270,7 @@ async function initializePayment(c: Parameters<typeof app.post>[1]) {
       amount: Number(order.total),
       currency: 'BIF',
       method,
-      customer: { name: order.holder_name || 'Tiketi Customer', email: order.holder_email || '', phone: paymentPhone },
+      customer: { name: order.holder_name || 'QPassa Customer', email: order.holder_email || '', phone: paymentPhone },
       returnUrl: returnUrl.toString(),
       webhookUrl,
     });

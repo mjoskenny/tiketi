@@ -75,7 +75,7 @@ function xmlValue(xml: Record<string, unknown>, key: string) {
 
 function splitName(value: string) {
   const parts = value.trim().split(/\s+/).filter(Boolean)
-  return { first: parts[0] ?? 'Tiketi', last: parts.slice(1).join(' ') || 'Customer' }
+  return { first: parts[0] ?? 'QPassa', last: parts.slice(1).join(' ') || 'Customer' }
 }
 
 function pickNestedString(value: unknown, keys: string[]): string | undefined {
@@ -242,7 +242,7 @@ class DpoPayAdapter implements PaymentAdapter {
   <Services>
     <Service>
       <ServiceTypeName>Event ticket</ServiceTypeName>
-      <ServiceDescription>Tiketi event ticket purchase</ServiceDescription>
+      <ServiceDescription>QPassa event ticket purchase</ServiceDescription>
       <ServiceDate>${xmlEscape(serviceDate)}</ServiceDate>
     </Service>
   </Services>

@@ -115,7 +115,7 @@ export default function DigitalTicketPage({ data, navigate }: Props) {
     }
     pdf.setTextColor(130, 130, 130)
     pdf.setFontSize(5)
-    pdf.text('Powered by Tiketi', 244, 114)
+    pdf.text('Powered by QPassa', 244, 114)
     return pdf
   }
 
@@ -206,7 +206,7 @@ export default function DigitalTicketPage({ data, navigate }: Props) {
             {image && <img src={image} alt={title} className="w-full h-full object-cover opacity-60" />}
             <div className="absolute inset-0 flex flex-col justify-between p-5"
               style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.4), rgba(0,0,0,0.7))' }}>
-              <div className="text-xl font-black" style={{ fontFamily: 'Outfit, sans-serif', color: 'var(--primary)' }}>TIKETI</div>
+              <div className="text-xl font-black" style={{ fontFamily: 'Outfit, sans-serif', color: 'var(--primary)' }}>QPASSA</div>
               <div>
                 <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full mb-2"
                   style={{ background: statusColor, color: '#fff' }}>

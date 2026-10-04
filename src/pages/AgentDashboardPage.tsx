@@ -582,7 +582,7 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
     return (
       <main className="min-h-screen px-4 py-10" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
         <div className="mx-auto max-w-2xl">
-          <button type="button" onClick={() => navigate('home')} aria-label="Back to Tiketi" title="Back to Tiketi" className="mb-8 flex h-10 w-10 items-center justify-center rounded-full" style={{ color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={18} /></button>
+          <button type="button" onClick={() => navigate('home')} aria-label="Back to QPassa" title="Back to QPassa" className="mb-8 flex h-10 w-10 items-center justify-center rounded-full" style={{ color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={18} /></button>
           <h1 className="text-4xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Agent invitations</h1>
           <p className="mt-2 text-sm" style={{ color: 'var(--muted-foreground)' }}>Choose whether to accept each assigned sales opportunity.</p>
           {agentInvitations.map(invitation => (
@@ -610,7 +610,7 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
           <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--primary)' }}>System status</p>
           <h1 className="mt-3 text-4xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>No active agent assignments</h1>
           <p className="mt-3 text-sm leading-6" style={{ color: 'var(--muted-foreground)' }}>This account is active, but no organizer has assigned event inventory for sales yet.</p>
-          <button type="button" onClick={() => navigate('home')} aria-label="Back to Tiketi" title="Back to Tiketi" className="mt-6 flex h-12 w-12 items-center justify-center rounded-full" style={{ background: 'var(--primary)', color: '#000' }}><ArrowLeftIcon size={20} /></button>
+          <button type="button" onClick={() => navigate('home')} aria-label="Back to QPassa" title="Back to QPassa" className="mt-6 flex h-12 w-12 items-center justify-center rounded-full" style={{ background: 'var(--primary)', color: '#000' }}><ArrowLeftIcon size={20} /></button>
         </div>
       </main>
     )
@@ -1081,10 +1081,10 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
                     </div>
                     <div className="rounded-2xl border p-4" style={{ borderColor: 'var(--border)' }}>
                       <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--muted-foreground)' }}>Email</p>
-                      <p className="mt-2 text-xl font-black">{user?.email ?? 'agent@tiketi.app'}</p>
+                      <p className="mt-2 text-xl font-black">{user?.email ?? 'agent@qpassa.app'}</p>
                     </div>
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => navigate('home')} aria-label="Back to Tiketi" title="Back to Tiketi" className="flex h-12 w-12 items-center justify-center rounded-full" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}><ArrowLeftIcon size={18} /></button>
+                      <button type="button" onClick={() => navigate('home')} aria-label="Back to QPassa" title="Back to QPassa" className="flex h-12 w-12 items-center justify-center rounded-full" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}><ArrowLeftIcon size={18} /></button>
                       <button onClick={() => navigate('auth-customer')} className="flex-1 rounded-xl px-4 py-3 text-sm font-bold" style={{ background: 'var(--primary)', color: '#000' }}>Edit profile</button>
                     </div>
                   </div>

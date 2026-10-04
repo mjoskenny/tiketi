@@ -1421,7 +1421,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                       <p className="mt-3 font-bold">No followers yet</p>
                     </div>
                   ) : followers.map(follower => {
-                    const followerName = follower.profiles?.full_name || follower.profiles?.username || 'Tiketi user'
+                    const followerName = follower.profiles?.full_name || follower.profiles?.username || 'QPassa user'
                     return (
                       <div key={follower.id} className="flex items-center gap-3 rounded-2xl p-4" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
                         {follower.profiles?.avatar_url ? <img src={follower.profiles.avatar_url} alt={followerName} className="h-10 w-10 rounded-full object-cover" /> : <div className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold" style={{ background: 'var(--muted)' }}>{followerName[0]?.toUpperCase() ?? '?'}</div>}
@@ -1718,7 +1718,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 type EventTierForm = { id?: string; name: string; price: string; quantity: string; description: string; ticket_type: 'consumable' | 'non_consumable'; consumable_amount: string; extra_info: string; expires_at: string; group_size: string; show_optional_details: boolean; sold: number }
 
 function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string; event?: Event | null; onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState(() => ({ title: event?.title ?? '', category: event?.category ?? 'Music', date: event?.date ?? '', time: event?.time ?? '18:00', end_time: event?.end_time ?? '', venue: event?.venue ?? '', venue_latitude: event?.venue_latitude ?? null as number | null, venue_longitude: event?.venue_longitude ?? null as number | null, city: event?.city ?? 'Bujumbura', description: event?.description ?? '', capacity: String(event?.capacity ?? 500), cover_image: event?.cover_image ?? '', tags: event?.tags?.join(', ') ?? '', status: event?.status ?? 'draft', featured: event?.is_featured ?? false, refund_policy: event?.refund_policy ?? 'Tickets are non-refundable', entry_policy: event?.entry_policy ?? 'Valid ID required at entry' }))
+  const [form, setForm] = useState(() => ({ title: event?.title ?? '', category: event?.category ?? 'Music', date: event?.date ?? '', time: event?.time ?? '18:00', end_time: event?.end_time ?? '', venue: event?.venue ?? '', venue_latitude: event?.venue_latitude ?? null as number | null, venue_longitude: event?.venue_longitude ?? null as number | null, city: event?.city ?? 'Bujumbura', description: event?.description ?? '', capacity: String(event?.capacity ?? 500), cover_image: event?.cover_image ?? '', tags: event?.tags?.join(', ') ?? '', status: event?.status ?? 'draft', refund_policy: event?.refund_policy ?? 'Tickets are non-refundable', entry_policy: event?.entry_policy ?? 'Valid ID required at entry' }))
   const [venueSearch, setVenueSearch] = useState(event?.venue ?? '')
   const [venueResults, setVenueResults] = useState<Array<{ display_name: string; lat: string; lon: string; class?: string; type?: string; address?: { city?: string; town?: string; village?: string } }>>([])
   const [venueSearching, setVenueSearching] = useState(false)
@@ -1830,7 +1830,6 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
       cover_image: coverImageUrl || null,
       tags: form.tags.split(',').map(tag => tag.trim()).filter(Boolean),
       status: form.status,
-      is_featured: form.featured,
       refund_policy: form.refund_policy,
       entry_policy: form.entry_policy,
     }
@@ -1987,7 +1986,7 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
               className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} />
             <p className="text-[11px] mt-1" style={{ color: 'var(--muted-foreground)' }}>Separate tags with commas. They appear as the event lineup.</p>
           </div>
-          <div className="grid grid-cols-2 gap-3 items-end">
+          <div>
             <div>
               <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Publication status</label>
               <select value={form.status} onChange={e => f('status', e.target.value)}
@@ -1995,10 +1994,6 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
                 {['draft', 'published', 'cancelled', 'completed'].map(status => <option key={status}>{status}</option>)}
               </select>
             </div>
-            <label className="flex items-center gap-2 pb-2 text-sm font-semibold">
-              <input type="checkbox" checked={form.featured} onChange={e => setForm(current => ({ ...current, featured: e.target.checked }))} />
-              Featured event
-            </label>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -2160,7 +2155,7 @@ function InviteAgentModal({ orgId, events, onClose, onInvited }: { orgId: string
   }
   return <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,.8)' }}><div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#1a1d1d', border: '1px solid var(--border)' }}>
     <div className="flex items-center justify-between"><h2 className="font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Invite Agent</h2><button onClick={onClose}>✕</button></div>
-    <p className="mt-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>The person must already have a Tiketi account.</p>
+    <p className="mt-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>The person must already have a QPassa account.</p>
     <div className="mt-4 space-y-3">
       <input value={email} onChange={event => setEmail(event.target.value)} placeholder="agent@example.com" className="w-full rounded-xl px-4 py-2.5 text-sm" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} />
       <select value={eventId} onChange={event => { setEventId(event.target.value); setTierIds([]) }} className="w-full rounded-xl px-4 py-2.5 text-sm" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }}>{events.map(event => <option key={event.id} value={event.id}>{event.title}</option>)}</select>
@@ -2243,7 +2238,7 @@ function InviteMemberModal({ orgId, onClose, roles, onInvited }: { orgId: string
     setSaving(true)
     const { data: profile, error: profileError } = await supabase.from('profiles').select('id').eq('email', normalizedEmail).maybeSingle()
     if (profileError || !profile) {
-      setError(profileError?.message ?? 'This email must have a Tiketi account before it can be invited.')
+      setError(profileError?.message ?? 'This email must have a QPassa account before it can be invited.')
       setSaving(false)
       return
     }
@@ -2270,7 +2265,7 @@ function InviteMemberModal({ orgId, onClose, roles, onInvited }: { orgId: string
         </div>
         <div className="p-6 space-y-4">
           {error && <p className="rounded-lg px-3 py-2 text-xs" style={{ background: '#3a1717', color: '#fecaca' }}>{error}</p>}
-          <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Add an existing Tiketi account to your team, or share the registration link below first.</p>
+          <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Add an existing QPassa account to your team, or share the registration link below first.</p>
           <input value={email} onChange={e => setEmail(e.target.value)} placeholder="team.member@example.com"
             className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} />
           {roles.length > 0 && <select value={roleId} onChange={e => setRoleId(e.target.value)} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }}>

@@ -82,8 +82,8 @@ type PublicPlatformSettings = {
 }
 
 const DEFAULT_PUBLIC_PLATFORM_SETTINGS: PublicPlatformSettings = {
-  platform_name: 'Tiketi',
-  support_email: 'hello@tiketi.events',
+  platform_name: 'QPassa',
+  support_email: 'hello@qpassa.events',
   support_phone: '+257 22 000 000',
   contact_whatsapp: '+257 22 000 000',
   contact_address: 'Bujumbura, Burundi',
@@ -340,7 +340,7 @@ export default function App() {
     return (
       <div className="flex items-center justify-center min-h-screen" style={{ background: 'var(--background)' }}>
         <div className="flex flex-col items-center gap-4">
-          <div className="text-3xl font-black" style={{ fontFamily: 'Outfit, sans-serif', color: 'var(--primary)' }}>TIKETI</div>
+          <div className="text-3xl font-black" style={{ fontFamily: 'Outfit, sans-serif', color: 'var(--primary)' }}>QPASSA</div>
           <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
         </div>
       </div>

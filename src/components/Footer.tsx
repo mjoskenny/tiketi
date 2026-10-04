@@ -14,8 +14,9 @@ type FooterProps = {
 }
 
 export default function Footer({ navigate, publicPlatformSettings }: FooterProps) {
-  const platformName = publicPlatformSettings?.platform_name || 'Tiketi'
-  const supportEmail = publicPlatformSettings?.support_email || 'hello@tiketi.events'
+  const configuredPlatformName = publicPlatformSettings?.platform_name?.trim()
+  const platformName = !configuredPlatformName || /^(tiketi|tike)$/i.test(configuredPlatformName) ? 'QPassa' : configuredPlatformName
+  const supportEmail = publicPlatformSettings?.support_email || 'hello@qpassa.events'
   const supportPhone = publicPlatformSettings?.support_phone || '+257 22 000 000'
   const contactAddress = publicPlatformSettings?.contact_address || 'Bujumbura, Burundi'
   const socials = (publicPlatformSettings?.social_links ?? []).filter(link => link.active && link.href)
@@ -33,7 +34,7 @@ export default function Footer({ navigate, publicPlatformSettings }: FooterProps
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-10">
           <div className="col-span-2 md:col-span-2">
-            <div className="mb-2 text-2xl font-black" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', letterSpacing: '-0.02em' }}>{platformName.toLowerCase()}</div>
+            <div className="mb-2 text-2xl font-black" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', letterSpacing: '-0.02em' }}>{platformName}</div>
             <p className="mb-5 text-sm" style={{ color: 'var(--muted-foreground)' }}>Discover. Book. Experience.</p>
             <div className="mb-3 flex items-center gap-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>
               <MapPinIcon size={13} />
@@ -115,12 +116,8 @@ export default function Footer({ navigate, publicPlatformSettings }: FooterProps
           </div>
         </div>
 
-        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t pt-6 sm:flex-row" style={{ borderColor: 'var(--border)' }}>
+        <div className="mt-12 flex items-center justify-center border-t pt-6 sm:justify-start" style={{ borderColor: 'var(--border)' }}>
           <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>© 2026 {platformName}. All rights reserved.</p>
-          <div className="flex items-center gap-2">
-            <div className="h-1.5 w-1.5 rounded-full" style={{ background: '#22c55e' }} />
-            <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>All systems operational</p>
-          </div>
         </div>
       </div>
     </footer>

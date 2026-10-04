@@ -9,22 +9,22 @@ type Props = { navigate: (page: string, extra?: unknown) => void }
 type Faq = { question: string; answer: string }
 
 const faqs: Faq[] = [
-  { question: 'What is Tiketi?', answer: 'Tiketi is a platform for discovering events, buying tickets, and helping organizers bring their experiences to audiences across Burundi.' },
-  { question: 'Who can create an event?', answer: 'Organizers, event teams, venues, and approved event partners can use Tiketi to bring their events online.' },
-  { question: 'How do I get my ticket?', answer: 'After completing your booking, your ticket and confirmation are kept in your Tiketi account for easy access.' },
-  { question: 'Where is Tiketi available?', answer: 'Tiketi is built for Burundi, starting with the country’s active event communities and expanding as the platform grows.' },
-  { question: 'Can I get help with an event?', answer: 'Yes. Tiketi provides support for ticketing and platform-related questions. For event-specific issues, we can also connect you with the organizer when needed.' },
+  { question: 'What is QPassa?', answer: 'QPassa is a platform for discovering events, buying tickets, and helping organizers bring their experiences to audiences across Burundi.' },
+  { question: 'Who can create an event?', answer: 'Organizers, event teams, venues, and approved event partners can use QPassa to bring their events online.' },
+  { question: 'How do I get my ticket?', answer: 'After completing your booking, your ticket and confirmation are kept in your QPassa account for easy access.' },
+  { question: 'Where is QPassa available?', answer: 'QPassa is built for Burundi, starting with the country’s active event communities and expanding as the platform grows.' },
+  { question: 'Can I get help with an event?', answer: 'Yes. QPassa provides support for ticketing and platform-related questions. For event-specific issues, we can also connect you with the organizer when needed.' },
 ]
 
 const principles = [
-  { number: '01', title: 'Make it feel local', copy: 'The best events feel connected to the people around them. Tiketi helps local experiences get discovered by the audiences they are meant for.' },
+  { number: '01', title: 'Make it feel local', copy: 'The best events feel connected to the people around them. QPassa helps local experiences get discovered by the audiences they are meant for.' },
   { number: '02', title: 'Keep it simple', copy: 'From the first tap to the ticket at the door, every part of the journey should feel clear, quick, and human.' },
   { number: '03', title: 'Grow the ecosystem', copy: 'Organizers, artists, venues, agents, brands, and audiences are stronger when the same ecosystem helps them connect and move forward.' },
 ]
 
 const productSteps = [
   { number: '01', label: 'DISCOVER', title: 'Find what is happening near you', copy: 'Browse concerts, parties, culture, sports, community events, and the experiences worth leaving home for.', tone: 'orange', action: 'Discover events', page: 'discover' },
-  { number: '02', label: 'FOLLOW', title: 'Never miss the ones you care about', copy: 'Follow organizers and experiences that feel like you. Tiketi keeps the events you care about closer.', tone: 'lime', action: 'See your favorites', page: 'favorites' },
+  { number: '02', label: 'FOLLOW', title: 'Never miss the ones you care about', copy: 'Follow organizers and experiences that feel like you. QPassa keeps the events you care about closer.', tone: 'lime', action: 'See your favorites', page: 'favorites' },
   { number: '03', label: 'BOOK', title: 'Book in seconds', copy: 'Choose your ticket, review the details, complete your booking, and keep your confirmation where you need it.', tone: 'blue', action: 'Browse tickets', page: 'events' },
   { number: '04', label: 'WALK IN', title: 'Straight through the door', copy: 'Keep your ticket ready on your phone and arrive prepared for the experience.', tone: 'violet', action: 'View my ticket', page: 'my-tickets' },
 ]
@@ -70,7 +70,7 @@ export default function AboutPage({ navigate }: Props) {
         <div className="about-hero-inner">
           <p className="about-eyebrow"><span /> The home for Burundi&apos;s live culture</p>
           <h1>Moments worth<br /><em>showing up for.</em></h1>
-          <p className="about-hero-copy">Tiketi helps people discover what is happening across Burundi and gives organizers a simple, trusted way to sell tickets, manage events, and bring people together.</p>
+          <p className="about-hero-copy">QPassa helps people discover what is happening across Burundi and gives organizers a simple, trusted way to sell tickets, manage events, and bring people together.</p>
           <div className="about-hero-actions">
             <button onClick={() => navigate('discover')} className="about-primary-button">Discover events <ArrowRightIcon size={16} /></button>
             <button onClick={() => navigate('auth-organizer')} className="about-text-button">Host an event <ArrowRightIcon size={15} /></button>
@@ -87,9 +87,9 @@ export default function AboutPage({ navigate }: Props) {
       </section>
 
       <section className="about-story about-section-shell">
-        <div className="about-section-label">01 / Why Tiketi</div>
-        <div className="about-story-intro"><div><h2>Less searching.<br /><span>More showing up.</span></h2><p>There is always something happening in Burundi. Tiketi makes the good stuff easier to discover, trust, book, and be part of.</p></div><div className="about-story-stamp"><span>BUILT<br />FOR<br /><b>THE MOMENT</b></span><ArrowRightIcon size={17} /></div></div>
-        <div className="about-story-grid"><div className="about-story-visual"><div className="about-story-card about-story-card-main"><span>TONIGHT</span><strong>Find your<br />next thing.</strong><small>Music · Culture · Community · Sports</small></div><div className="about-story-card about-story-card-small"><MapPinIcon size={15} /><span>Bujumbura<br /><b>is alive</b></span></div><div className="about-story-line" /></div><div className="about-story-copy"><p>From live music and nightlife to sports, culture, comedy, community gatherings, and new creative experiences, events bring people together. Discovery should not feel like work.</p><p>Tiketi brings discovery, booking, and the ticket at the door into one clear journey, while giving the people behind each experience better tools to reach and understand their audience.</p></div></div>
+        <div className="about-section-label">01 / Why QPassa</div>
+        <div className="about-story-intro"><div><h2>Less searching.<br /><span>More showing up.</span></h2><p>There is always something happening in Burundi. QPassa makes the good stuff easier to discover, trust, book, and be part of.</p></div><div className="about-story-stamp"><span>BUILT<br />FOR<br /><b>THE MOMENT</b></span><ArrowRightIcon size={17} /></div></div>
+        <div className="about-story-grid"><div className="about-story-visual"><div className="about-story-card about-story-card-main"><span>TONIGHT</span><strong>Find your<br />next thing.</strong><small>Music · Culture · Community · Sports</small></div><div className="about-story-card about-story-card-small"><MapPinIcon size={15} /><span>Bujumbura<br /><b>is alive</b></span></div><div className="about-story-line" /></div><div className="about-story-copy"><p>From live music and nightlife to sports, culture, comedy, community gatherings, and new creative experiences, events bring people together. Discovery should not feel like work.</p><p>QPassa brings discovery, booking, and the ticket at the door into one clear journey, while giving the people behind each experience better tools to reach and understand their audience.</p></div></div>
         <div className="about-story-action"><button onClick={() => navigate('discover')} className="about-glass-button">See what is happening <ArrowRightIcon size={15} /></button></div>
       </section>
 
@@ -101,7 +101,7 @@ export default function AboutPage({ navigate }: Props) {
 
       <section className="about-product about-section-shell">
         <div className="about-section-label">02 / From discovery to the door</div>
-        <div className="about-product-heading"><h2>Everything you need,<br /><span>in your pocket.</span></h2><p>Tiketi keeps the event journey simple. Explore what is on, follow what matters, book when you are ready, and arrive with confidence.</p></div>
+        <div className="about-product-heading"><h2>Everything you need,<br /><span>in your pocket.</span></h2><p>QPassa keeps the event journey simple. Explore what is on, follow what matters, book when you are ready, and arrive with confidence.</p></div>
         <div className="about-product-steps">{productSteps.map((step, index) => <article className={`about-product-step about-product-step-${step.tone}`} key={step.number}><div className="about-product-copy"><span className="about-step-number">{step.number} · {step.label}</span><h3>{step.title}</h3><p>{step.copy}</p><button onClick={() => navigate(step.page)} className="about-product-action">{step.action} <ArrowRightIcon size={15} /></button></div><PhoneMockup variant={index} /></article>)}</div>
       </section>
 
@@ -111,9 +111,9 @@ export default function AboutPage({ navigate }: Props) {
 
       <section className="about-pricing about-section-shell"><div className="about-section-label">04 / Simple pricing</div><div className="about-pricing-heading"><h2>Clear from the<br /><span>first ticket.</span></h2><p>Straightforward tools and pricing designed to make professional event management more accessible to organizers in Burundi.</p></div><div className="about-price-grid"><article><span>Discover</span><strong>Free</strong><p>Find events and keep your tickets in one place.</p><button onClick={() => navigate('discover')}>Browse events <ArrowRightIcon size={15} /></button></article><article className="about-price-featured"><span>Host</span><strong>Built to grow</strong><p>Tools for organizers to publish, sell, scan, manage, and understand their events.</p><button onClick={() => navigate('auth-organizer')}>Become an organizer <ArrowRightIcon size={15} /></button></article></div></section>
 
-      <section className="about-faq about-section-shell"><div className="about-section-label">05 / Questions</div><div className="about-faq-grid"><div><h2>Good to<br /><span>know.</span></h2><p>Still curious? Here are a few answers to help you find your way around Tiketi.</p></div><div className="about-faq-list">{faqs.map((faq, index) => <div className={`about-faq-item ${openFaq === index ? 'is-open' : ''}`} key={faq.question}><button onClick={() => setOpenFaq(openFaq === index ? -1 : index)}><span>{faq.question}</span><ChevronDownIcon size={18} /></button>{openFaq === index && <p>{faq.answer}</p>}</div>)}</div></div></section>
+      <section className="about-faq about-section-shell"><div className="about-section-label">05 / Questions</div><div className="about-faq-grid"><div><h2>Good to<br /><span>know.</span></h2><p>Still curious? Here are a few answers to help you find your way around QPassa.</p></div><div className="about-faq-list">{faqs.map((faq, index) => <div className={`about-faq-item ${openFaq === index ? 'is-open' : ''}`} key={faq.question}><button onClick={() => setOpenFaq(openFaq === index ? -1 : index)}><span>{faq.question}</span><ChevronDownIcon size={18} /></button>{openFaq === index && <p>{faq.answer}</p>}</div>)}</div></div></section>
 
-      <section className="about-contact about-section-shell"><div className="about-contact-inner"><div className="about-section-label">06 / Get in touch</div><h2>Have something<br /><span>in mind?</span></h2><p>Whether you are planning your first event, growing an event series, building a venue, looking for the next experience to attend, or want to work with Tiketi, we would love to hear from you.</p><a href="mailto:hello@tiketi.events" className="about-email">hello@tiketi.events <ArrowRightIcon size={17} /></a></div></section>
+      <section className="about-contact about-section-shell"><div className="about-contact-inner"><div className="about-section-label">06 / Get in touch</div><h2>Have something<br /><span>in mind?</span></h2><p>Whether you are planning your first event, growing an event series, building a venue, looking for the next experience to attend, or want to work with QPassa, we would love to hear from you.</p><a href="mailto:hello@qpassa.events" className="about-email">hello@qpassa.events <ArrowRightIcon size={17} /></a></div></section>
     </main>
   )
 }

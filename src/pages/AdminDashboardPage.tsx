@@ -159,8 +159,8 @@ const organizerVerificationStatus = (organizer: { verified?: boolean | null; ver
 
 const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   id: true,
-  platform_name: 'Tiketi',
-  support_email: 'hello@tiketi.events',
+  platform_name: 'QPassa',
+  support_email: 'hello@qpassa.events',
   support_phone: '+257 22 000 000',
   contact_whatsapp: '+257 22 000 000',
   contact_address: 'Bujumbura, Burundi',
@@ -2001,8 +2001,8 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
       >
         <div className="border-b px-5 py-5" style={{ borderColor: 'rgba(255,255,255,0.09)' }}>
           <a href="/admin-dashboard" onClick={event => { event.preventDefault(); handleSelectSection('overview') }} className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-black" style={{ background: 'var(--primary)', color: '#17100a' }}>t</span>
-            <span className="text-lg font-black tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>tiketi admin</span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-black" style={{ background: 'var(--primary)', color: '#17100a' }}>Q</span>
+            <span className="text-lg font-black tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>QPassa admin</span>
           </a>
           <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--muted-foreground)' }}>Platform operations</p>
           <p className="mt-1 truncate text-xs" style={{ color: 'rgba(255,255,255,0.72)' }}>{profile?.full_name?.trim() || 'Admin workspace'}</p>

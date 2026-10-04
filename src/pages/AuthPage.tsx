@@ -147,7 +147,7 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
         <div className="relative flex flex-col justify-between h-full p-12">
           <button onClick={() => navigate?.('home')} className="text-2xl font-black w-fit"
             style={{ fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.02em' }}>
-            TIKETI
+            QPASSA
           </button>
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold mb-5"
@@ -179,7 +179,7 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
               </div>
             )}
           </div>
-          <p className="text-xs" style={{ color: 'rgba(255,255,255,0.18)' }}>© 2026 Tiketi · Bujumbura, Burundi</p>
+          <p className="text-xs" style={{ color: 'rgba(255,255,255,0.18)' }}>© 2026 QPassa · Bujumbura, Burundi</p>
         </div>
       </div>
 
@@ -190,7 +190,7 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
 
           {/* Mobile logo */}
           <button onClick={() => navigate?.('home')} className="lg:hidden block w-full text-center text-2xl font-black mb-8"
-            style={{ fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.02em' }}>TIKETI</button>
+            style={{ fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.02em' }}>QPASSA</button>
 
           {/* Role selector */}
           <div className="mb-5">

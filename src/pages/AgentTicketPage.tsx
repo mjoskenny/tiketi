@@ -123,7 +123,7 @@ export default function AgentTicketPage({ data, navigate }: Props) {
     }
     pdf.setTextColor(130, 130, 130)
     pdf.setFontSize(5)
-    pdf.text('Powered by Tiketi', 244, 114)
+    pdf.text('Powered by QPassa', 244, 114)
     return pdf
   }
 
@@ -188,7 +188,7 @@ export default function AgentTicketPage({ data, navigate }: Props) {
           <div className="relative h-48 overflow-hidden sm:h-64" style={{ background: '#111' }}>
             {image && <img src={image} alt={title} className="h-full w-full object-cover" />}
             <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(0,0,0,.8), rgba(0,0,0,.18))' }} />
-            <div className="absolute inset-0 flex flex-col justify-end p-5 sm:p-7"><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/65">{event.organizers?.name ?? 'Tiketi event'}</p><h2 className="mt-2 max-w-2xl text-2xl font-black text-white sm:text-4xl" style={{ fontFamily: 'Outfit, sans-serif' }}>{title}</h2><p className="mt-2 text-sm text-white/75">{date}{time ? ` · ${time}` : ''} · {event.venue ?? 'Venue unavailable'}</p></div>
+            <div className="absolute inset-0 flex flex-col justify-end p-5 sm:p-7"><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/65">{event.organizers?.name ?? 'QPassa event'}</p><h2 className="mt-2 max-w-2xl text-2xl font-black text-white sm:text-4xl" style={{ fontFamily: 'Outfit, sans-serif' }}>{title}</h2><p className="mt-2 text-sm text-white/75">{date}{time ? ` · ${time}` : ''} · {event.venue ?? 'Venue unavailable'}</p></div>
           </div>
 
           <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_14rem]">
