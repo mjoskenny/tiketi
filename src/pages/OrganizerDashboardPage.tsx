@@ -3,7 +3,7 @@ import { signOut, supabase } from '../lib/supabase'
 import { fetchAllRows } from '../lib/supabasePagination'
 import { useAuth } from '../context/AuthContext'
 import { formatPrice } from '../data/events'
-import { BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, UsersIcon, UserIcon, KeyIcon, TagIcon, DollarSignIcon, TicketIcon, TrendingUpIcon, CheckIcon, ArrowLeftIcon, EyeIcon, LinkIcon } from '../components/Icon'
+import { BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, UsersIcon, UserIcon, KeyIcon, TagIcon, DollarSignIcon, TicketIcon, TrendingUpIcon, CheckIcon, ArrowLeftIcon, EyeIcon, LinkIcon, ShieldIcon } from '../components/Icon'
 import type { Event, Order, Customer, Transaction, OrganizerWithdrawal, OrganizerMember, OrganizerRole, Subscription, Ticket, AgentAssignment } from '../lib/types'
 import { FEATURES } from '../lib/features'
 import OrganizerEventViewPage from './OrganizerEventViewPage'
@@ -905,6 +905,19 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
           <button onClick={acceptMembership} className="shrink-0 rounded-lg px-3 py-1.5 font-bold" style={{ background: 'var(--primary)', color: '#000' }}>Accept invite</button>
         </div>
       )}
+
+      <div className="mx-5 mt-5 rounded-2xl border p-4" style={{ background: 'rgba(20,21,20,0.9)', borderColor: 'rgba(255,255,255,0.08)' }}>
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(249,112,21,0.12)', color: 'var(--primary)' }}>
+            <ShieldIcon size={18} />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--muted-foreground)' }}>Compliance reminder</p>
+            <p className="mt-1 text-sm font-semibold">Keep event information accurate, refund policies transparent, and contact details up to date.</p>
+            <p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Review your listings before every event to reduce disputes and maintain customer trust.</p>
+          </div>
+        </div>
+      </div>
       {/* Sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 z-40 w-64 flex flex-col border-r transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
@@ -1584,7 +1597,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                     {refundRequests.length === 0 ? <div className="px-5 py-14 text-center"><p className="font-bold">No refund requests</p><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>New requests from ticket holders will appear here.</p></div> : <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
                       {refundRequests.map(request => <div key={request.id} className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-bold text-sm">{request.profiles?.full_name || request.profiles?.email || 'Customer'}</p><Badge label={request.status} color={STATUS_COLORS[request.status] ?? '#888'} /></div><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{request.events?.title || 'Event'} · {new Date(request.created_at).toLocaleString()}</p><p className="mt-3 text-sm leading-relaxed">{request.reason}</p><p className="mt-2 font-mono text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Order {request.order_id.slice(0, 8)}…{request.ticket_id ? ` · Ticket ${request.ticket_id.slice(0, 8)}…` : ''}</p></div>
-                        <div className="flex shrink-0 flex-wrap gap-2">{request.status === 'pending' && <><button type="button" onClick={() => void reviewRefundRequest(request, 'approved')} className="rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'rgba(34,197,94,0.14)', color: '#86efac' }}>Approve</button><button type="button" onClick={() => void reviewRefundRequest(request, 'rejected')} className="rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'rgba(239,68,68,0.14)', color: '#fca5a5' }}>Decline</button></>}<a href="mailto:hello@tiketi.events?subject=Refund%20request%20review" className="rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>Contact support</a></div>
+                        <div className="flex shrink-0 flex-wrap gap-2">{request.status === 'pending' && <><button type="button" onClick={() => void reviewRefundRequest(request, 'approved')} className="rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'rgba(34,197,94,0.14)', color: '#86efac' }}>Approve</button><button type="button" onClick={() => void reviewRefundRequest(request, 'rejected')} className="rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'rgba(239,68,68,0.14)', color: '#fca5a5' }}>Decline</button></>}<a href="mailto:hello@qpassa.events?subject=Refund%20request%20review" className="rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>Contact support</a></div>
                       </div>)}
                     </div>}
                   </div>

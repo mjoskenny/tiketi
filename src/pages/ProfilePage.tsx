@@ -240,6 +240,24 @@ export default function ProfilePage({ navigate }: Props) {
     setSaving(false)
   }
 
+  const handlePrivacyRequest = (requestType: 'export' | 'delete') => {
+    const subject = requestType === 'export' ? 'Data export request' : 'Account deletion request'
+    const body = [
+      `Account email: ${email || 'Unknown'}`,
+      `User ID: ${user.id}`,
+      `Requested at: ${new Date().toISOString()}`,
+      'Please confirm the next steps and expected response time for this request.',
+    ].join('\n')
+    try {
+      window.localStorage.setItem('tiketi-privacy-request', requestType)
+    } catch {
+      // Storage may be unavailable, but the request can still continue via email.
+    }
+    window.location.href = `mailto:hello@qpassa.events?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+    setMessage(requestType === 'export' ? 'Your data export request has been prepared in your email app.' : 'Your account deletion request has been prepared in your email app.')
+    setError('')
+  }
+
   const handleMediaFile = (kind: 'avatar' | 'cover', file: File | undefined) => {
     if (!file) return
     if (!file.type.startsWith('image/')) { setError('Profile media must be an image file.'); return }
@@ -524,6 +542,17 @@ export default function ProfilePage({ navigate }: Props) {
                 style={{ background: 'var(--primary)', color: '#fff', opacity: saving ? 0.7 : 1 }}>
                 {saving ? 'Updating...' : 'Update password'}
               </button>
+              <div className="pt-3 mt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+                <p className="text-xs font-semibold mb-1" style={{ color: 'var(--muted-foreground)' }}>Privacy controls</p>
+                <div className="space-y-2">
+                  <button type="button" onClick={() => handlePrivacyRequest('export')} className="w-full rounded-xl px-4 py-2.5 text-sm font-semibold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>
+                    Request data export
+                  </button>
+                  <button type="button" onClick={() => handlePrivacyRequest('delete')} className="w-full rounded-xl px-4 py-2.5 text-sm font-semibold" style={{ background: 'rgba(248,113,113,0.08)', color: '#fca5a5', border: '1px solid rgba(248,113,113,0.2)' }}>
+                    Request account deletion
+                  </button>
+                </div>
+              </div>
               <div className="pt-3 mt-2 border-t" style={{ borderColor: 'var(--border)' }}>
                 <p className="text-xs font-semibold mb-1" style={{ color: 'var(--muted-foreground)' }}>Sign-in method</p>
                 <p className="text-sm">{user.app_metadata?.provider === 'google' ? 'Google' : 'Email & Password'}</p>
