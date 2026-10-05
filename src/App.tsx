@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from './context/AuthContext'
 import Nav from './components/Nav'
 import HomePage from './pages/HomePage'
@@ -28,6 +28,9 @@ import { supabase } from './lib/supabase'
 import { type Event, type Organizer } from './lib/types'
 import { FEATURES } from './lib/features'
 import { LanguageSwitcher } from './components/LocaleContent'
+import i18n from './lib/i18n'
+import { getCookiePreferences, hasSavedCookieConsent, resetCookiePreferences, saveCookiePreferences, type CookiePreferences } from './lib/cookies'
+import { configureConsentTracking, trackConsentedEvent, trackConsentedMarketingEvent, trackConsentedPageView } from './lib/consentedTracking'
 
 type Page =
   | 'home'
@@ -78,6 +81,8 @@ type PublicPlatformSettings = {
   maintenance_mode: boolean
   maintenance_message: string
   marketplace_enabled: boolean
+  google_analytics_id: string
+  meta_pixel_id: string
   social_links: SocialLinkSetting[]
 }
 
@@ -90,6 +95,8 @@ const DEFAULT_PUBLIC_PLATFORM_SETTINGS: PublicPlatformSettings = {
   maintenance_mode: false,
   maintenance_message: '',
   marketplace_enabled: true,
+  google_analytics_id: '',
+  meta_pixel_id: '',
   social_links: [],
 }
 
@@ -223,6 +230,8 @@ export default function App() {
         maintenance_mode: settings.maintenance_mode ?? false,
         maintenance_message: settings.maintenance_message ?? '',
         marketplace_enabled: settings.marketplace_enabled ?? true,
+        google_analytics_id: settings.google_analytics_id ?? '',
+        meta_pixel_id: settings.meta_pixel_id ?? '',
         social_links: socialLinks,
       })
     }
@@ -330,6 +339,55 @@ export default function App() {
     setAuthPrompt({ title, message, mode })
   }
 
+  const [cookiePreferences, setCookiePreferences] = useState<CookiePreferences>(() => getCookiePreferences())
+  const [showCookieBanner, setShowCookieBanner] = useState<boolean>(() => !hasSavedCookieConsent())
+  const lastTrackedRoute = useRef('')
+
+  useEffect(() => {
+    configureConsentTracking({
+      preferences: cookiePreferences,
+      googleAnalyticsId: publicPlatformSettings.google_analytics_id,
+      metaPixelId: publicPlatformSettings.meta_pixel_id,
+    })
+
+    const path = `${window.location.pathname}${window.location.hash}`
+    trackConsentedPageView(path, document.title)
+    const canTrack = (cookiePreferences.analytics && Boolean(publicPlatformSettings.google_analytics_id))
+      || (cookiePreferences.marketing && Boolean(publicPlatformSettings.meta_pixel_id))
+    if (!canTrack) {
+      lastTrackedRoute.current = ''
+      return
+    }
+
+    const routeKey = `${page}:${path}:${eventDetail?.id ?? checkoutData?.event.id ?? ''}`
+    if (lastTrackedRoute.current === routeKey) return
+    lastTrackedRoute.current = routeKey
+
+    if (page === 'event-detail' && eventDetail) {
+      trackConsentedEvent('view_item', { item_id: eventDetail.id, item_name: eventDetail.title, item_category: eventDetail.category })
+      trackConsentedMarketingEvent('ViewContent', { content_ids: eventDetail.id, content_name: eventDetail.title, content_type: 'product' })
+    }
+    if (page === 'checkout' && checkoutData) {
+      const selectedItems = Object.entries(checkoutData.quantities).filter(([, quantity]) => quantity > 0).map(([tierKey, quantity]) => {
+        const tier = checkoutData.event.ticket_tiers?.find(item => item.id === tierKey || item.name === tierKey)
+        return { item_id: tier?.id ?? tierKey, item_name: tier?.name ?? tierKey, price: tier?.price, quantity }
+      })
+      trackConsentedEvent('begin_checkout', { currency: 'BIF', value: checkoutData.total, items: selectedItems })
+      trackConsentedMarketingEvent('InitiateCheckout', { currency: 'BIF', value: checkoutData.total, num_items: selectedItems.reduce((sum, item) => sum + item.quantity, 0), content_ids: selectedItems.map(item => item.item_id) })
+    }
+  }, [page, eventDetail?.id, checkoutData?.event.id, cookiePreferences.analytics, cookiePreferences.marketing, publicPlatformSettings.google_analytics_id, publicPlatformSettings.meta_pixel_id])
+
+  const applyCookiePreferences = (next: Partial<CookiePreferences>) => {
+    const merged = saveCookiePreferences(next)
+    setCookiePreferences(merged)
+    setShowCookieBanner(false)
+  }
+
+  const withdrawOptionalCookieConsent = () => {
+    setCookiePreferences(resetCookiePreferences())
+    setShowCookieBanner(true)
+  }
+
   const handleAuthPromptSignIn = () => {
     if (!authPrompt) return
     setAuthPrompt(null)
@@ -405,6 +463,27 @@ export default function App() {
         </div>
       )}
 
+      {showCookieBanner && (
+        <div className="fixed bottom-4 right-4 z-[80] w-full max-w-sm px-4">
+          <div className="rounded-2xl border border-white/10 bg-[#101413]/95 p-4 shadow-2xl backdrop-blur-xl" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+            <p className="text-[10px] font-black uppercase tracking-[0.24em]" style={{ color: 'var(--primary)' }}>{i18n.t('Privacy')}</p>
+            <h3 className="mt-2 text-base font-bold leading-5">{i18n.t('Are you okay with cookies?')}</h3>
+            <p className="mt-2 text-sm leading-5" style={{ color: 'var(--muted-foreground)' }}>
+              {i18n.t('We use cookies to keep the app working, improve your experience, and remember your preferences.')}
+            </p>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" onClick={() => navigate('privacy')} className="flex-1 rounded-xl border px-3 py-2 text-sm font-semibold" style={{ background: 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'var(--foreground)' }}>
+                {i18n.t('View policy')}
+              </button>
+              <button type="button" onClick={() => applyCookiePreferences({ analytics: true, marketing: true, personalization: true })} className="flex-1 rounded-xl px-3 py-2 text-sm font-bold" style={{ background: 'var(--primary)', color: '#000' }}>
+                {i18n.t('Accept all')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {(page === 'home' || page === 'discover') && <HomePage navigate={navigate} />}
       {page === 'events' && <EventsPage navigate={navigate} />}
       {page === 'event-detail' && eventDetail && <EventDetailPage event={eventDetail as any} navigate={navigate} onRequireAuth={requestAuth} />}
@@ -447,7 +526,7 @@ export default function App() {
       )}
       {page === 'marketing' && <AboutPage navigate={navigate} />}
       {page === 'about' && <AboutInfoPage navigate={navigate} />}
-      {(['help', 'contact', 'terms', ...(FEATURES.refunds ? ['refunds' as const] : []), 'privacy'] as const).includes(page as 'help' | 'contact' | 'terms' | 'privacy' | 'refunds') && <InfoPage kind={page as 'help' | 'contact' | 'terms' | 'privacy' | 'refunds'} navigate={navigate} />}
+      {(['help', 'contact', 'terms', ...(FEATURES.refunds ? ['refunds' as const] : []), 'privacy'] as const).includes(page as 'help' | 'contact' | 'terms' | 'privacy' | 'refunds') && <InfoPage kind={page as 'help' | 'contact' | 'terms' | 'privacy' | 'refunds'} navigate={navigate} onWithdrawCookieConsent={withdrawOptionalCookieConsent} />}
       {page === 'dashboard' && (
         !user
           ? <div className="flex items-center justify-center min-h-screen flex-col gap-4 pt-16">

@@ -22,6 +22,7 @@ import { supabase } from '../lib/supabase'
 import { fetchAllRows } from '../lib/supabasePagination'
 import { LanguageSwitcher } from '../components/LocaleContent'
 import StatusBadge from '../components/StatusBadge'
+import i18n from '../lib/i18n'
 
 type Section =
   | 'overview'
@@ -77,6 +78,8 @@ type PlatformSettings = {
   social_tiktok_active: boolean
   social_whatsapp_url: string
   social_whatsapp_active: boolean
+  google_analytics_id: string
+  meta_pixel_id: string
   updated_at?: string
 }
 
@@ -186,6 +189,8 @@ const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   social_tiktok_active: false,
   social_whatsapp_url: '',
   social_whatsapp_active: false,
+  google_analytics_id: '',
+  meta_pixel_id: '',
 }
 
 const NAV: { key: Section; label: string }[] = [
@@ -404,7 +409,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
     const loadPlatformSettings = async () => {
       setSettingsLoading(true)
       setSettingsError('')
-      const { data, error } = await supabase.from('platform_settings').select('id, platform_name, support_email, support_phone, contact_whatsapp, contact_address, checkout_notice, service_fee_percent, ticket_sales_enabled, mobile_money_enabled, card_payments_enabled, maintenance_mode, maintenance_message, marketplace_enabled, max_tickets_per_order, require_verified_organizers_to_publish, refund_requests_enabled, checkin_enabled, social_instagram_url, social_instagram_active, social_facebook_url, social_facebook_active, social_x_url, social_x_active, social_tiktok_url, social_tiktok_active, social_whatsapp_url, social_whatsapp_active, updated_at').eq('id', true).maybeSingle()
+      const { data, error } = await supabase.from('platform_settings').select('id, platform_name, support_email, support_phone, contact_whatsapp, contact_address, checkout_notice, service_fee_percent, ticket_sales_enabled, mobile_money_enabled, card_payments_enabled, maintenance_mode, maintenance_message, marketplace_enabled, max_tickets_per_order, require_verified_organizers_to_publish, refund_requests_enabled, checkin_enabled, social_instagram_url, social_instagram_active, social_facebook_url, social_facebook_active, social_x_url, social_x_active, social_tiktok_url, social_tiktok_active, social_whatsapp_url, social_whatsapp_active, google_analytics_id, meta_pixel_id, updated_at').eq('id', true).maybeSingle()
 
       if (!isMounted) return
       if (error) {
@@ -439,6 +444,8 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
           social_tiktok_active: data.social_tiktok_active ?? DEFAULT_PLATFORM_SETTINGS.social_tiktok_active,
           social_whatsapp_url: data.social_whatsapp_url ?? DEFAULT_PLATFORM_SETTINGS.social_whatsapp_url,
           social_whatsapp_active: data.social_whatsapp_active ?? DEFAULT_PLATFORM_SETTINGS.social_whatsapp_active,
+          google_analytics_id: data.google_analytics_id ?? '',
+          meta_pixel_id: data.meta_pixel_id ?? '',
           updated_at: data.updated_at ?? undefined,
         })
       }
@@ -1056,6 +1063,8 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
     const contactAddress = platformSettings.contact_address.trim()
     const checkoutNotice = platformSettings.checkout_notice.trim()
     const maintenanceMessage = platformSettings.maintenance_message.trim()
+    const googleAnalyticsId = platformSettings.google_analytics_id.trim()
+    const metaPixelId = platformSettings.meta_pixel_id.trim()
     const serviceFeePercent = Number(platformSettings.service_fee_percent)
     const maxTicketsPerOrder = Number(platformSettings.max_tickets_per_order)
 
@@ -1066,6 +1075,8 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
     if (!Number.isFinite(serviceFeePercent) || serviceFeePercent < 0 || serviceFeePercent > 100) { setSettingsError('Service fee must be between 0% and 100%.'); return }
     if (!Number.isInteger(maxTicketsPerOrder) || maxTicketsPerOrder < 1 || maxTicketsPerOrder > 100) { setSettingsError('Tickets per order must be a whole number between 1 and 100.'); return }
     if (!platformSettings.mobile_money_enabled && !platformSettings.card_payments_enabled) { setSettingsError('Keep at least one payment method enabled.'); return }
+    if (googleAnalyticsId && !/^G-[A-Z0-9]+$/i.test(googleAnalyticsId)) { setSettingsError(i18n.t('Enter a valid Google Analytics 4 measurement ID (G-XXXXXXXXXX).')); return }
+    if (metaPixelId && !/^\d{5,20}$/.test(metaPixelId)) { setSettingsError(i18n.t('Enter a valid Meta Pixel ID containing digits only.')); return }
 
     setSettingsSaving(true)
     setSettingsError('')
@@ -1079,6 +1090,8 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
       contact_address: contactAddress,
       checkout_notice: checkoutNotice,
       maintenance_message: maintenanceMessage,
+      google_analytics_id: googleAnalyticsId,
+      meta_pixel_id: metaPixelId,
       service_fee_percent: serviceFeePercent,
       max_tickets_per_order: maxTicketsPerOrder,
     }
@@ -1970,6 +1983,21 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
                       <input value={platformSettings.social_whatsapp_url} onChange={event => updatePlatformSetting('social_whatsapp_url', event.target.value)} placeholder="https://wa.me/25700000000" className="w-full rounded-lg border px-3 py-2 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
                     </div>
                   </div>
+                </section>
+
+                <section className="rounded-2xl border p-5 lg:col-span-2" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--muted-foreground)' }}>{i18n.t('Consent-gated tracking')}</p>
+                  <h3 className="mt-1 text-lg font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>{i18n.t('Analytics and marketing tools')}</h3>
+                  <p className="mt-2 max-w-3xl text-sm leading-6" style={{ color: 'var(--muted-foreground)' }}>{i18n.t('Vendor scripts load only after a visitor accepts cookies. GA4 receives page views, event views, checkout starts, and confirmed purchases. Meta Pixel receives page views, content views, checkout starts, and confirmed purchases. Customer contact details are never sent.')}</p>
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <label className="block text-sm font-semibold">{i18n.t('Google Analytics 4 measurement ID')}<span className="mt-1 block text-xs font-normal leading-5" style={{ color: 'var(--muted-foreground)' }}>{i18n.t('Optional. Format: G-XXXXXXXXXX. Reports are available in Google Analytics.')}</span><input value={platformSettings.google_analytics_id} onChange={event => updatePlatformSetting('google_analytics_id', event.target.value)} placeholder="G-XXXXXXXXXX" autoComplete="off" className="mt-2 w-full rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
+                    <label className="block text-sm font-semibold">{i18n.t('Meta Pixel ID')}<span className="mt-1 block text-xs font-normal leading-5" style={{ color: 'var(--muted-foreground)' }}>{i18n.t('Optional. Digits only. Events appear in Meta Events Manager for reporting and ad attribution.')}</span><input value={platformSettings.meta_pixel_id} onChange={event => updatePlatformSetting('meta_pixel_id', event.target.value)} placeholder="123456789012345" inputMode="numeric" autoComplete="off" className="mt-2 w-full rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-4 text-sm font-semibold">
+                    <a href="https://analytics.google.com/analytics/web/" target="_blank" rel="noreferrer" className="underline underline-offset-4">{i18n.t('Open Google Analytics')}</a>
+                    <a href="https://business.facebook.com/events_manager/" target="_blank" rel="noreferrer" className="underline underline-offset-4">{i18n.t('Open Meta Events Manager')}</a>
+                  </div>
+                  <p className="mt-4 text-xs leading-5" style={{ color: 'var(--muted-foreground)' }}>{i18n.t('Visitors who have not accepted are not sent to these services. Clear an ID and save to stop enabling that integration for new visitors. Existing vendor accounts remain managed in their respective dashboards.')}</p>
                 </section>
 
                 <section className="rounded-2xl border p-5" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>

@@ -4,6 +4,7 @@ import type { Event, TicketTier } from '../lib/types'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { sendOrderTicketEmails } from '../lib/ticketEmail'
+import { trackConsentedEvent, trackConsentedMarketingEvent } from '../lib/consentedTracking'
 
 type CheckoutData = {
   event: Event
@@ -187,6 +188,26 @@ export default function CheckoutPage({ data, navigate }: Props) {
     setLoading(false)
     window.sessionStorage.removeItem(`tiketi-checkout:${event.id}`)
     const tickets = Array.isArray(confirmedTickets) ? confirmedTickets : []
+    const ticketQuantity = tickets.length
+    const purchasedItems = [...new Set(tickets.map((ticket: { ticket_tier_id?: string }) => ticket.ticket_tier_id).filter(Boolean))].map(tierId => {
+      const tier = tiers.find(item => item.id === tierId)
+      const quantity = tickets.filter((ticket: { ticket_tier_id?: string }) => ticket.ticket_tier_id === tierId).length
+      return { item_id: tierId, item_name: tier?.name ?? 'Ticket', price: tier?.price, quantity }
+    })
+    trackConsentedEvent('purchase', {
+      transaction_id: String(orderId),
+      currency: 'BIF',
+      value: total,
+      items: purchasedItems,
+    })
+    trackConsentedMarketingEvent('Purchase', {
+      content_ids: purchasedItems.map(item => item.item_id),
+      content_name: event.title,
+      content_type: 'product',
+      currency: 'BIF',
+      value: total,
+      num_items: ticketQuantity,
+    })
     const emailDelivery = await sendOrderTicketEmails(orderId)
     const firstTicket = tickets[0]
     const firstTier = tiers.find(tier => tier.id === firstTicket?.ticket_tier_id) ?? tiers[0]

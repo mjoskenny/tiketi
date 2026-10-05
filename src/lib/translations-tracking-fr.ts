@@ -1,0 +1,26 @@
+const trackingFr: Record<string, string> = {
+  'Are you okay with cookies?': 'Êtes-vous d’accord avec les cookies ?',
+  'We use cookies to keep the app working, improve your experience, and remember your preferences.': 'Nous utilisons des cookies pour que l’application fonctionne, améliorer votre expérience et mémoriser vos préférences.',
+  'View policy': 'Voir la politique',
+  'Consent-gated tracking': 'Suivi soumis au consentement',
+  'Vendor scripts load only after a visitor accepts cookies. GA4 receives page views, event views, checkout starts, and confirmed purchases. Meta Pixel receives page views, content views, checkout starts, and confirmed purchases. Customer contact details are never sent.': 'Les scripts des prestataires ne se chargent qu’après l’acceptation des cookies. GA4 reçoit les pages consultées, les événements consultés, les débuts de paiement et les achats confirmés. Meta Pixel reçoit les pages consultées, les contenus consultés, les débuts de paiement et les achats confirmés. Aucune coordonnée client n’est transmise.',
+  'Google Analytics 4 measurement ID': 'ID de mesure Google Analytics 4',
+  'Optional. Format: G-XXXXXXXXXX. Reports are available in Google Analytics.': 'Facultatif. Format : G-XXXXXXXXXX. Les rapports sont disponibles dans Google Analytics.',
+  'Meta Pixel ID': 'ID Meta Pixel',
+  'Optional. Digits only. Events appear in Meta Events Manager for reporting and ad attribution.': 'Facultatif. Chiffres uniquement. Les événements apparaissent dans Meta Events Manager pour les rapports et l’attribution publicitaire.',
+  'Visitors who have not accepted are not sent to these services. Clear an ID and save to stop enabling that integration for new visitors. Existing vendor accounts remain managed in their respective dashboards.': 'Les données des visiteurs qui n’ont pas accepté ne sont pas envoyées à ces services. Effacez un ID et enregistrez pour désactiver cette intégration pour les nouveaux visiteurs. Les comptes prestataires existants restent gérés dans leurs tableaux de bord respectifs.',
+  'Open Google Analytics': 'Ouvrir Google Analytics',
+  'Open Meta Events Manager': 'Ouvrir Meta Events Manager',
+  'Enter a valid Google Analytics 4 measurement ID (G-XXXXXXXXXX).': 'Saisissez un ID de mesure Google Analytics 4 valide (G-XXXXXXXXXX).',
+  'Enter a valid Meta Pixel ID containing digits only.': 'Saisissez un ID Meta Pixel valide composé uniquement de chiffres.',
+  'Analytics and marketing tools': 'Outils d’analyse et de marketing',
+  'QPassa uses essential storage for platform operation and, only after you accept, may load Google Analytics 4 for usage measurement and Meta Pixel for marketing attribution. You can withdraw optional consent at any time below. The current integrations record page views, event views, checkout starts, and confirmed purchases; customer names, email addresses, and phone numbers are not sent to these tools.': 'QPassa utilise le stockage essentiel au fonctionnement de la plateforme et peut, uniquement après votre acceptation, charger Google Analytics 4 pour mesurer l’utilisation et Meta Pixel pour l’attribution marketing. Vous pouvez retirer votre consentement facultatif ci-dessous. Les intégrations actuelles enregistrent les pages consultées, les événements consultés, les débuts de paiement et les achats confirmés ; les noms, adresses e-mail et numéros de téléphone des clients ne sont pas transmis à ces outils.',
+  'Essential storage supports sign-in, session stability, and platform operation.': 'Le stockage essentiel permet la connexion, la stabilité des sessions et le fonctionnement de la plateforme.',
+  'Google Analytics 4 and Meta Pixel are only enabled after acceptance and when configured by QPassa.': 'Google Analytics 4 et Meta Pixel ne sont activés qu’après acceptation et configuration par QPassa.',
+  'You can withdraw optional consent here; browser settings can also clear locally stored preferences.': 'Vous pouvez retirer ici votre consentement facultatif ; les paramètres du navigateur peuvent également effacer les préférences enregistrées localement.',
+  'Cookie preferences': 'Préférences relatives aux cookies',
+  'Turn off optional analytics and marketing tracking. Essential storage remains active.': 'Désactivez le suivi facultatif à des fins d’analyse et de marketing. Le stockage essentiel reste actif.',
+  'Withdraw optional consent': 'Retirer le consentement facultatif',
+}
+
+export default trackingFr
