@@ -547,50 +547,53 @@ export default function App() {
       {page === 'marketing' && <AboutPage navigate={navigate} />}
       {page === 'about' && <AboutInfoPage navigate={navigate} />}
       {(['help', 'contact', 'terms', ...(FEATURES.refunds ? ['refunds' as const] : []), 'privacy'] as const).includes(page as 'help' | 'contact' | 'terms' | 'privacy' | 'refunds') && <InfoPage kind={page as 'help' | 'contact' | 'terms' | 'privacy' | 'refunds'} navigate={navigate} onWithdrawCookieConsent={withdrawOptionalCookieConsent} />}
-      {(page === 'dashboard' || keepOrganizerDashboardMounted) && <div style={{ display: page === 'dashboard' ? 'contents' : 'none' }}>
       {(page === 'dashboard' || keepOrganizerDashboardMounted) && (
-        !user
-          ? <div className="flex items-center justify-center min-h-screen flex-col gap-4 pt-16">
-              <p className="text-xl font-bold">Sign in to access the dashboard</p>
-              <button onClick={() => navigate('auth-organizer')} className="px-6 py-3 rounded-xl font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>Sign in as Organizer</button>
-            </div>
-          : profileLoading
-            // Profile still loading from server — never flash "access denied"
-            ? <div className="flex items-center justify-center min-h-screen flex-col gap-3 pt-16">
-                <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
-                <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Loading your dashboard…</p>
+        <div style={{ display: page === 'dashboard' ? 'block' : 'none', width: '100%', minHeight: '100vh' }}>
+          {!user
+            ? <div className="flex items-center justify-center min-h-screen flex-col gap-4 pt-16">
+                <p className="text-xl font-bold">Sign in to access the dashboard</p>
+                <button onClick={() => navigate('auth-organizer')} className="px-6 py-3 rounded-xl font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>Sign in as Organizer</button>
               </div>
-            : (isOrganizer || teamMembership?.status === 'pending')
-              ? <OrganizerDashboardPage navigate={navigate} />
-              : <div className="flex items-center justify-center min-h-screen flex-col gap-4 pt-16">
-                  <p className="text-xl font-bold">Organizer access required</p>
-                  <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>This account is not registered as an organizer.</p>
-                  <button onClick={() => navigate('home')} className="px-6 py-3 rounded-xl font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>Go Home</button>
+            : profileLoading
+              // Profile still loading from server — never flash "access denied"
+              ? <div className="flex items-center justify-center min-h-screen flex-col gap-3 pt-16">
+                  <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
+                  <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Loading your dashboard…</p>
                 </div>
+              : (isOrganizer || teamMembership?.status === 'pending')
+                ? <OrganizerDashboardPage navigate={navigate} />
+                : <div className="flex items-center justify-center min-h-screen flex-col gap-4 pt-16">
+                    <p className="text-xl font-bold">Organizer access required</p>
+                    <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>This account is not registered as an organizer.</p>
+                    <button onClick={() => navigate('home')} className="px-6 py-3 rounded-xl font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>Go Home</button>
+                  </div>
+          }
+        </div>
       )}
-      </div>}
-      {(page === 'admin-dashboard' || keepAdminDashboardMounted) && <div style={{ display: page === 'admin-dashboard' ? 'contents' : 'none' }}>
       {(page === 'admin-dashboard' || keepAdminDashboardMounted) && (
-        !user
-          ? <div className="flex min-h-screen items-center justify-center flex-col gap-4 pt-16"><p className="text-xl font-bold">Sign in to access admin tools</p><button onClick={() => navigate('auth-customer')} className="px-6 py-3 rounded-xl font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>Sign In</button></div>
-          : profileLoading
-            ? <div className="flex min-h-screen items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} /></div>
-            : profile?.role === 'admin'
-              ? <AdminDashboardPage navigate={navigate} />
-              : <div className="flex min-h-screen items-center justify-center flex-col gap-4"><p className="text-xl font-bold">Admin access required.</p><p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>This account does not have platform admin privileges.</p></div>
+        <div style={{ display: page === 'admin-dashboard' ? 'block' : 'none', width: '100%', minHeight: '100vh' }}>
+          {!user
+            ? <div className="flex min-h-screen items-center justify-center flex-col gap-4 pt-16"><p className="text-xl font-bold">Sign in to access admin tools</p><button onClick={() => navigate('auth-customer')} className="px-6 py-3 rounded-xl font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>Sign In</button></div>
+            : profileLoading
+              ? <div className="flex min-h-screen items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} /></div>
+              : profile?.role === 'admin'
+                ? <AdminDashboardPage navigate={navigate} />
+                : <div className="flex min-h-screen items-center justify-center flex-col gap-4"><p className="text-xl font-bold">Admin access required.</p><p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>This account does not have platform admin privileges.</p></div>
+          }
+        </div>
       )}
-      </div>}
-      {(page === 'agent-dashboard' || keepAgentDashboardMounted) && <div style={{ display: page === 'agent-dashboard' ? 'contents' : 'none' }}>
       {(page === 'agent-dashboard' || keepAgentDashboardMounted) && (
-        !user
-          ? <div className="flex min-h-screen items-center justify-center flex-col gap-4 pt-16"><p className="text-xl font-bold">Sign in to access agent tools</p><button onClick={() => navigate('auth-customer')} className="px-6 py-3 rounded-xl font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>Sign In</button></div>
-          : profileLoading
-            ? <div className="flex min-h-screen items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} /></div>
-            : agentAssignments.length > 0 || agentInvitations.length > 0
-              ? <AgentDashboardPage navigate={navigate} />
-              : <div className="flex min-h-screen items-center justify-center flex-col gap-4"><p className="text-xl font-bold">Agent access required.</p><p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>This account does not have an active agent assignment.</p></div>
+        <div style={{ display: page === 'agent-dashboard' ? 'block' : 'none', width: '100%', minHeight: '100vh' }}>
+          {!user
+            ? <div className="flex min-h-screen items-center justify-center flex-col gap-4 pt-16"><p className="text-xl font-bold">Sign in to access agent tools</p><button onClick={() => navigate('auth-customer')} className="px-6 py-3 rounded-xl font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>Sign In</button></div>
+            : profileLoading
+              ? <div className="flex min-h-screen items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} /></div>
+              : agentAssignments.length > 0 || agentInvitations.length > 0
+                ? <AgentDashboardPage navigate={navigate} />
+                : <div className="flex min-h-screen items-center justify-center flex-col gap-4"><p className="text-xl font-bold">Agent access required.</p><p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>This account does not have an active agent assignment.</p></div>
+          }
+        </div>
       )}
-      </div>}
       {!['auth-customer', 'auth-organizer', 'checkin', 'dashboard', 'agent-dashboard', 'agent-ticket', 'admin-dashboard'].includes(page) && <Footer navigate={navigate} publicPlatformSettings={publicPlatformSettings} />}
     </div>
   )

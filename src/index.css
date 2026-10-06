@@ -96,6 +96,24 @@ html, body, #root {
   color: var(--foreground);
 }
 
+.organizer-dashboard-shell {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0b0c0c 0%, #11100e 48%, #0b0c0c 100%);
+}
+
+.organizer-dashboard-shell > aside {
+  width: 16rem;
+  min-width: 16rem;
+}
+
+.organizer-dashboard-shell > main {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+
 body {
   font-family: 'Inter', sans-serif;
   font-size: 16px;
