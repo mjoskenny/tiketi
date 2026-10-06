@@ -3,7 +3,7 @@ import { signOut, supabase } from '../lib/supabase'
 import { fetchAllRows } from '../lib/supabasePagination'
 import { useAuth } from '../context/AuthContext'
 import { formatPrice } from '../data/events'
-import { BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, UsersIcon, UserIcon, KeyIcon, TagIcon, DollarSignIcon, TicketIcon, TrendingUpIcon, CheckIcon, ArrowLeftIcon, EyeIcon, LinkIcon, ShieldIcon, EditIcon, RefreshIcon, TrashIcon, XIcon } from '../components/Icon'
+import { BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, UsersIcon, UserIcon, KeyIcon, TagIcon, DollarSignIcon, TicketIcon, TrendingUpIcon, CheckIcon, ArrowLeftIcon, EyeIcon, LinkIcon, ShieldIcon, EditIcon, TrashIcon, XIcon } from '../components/Icon'
 import type { Event, Order, Customer, Transaction, OrganizerWithdrawal, OrganizerMember, OrganizerRole, Subscription, Ticket, AgentAssignment } from '../lib/types'
 import { FEATURES } from '../lib/features'
 import OrganizerEventViewPage from './OrganizerEventViewPage'
@@ -37,7 +37,7 @@ const NAV_ICONS: Record<Section, React.FC<{ size?: number }>> = {
 }
 
 const NAV: { key: Section; label: string }[] = [
-  { key: 'overview', label: 'Analytics' },
+  { key: 'overview', label: 'Overview' },
   { key: 'events', label: 'Events' },
   { key: 'orders', label: 'Orders' },
   { key: 'customers', label: 'Customers' },
@@ -167,7 +167,7 @@ function EventPerformanceChart({ events, performance }: { events: Event[]; perfo
 }
 
 export default function OrganizerDashboardPage({ navigate }: Props) {
-  const { user, profile, organizer, teamMembership, refreshProfile } = useAuth()
+  const { user, profile, organizer, teamMembership } = useAuth()
   const [section, setSection] = useState<Section>(() => sectionFromPath(window.location.pathname))
   const [eventViewId, setEventViewId] = useState<string | null>(() => eventIdFromPath(window.location.pathname))
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -228,7 +228,6 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
   useEffect(() => {
     const handlePathChange = () => {
-      if (!window.location.pathname.startsWith('/dashboard')) return
       setSection(sectionFromPath(window.location.pathname))
       setEventViewId(eventIdFromPath(window.location.pathname))
     }
@@ -367,13 +366,9 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
       items.push(item)
       itemsByOrder.set(item.order_id, items)
     })
-    const normalizedAgentSales = (agentSales as unknown as Array<Omit<AgentOrderMeta, 'profiles'> & { profiles?: AgentOrderMeta['profiles'] | AgentOrderMeta['profiles'][] }>).map(item => ({
-      ...item,
-      profiles: Array.isArray(item.profiles) ? item.profiles[0] ?? null : item.profiles ?? null,
-    }))
     setEvents(ev as Event[])
     setOrders(loadedOrders.map(order => ({ ...order, order_items: itemsByOrder.get(order.id) ?? [] })))
-    setAgentOrderMeta(Object.fromEntries(normalizedAgentSales.map(item => [item.order_id, item])))
+    setAgentOrderMeta(Object.fromEntries((agentSales as AgentOrderMeta[]).map(item => [item.order_id, item])))
     setAgentAssignments((assignments.data ?? []) as AgentAssignment[])
     setCustomers(cust as Customer[])
     setMembers(mem.data ?? [])
@@ -418,6 +413,17 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'organizer_members', filter: `organizer_id=eq.${orgId}` }, () => { void load() })
       .subscribe()
     return () => { void supabase.removeChannel(channel) }
+  }, [orgId, load])
+
+  useEffect(() => {
+    if (!orgId) return
+    const refresh = () => { void load() }
+    const interval = window.setInterval(refresh, 60_000)
+    window.addEventListener('focus', refresh)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('focus', refresh)
+    }
   }, [orgId, load])
 
   useEffect(() => {
@@ -728,8 +734,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     if (!teamMembership || teamMembership.status !== 'pending') return
     const { error } = await supabase.from('organizer_members').update({ status: 'active' }).eq('id', teamMembership.id)
     if (error) { setActionError(error.message); return }
-    await refreshProfile()
-    await load()
+    window.location.reload()
   }
 
   const changeSubscription = async (tier: Subscription['tier'], price: number) => {
@@ -901,18 +906,6 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
         </div>
       )}
 
-      <div className="mx-5 mt-5 rounded-2xl border p-4" style={{ background: 'rgba(20,21,20,0.9)', borderColor: 'rgba(255,255,255,0.08)' }}>
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(249,112,21,0.12)', color: 'var(--primary)' }}>
-            <ShieldIcon size={18} />
-          </div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--muted-foreground)' }}>Compliance reminder</p>
-            <p className="mt-1 text-sm font-semibold">Keep event information accurate, refund policies transparent, and contact details up to date.</p>
-            <p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Review your listings before every event to reduce disputes and maintain customer trust.</p>
-          </div>
-        </div>
-      </div>
       {/* Sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 z-40 w-64 flex flex-col border-r transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
@@ -963,94 +956,105 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
       {/* Overlay for mobile sidebar */}
       {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/60 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
-      {/* Main */}
-      <main className="flex-1 min-w-0 flex flex-col lg:pl-64">
-        {/* Top bar */}
-        <header className="sticky top-0 z-20 flex items-center justify-between px-5 py-3.5 border-b" style={{ background: 'rgba(11,12,12,0.88)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255,255,255,0.09)' }}>
-          <div className="flex items-center gap-3">
-            <button className="lg:hidden p-1.5 rounded-lg" style={{ background: 'var(--muted)' }} onClick={() => setSidebarOpen(v => !v)}>
-              <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><rect y="2" width="16" height="1.5" rx="1"/><rect y="7" width="16" height="1.5" rx="1"/><rect y="12" width="16" height="1.5" rx="1"/></svg>
-            </button>
-            <div>
-              <div className="flex items-center gap-2"><h1 className="font-black text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                {visibleNav.find(n => n.key === section)?.label ?? 'Dashboard'}
-              </h1><span className="hidden sm:inline rounded-md px-2 py-1 text-[10px] font-mono" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--muted-foreground)' }}>{SECTION_PATHS[section]}</span></div>
-              <p className="mt-1 text-[10px] font-mono sm:hidden" style={{ color: 'var(--muted-foreground)' }}>{SECTION_PATHS[section]}</p>
-              <p className="text-xs hidden sm:block" style={{ color: 'var(--muted-foreground)' }}>
-                Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {profile?.full_name?.split(' ')[0] ?? 'Organizer'} · {isOwner ? organizer.name : `${organizer.name} team`} 👋
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {utilityPopup && <button className="fixed inset-0 z-10 cursor-default" aria-label="Close popup" onClick={() => setUtilityPopup(null)} />}
-            <LanguageSwitcher bare />
-            <button type="button" onClick={() => void load()} disabled={dataLoading} aria-label="Refresh organizer dashboard" title="Refresh dashboard" className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors hover:bg-white/5 disabled:cursor-wait disabled:opacity-50" style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'var(--foreground)' }}>
-              <RefreshIcon size={16} className={dataLoading ? 'animate-spin' : ''} />
-            </button>
-            <div className="relative z-20">
-              <button onClick={() => setUtilityPopup(current => current === 'notifications' ? null : 'notifications')} aria-label="Notifications" title="Notifications" className="relative flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: utilityPopup === 'notifications' ? 'rgba(200,169,110,0.14)' : 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}>
-                <BellIcon size={18} />
-                {organizerNotifications.filter(notification => !notification.read_at).length > 0 && <span className="absolute -right-2 -top-2 min-w-5 rounded-full px-1 text-center text-[10px] font-black" style={{ background: 'var(--primary)', color: '#000' }}>{organizerNotifications.filter(notification => !notification.read_at).length > 99 ? '99+' : organizerNotifications.filter(notification => !notification.read_at).length}</span>}
+      <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
+        {/* Main */}
+        <main className="flex-1 min-w-0 flex flex-col">
+          {/* Top bar */}
+          <header className="sticky top-0 z-20 flex items-center justify-between px-5 py-3.5 border-b" style={{ background: 'rgba(11,12,12,0.88)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255,255,255,0.09)' }}>
+            <div className="flex items-center gap-3">
+              <button className="lg:hidden p-1.5 rounded-lg" style={{ background: 'var(--muted)' }} onClick={() => setSidebarOpen(v => !v)}>
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><rect y="2" width="16" height="1.5" rx="1"/><rect y="7" width="16" height="1.5" rx="1"/><rect y="12" width="16" height="1.5" rx="1"/></svg>
               </button>
-              {utilityPopup === 'notifications' && (
-                <div className="absolute right-0 top-11 flex h-80 w-72 flex-col rounded-2xl border p-4 shadow-2xl" style={{ background: '#171918', borderColor: 'rgba(255,255,255,0.12)' }}>
-                  <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold">Organizer notifications</p><BellIcon size={15} /></div>
-                  <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto">
-                    {organizerNotifications.map(notification => (
-                      <button key={notification.id} type="button" onClick={() => void openOrganizerNotification(notification)} className="w-full rounded-xl px-3 py-2 text-left" style={{ background: notification.read_at ? 'rgba(255,255,255,0.04)' : 'rgba(200,169,110,0.12)' }}>
-                        <p className="text-xs font-semibold">{notification.title}</p>
-                        <p className="mt-1 text-[11px] leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>{notification.body}</p>
-                      </button>
-                    ))}
-                    {organizerNotifications.length === 0 && <p className="py-2 text-xs leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>No organizer notifications yet.</p>}
-                    <button type="button" onClick={() => { setUtilityPopup(null); selectSection('notifications') }} className="mt-2 w-full rounded-lg py-2 text-xs font-bold" style={{ color: 'var(--primary)', background: 'rgba(249,112,21,0.08)' }}>View all notifications</button>
+              <div>
+                <div className="flex items-center gap-2"><h1 className="font-black text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
+                  {visibleNav.find(n => n.key === section)?.label ?? 'Dashboard'}
+                </h1><span className="hidden sm:inline rounded-md px-2 py-1 text-[10px] font-mono" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--muted-foreground)' }}>{SECTION_PATHS[section]}</span></div>
+                <p className="mt-1 text-[10px] font-mono sm:hidden" style={{ color: 'var(--muted-foreground)' }}>{SECTION_PATHS[section]}</p>
+                <p className="text-xs hidden sm:block" style={{ color: 'var(--muted-foreground)' }}>
+                  Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {profile?.full_name?.split(' ')[0] ?? 'Organizer'} · {isOwner ? organizer.name : `${organizer.name} team`} 👋
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {utilityPopup && <button className="fixed inset-0 z-10 cursor-default" aria-label="Close popup" onClick={() => setUtilityPopup(null)} />}
+              <LanguageSwitcher bare />
+              <div className="relative z-20">
+                <button onClick={() => setUtilityPopup(current => current === 'notifications' ? null : 'notifications')} aria-label="Notifications" title="Notifications" className="relative flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: utilityPopup === 'notifications' ? 'rgba(200,169,110,0.14)' : 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}>
+                  <BellIcon size={18} />
+                  {organizerNotifications.filter(notification => !notification.read_at).length > 0 && <span className="absolute -right-2 -top-2 min-w-5 rounded-full px-1 text-center text-[10px] font-black" style={{ background: 'var(--primary)', color: '#000' }}>{organizerNotifications.filter(notification => !notification.read_at).length > 99 ? '99+' : organizerNotifications.filter(notification => !notification.read_at).length}</span>}
+                </button>
+                {utilityPopup === 'notifications' && (
+                  <div className="absolute right-0 top-11 flex h-80 w-72 flex-col rounded-2xl border p-4 shadow-2xl" style={{ background: '#171918', borderColor: 'rgba(255,255,255,0.12)' }}>
+                    <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold">Organizer notifications</p><BellIcon size={15} /></div>
+                    <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto">
+                      {organizerNotifications.map(notification => (
+                        <button key={notification.id} type="button" onClick={() => void openOrganizerNotification(notification)} className="w-full rounded-xl px-3 py-2 text-left" style={{ background: notification.read_at ? 'rgba(255,255,255,0.04)' : 'rgba(200,169,110,0.12)' }}>
+                          <p className="text-xs font-semibold">{notification.title}</p>
+                          <p className="mt-1 text-[11px] leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>{notification.body}</p>
+                        </button>
+                      ))}
+                      {organizerNotifications.length === 0 && <p className="py-2 text-xs leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>No organizer notifications yet.</p>}
+                      <button type="button" onClick={() => { setUtilityPopup(null); selectSection('notifications') }} className="mt-2 w-full rounded-lg py-2 text-xs font-bold" style={{ color: 'var(--primary)', background: 'rgba(249,112,21,0.08)' }}>View all notifications</button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-            {canUseCalendar && <div className="relative z-20">
-              <button onClick={() => setUtilityPopup(current => current === 'calendar' ? null : 'calendar')} aria-label="Calendar" title="Calendar" className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: utilityPopup === 'calendar' ? 'rgba(200,169,110,0.14)' : 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}>
-                <CalendarIcon size={18} />
-              </button>
-              {utilityPopup === 'calendar' && (
-                <div className="absolute right-0 top-11 w-80 rounded-2xl border p-4 shadow-2xl" style={{ background: '#171918', borderColor: 'rgba(255,255,255,0.12)' }}>
-                  <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold">Event calendar</p><CalendarIcon size={15} /></div>
-                  <div className="mt-3 space-y-2">
-                    {events.slice(0, 3).map(event => (
-                      <button key={event.id} onClick={() => { setUtilityPopup(null); openEventView(event) }} className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                        <span className="min-w-0 truncate text-xs font-semibold">{event.title}</span>
-                        <span className="shrink-0 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{event.date}</span>
-                      </button>
-                    ))}
-                    {events.length === 0 && <p className="py-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>No events scheduled yet.</p>}
+                )}
+              </div>
+              {canUseCalendar && <div className="relative z-20">
+                <button onClick={() => setUtilityPopup(current => current === 'calendar' ? null : 'calendar')} aria-label="Calendar" title="Calendar" className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: utilityPopup === 'calendar' ? 'rgba(200,169,110,0.14)' : 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}>
+                  <CalendarIcon size={18} />
+                </button>
+                {utilityPopup === 'calendar' && (
+                  <div className="absolute right-0 top-11 w-80 rounded-2xl border p-4 shadow-2xl" style={{ background: '#171918', borderColor: 'rgba(255,255,255,0.12)' }}>
+                    <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold">Event calendar</p><CalendarIcon size={15} /></div>
+                    <div className="mt-3 space-y-2">
+                      {events.slice(0, 3).map(event => (
+                        <button key={event.id} onClick={() => { setUtilityPopup(null); openEventView(event) }} className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                          <span className="min-w-0 truncate text-xs font-semibold">{event.title}</span>
+                          <span className="shrink-0 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{event.date}</span>
+                        </button>
+                      ))}
+                      {events.length === 0 && <p className="py-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>No events scheduled yet.</p>}
+                    </div>
+                    {canViewEvents && <button onClick={() => { setUtilityPopup(null); selectSection('events') }} className="mt-4 w-full rounded-xl border px-3 py-2 text-xs font-bold" style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'var(--foreground)' }}>Open all events</button>}
                   </div>
-                  {canViewEvents && <button onClick={() => { setUtilityPopup(null); selectSection('events') }} className="mt-4 w-full rounded-xl border px-3 py-2 text-xs font-bold" style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'var(--foreground)' }}>Open all events</button>}
-                </div>
-              )}
-            </div>}
-            <a href={`/organizers/${organizer.id}/${organizer.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`} onClick={event => { event.preventDefault(); navigate('organizer-profile', organizer) }} className="hidden sm:flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold" style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}><LinkIcon size={14} /> Public profile</a>
-            <div className="relative z-20">
-              <button onClick={() => setUtilityPopup(current => current === 'profile' ? null : 'profile')} aria-label="Profile menu" title="Profile menu" className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: utilityPopup === 'profile' ? 'rgba(200,169,110,0.14)' : 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}>
-                {profile?.profile_image || profile?.avatar_url
-                  ? <img src={profile.profile_image || profile.avatar_url || ''} className="h-7 w-7 rounded-full object-cover" alt={profile.full_name ?? ''} />
-                  : <UserIcon size={18} />}
-              </button>
-              {utilityPopup === 'profile' && (
-                <div className="absolute right-0 top-11 w-56 rounded-2xl border p-2 shadow-2xl" style={{ background: '#171918', borderColor: 'rgba(255,255,255,0.12)' }}>
-                  <p className="px-3 py-2 text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{profile?.full_name?.trim() || organizer.name}</p>
-                  <button onClick={() => { setUtilityPopup(null); navigate('profile') }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-white/5"><UserIcon size={14} /> Account profile</button>
-                  <button onClick={() => { setUtilityPopup(null); navigate('organizer-profile', organizer) }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-white/5"><LinkIcon size={14} /> Organizer profile</button>
-                  <button onClick={() => { setUtilityPopup(null); navigate('home') }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-white/5"><EyeIcon size={14} /> View site</button>
-                  <button onClick={handleSignOut} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-white/5" style={{ color: '#f87171' }}><ArrowLeftIcon size={14} /> Sign out</button>
-                </div>
-              )}
+                )}
+              </div>}
+              <a href={`/organizers/${organizer.id}/${organizer.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`} onClick={event => { event.preventDefault(); navigate('organizer-profile', organizer) }} className="hidden sm:flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold" style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}><LinkIcon size={14} /> Public profile</a>
+              <div className="relative z-20">
+                <button onClick={() => setUtilityPopup(current => current === 'profile' ? null : 'profile')} aria-label="Profile menu" title="Profile menu" className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: utilityPopup === 'profile' ? 'rgba(200,169,110,0.14)' : 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}>
+                  {profile?.profile_image || profile?.avatar_url
+                    ? <img src={profile.profile_image || profile.avatar_url || ''} className="h-7 w-7 rounded-full object-cover" alt={profile.full_name ?? ''} />
+                    : <UserIcon size={18} />}
+                </button>
+                {utilityPopup === 'profile' && (
+                  <div className="absolute right-0 top-11 w-56 rounded-2xl border p-2 shadow-2xl" style={{ background: '#171918', borderColor: 'rgba(255,255,255,0.12)' }}>
+                    <p className="px-3 py-2 text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{profile?.full_name?.trim() || organizer.name}</p>
+                    <button onClick={() => { setUtilityPopup(null); navigate('profile') }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-white/5"><UserIcon size={14} /> Account profile</button>
+                    <button onClick={() => { setUtilityPopup(null); navigate('organizer-profile', organizer) }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-white/5"><LinkIcon size={14} /> Organizer profile</button>
+                    <button onClick={() => { setUtilityPopup(null); navigate('home') }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-white/5"><EyeIcon size={14} /> View site</button>
+                    <button onClick={handleSignOut} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-white/5" style={{ color: '#f87171' }}><ArrowLeftIcon size={14} /> Sign out</button>
+                  </div>
+                )}
+              </div>
+              <a href="/" onClick={event => { event.preventDefault(); navigate('home') }} className="hidden md:flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.78)' }}><EyeIcon size={14} /> View site</a>
             </div>
-            <a href="/" onClick={event => { event.preventDefault(); navigate('home') }} className="hidden md:flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.78)' }}><EyeIcon size={14} /> View site</a>
-          </div>
-        </header>
+          </header>
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-5">
+          {section === 'overview' && <div className="mb-5 rounded-2xl border p-4" style={{ background: 'rgba(20,21,20,0.9)', borderColor: 'rgba(255,255,255,0.08)' }}>
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(249,112,21,0.12)', color: 'var(--primary)' }}>
+                <ShieldIcon size={18} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--muted-foreground)' }}>Compliance reminder</p>
+                <p className="mt-1 text-sm font-semibold">Keep event information accurate, refund policies transparent, and contact details up to date.</p>
+                <p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Review your listings before every event to reduce disputes and maintain customer trust.</p>
+              </div>
+            </div>
+          </div>}
+
           {dataLoading && (
             <div className="flex items-center justify-center py-20">
               <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
@@ -1086,8 +1090,8 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                     {analyticsRange === 'custom' && <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--muted-foreground)' }}><label>From<input type="date" value={analyticsStart} onChange={event => setAnalyticsStart(event.target.value)} className="ml-1 rounded-lg border px-2 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.035)', borderColor: 'rgba(255,255,255,0.14)', color: 'var(--foreground)', backdropFilter: 'blur(18px)' }} /></label><label>To<input type="date" value={analyticsEnd} onChange={event => setAnalyticsEnd(event.target.value)} className="ml-1 rounded-lg border px-2 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.035)', borderColor: 'rgba(255,255,255,0.14)', color: 'var(--foreground)', backdropFilter: 'blur(18px)' }} /></label></div>}
                   </div>
                   {verificationStatus !== 'verified' && <div className="flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                    <div><p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Organizer verification</p><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>{verificationStatus === 'pending' ? 'Your verification request is awaiting review.' : 'Verify your profile to show a trusted badge on organizer cards and profiles.'}</p></div>
-                    <button onClick={requestVerification} disabled={verificationStatus !== 'unverified'} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: verificationStatus === 'unverified' ? 'var(--primary)' : 'var(--muted)', color: verificationStatus === 'unverified' ? '#000' : 'var(--muted-foreground)' }}>{verificationStatus === 'pending' ? 'Pending review' : 'Request verification'}</button>
+                    <div><p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Organizer verification</p><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>{verificationStatus === 'verified' ? 'Your organizer profile is verified.' : verificationStatus === 'pending' ? 'Your verification request is awaiting review.' : 'Verify your profile to show a trusted badge on organizer cards and profiles.'}</p></div>
+                    <button onClick={requestVerification} disabled={verificationStatus !== 'unverified'} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: verificationStatus === 'unverified' ? 'var(--primary)' : 'var(--muted)', color: verificationStatus === 'unverified' ? '#000' : 'var(--muted-foreground)' }}>{verificationStatus === 'verified' ? 'Verified' : verificationStatus === 'pending' ? 'Pending review' : 'Request verification'}</button>
                   </div>}
                   {/* KPI grid */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1305,25 +1309,25 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                             <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{sold}/{ev.capacity} sold</p>
                           </div>
                         </div>
-                        <div className="flex gap-2 flex-shrink-0 self-stretch sm:self-auto">
-                          <button type="button" onClick={() => openEventView(ev)} aria-label={`View ${ev.title}`} title="View event" className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--foreground)' }}>
-                            <EyeIcon size={15} />
+                        <div className="flex shrink-0 items-center justify-end gap-2 self-stretch sm:self-auto">
+                          <button type="button" onClick={() => openEventView(ev)} aria-label={`View ${ev.title}`} title="View event" className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ background: 'rgba(255,255,255,0.06)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
+                            <EyeIcon size={16} />
                           </button>
-                          <button type="button" onClick={() => setEditingEvent(ev)} aria-label={`Edit ${ev.title}`} title="Edit event" className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ background: 'rgba(249,112,21,0.12)', color: 'var(--primary)' }}>
-                            <EditIcon size={15} />
+                          <button type="button" onClick={() => setEditingEvent(ev)} aria-label={`Edit ${ev.title}`} title="Edit event" className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors hover:bg-orange-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ background: 'rgba(249,112,21,0.1)', borderColor: 'rgba(249,112,21,0.2)', color: 'var(--primary)' }}>
+                            <EditIcon size={16} />
                           </button>
                           <button
                             type="button"
                             onClick={() => toggleEventStatus(ev)}
-                            aria-label={ev.status === 'published' ? `Unpublish ${ev.title}` : `Publish ${ev.title}`}
+                            aria-label={`${ev.status === 'published' ? 'Unpublish' : 'Publish'} ${ev.title}`}
                             title={ev.status === 'published' ? 'Unpublish event' : 'Publish event'}
-                            className="flex h-9 w-9 items-center justify-center rounded-lg"
-                            style={{ background: ev.status === 'published' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)', color: ev.status === 'published' ? '#ef4444' : '#22c55e' }}
+                            className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                            style={{ background: ev.status === 'published' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)', borderColor: ev.status === 'published' ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)', color: ev.status === 'published' ? '#ef4444' : '#22c55e' }}
                           >
-                            {ev.status === 'published' ? <XIcon size={15} /> : <CheckIcon size={15} />}
+                            {ev.status === 'published' ? <XIcon size={16} /> : <CheckIcon size={16} />}
                           </button>
-                          <button type="button" onClick={() => deleteEvent(ev.id)} aria-label={`Delete ${ev.title}`} title="Delete event" className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>
-                            <TrashIcon size={15} />
+                          <button type="button" onClick={() => deleteEvent(ev.id)} aria-label={`Delete ${ev.title}`} title="Delete event" className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors hover:bg-red-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ background: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.16)', color: '#ef4444' }}>
+                            <TrashIcon size={16} />
                           </button>
                         </div>
                       </div>
@@ -1344,8 +1348,8 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                         {lastUpdated && ` · Updated ${lastUpdated.toLocaleTimeString()}`}
                       </p>
                     </div>
-                    <button type="button" onClick={() => void load()} disabled={dataLoading} aria-label="Refresh orders" title="Refresh orders" className="flex h-9 w-9 items-center justify-center rounded-lg border disabled:cursor-wait disabled:opacity-50" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
-                      <RefreshIcon size={15} className={dataLoading ? 'animate-spin' : ''} />
+                    <button type="button" onClick={() => void load()} disabled={dataLoading} className="rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-50" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>
+                      {dataLoading ? 'Refreshing…' : 'Refresh orders'}
                     </button>
                   </div>
                   <div className="overflow-x-auto">
@@ -1374,7 +1378,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                             <td className="px-4 py-3 text-xs font-bold" style={{ color: 'var(--primary)' }}>{formatPrice(o.total)}</td>
                             <td className="px-4 py-3"><Badge label={o.status} color={STATUS_COLORS[o.status] ?? '#888'} /></td>
                             <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted-foreground)' }}>{new Date(o.created_at).toLocaleDateString()}</td>
-                            <td className="px-4 py-3"><button type="button" onClick={() => setSelectedOrder(o)} aria-label={`View order ${o.id.slice(0, 8)}`} title="View order" className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}><EyeIcon size={14} /></button></td>
+                            <td className="px-4 py-3"><button onClick={() => setSelectedOrder(o)} className="rounded-lg px-2.5 py-1.5 text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>View order</button></td>
                           </tr>
                           )
                         })}
@@ -1716,6 +1720,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
           )}
         </div>
       </main>
+      </div>
 
       {/* ── CREATE EVENT MODAL ── */}
       {(showNewEvent || editingEvent) && <CreateEventModal orgId={orgId!} event={editingEvent} onClose={() => { setShowNewEvent(false); setEditingEvent(null) }} onCreated={() => { setShowNewEvent(false); setEditingEvent(null); load() }} />}

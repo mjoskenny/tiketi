@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeftIcon, CalendarIcon, CheckIcon, ClockIcon, DollarSignIcon, DownloadIcon, MapPinIcon, SearchIcon, TicketIcon, TrendingUpIcon, UsersIcon } from '../components/Icon'
+import { ArrowLeftIcon, CalendarIcon, ClockIcon, DollarSignIcon, DownloadIcon, EditIcon, EyeIcon, MapPinIcon, QrCodeIcon, SearchIcon, TicketIcon, TrendingUpIcon, UsersIcon } from '../components/Icon'
 import { formatPrice } from '../data/events'
 import type { Event, Order, Ticket } from '../lib/types'
 import { supabase } from '../lib/supabase'
@@ -213,9 +213,9 @@ export default function OrganizerEventViewPage({ event, orders, tickets, agentOr
     <div className="flex flex-wrap items-center justify-between gap-3">
       <button type="button" onClick={onBack} aria-label="Back to all events" title="Back to all events" className="flex h-10 w-10 items-center justify-center rounded-xl border transition hover:bg-white/5" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={18} /></button>
       <div className="flex flex-wrap gap-2">
-        {event.status === 'published' && <button onClick={() => navigate('event-detail', event)} className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition hover:bg-white/5" style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}>Preview public page</button>}
-        {canCheckIn && event.status === 'published' && <button type="button" onClick={() => setCheckInOpen(true)} className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition hover:bg-white/5" style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}><CheckIcon size={15} /> Check in guests</button>}
-        <button onClick={() => onEdit(event)} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: 'var(--primary)', color: '#111' }}>Edit event</button>
+        {event.status === 'published' && <button type="button" onClick={() => navigate('event-detail', event)} aria-label="Preview public event page" title="Preview public page" className="flex h-10 w-10 items-center justify-center rounded-xl border transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.04)', color: 'var(--foreground)' }}><EyeIcon size={17} /></button>}
+        {canCheckIn && event.status === 'published' && <button type="button" onClick={() => setCheckInOpen(true)} aria-label="Check in guests" title="Check in guests" className="flex h-10 w-10 items-center justify-center rounded-xl border transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.04)', color: 'var(--foreground)' }}><QrCodeIcon size={17} /></button>}
+        <button type="button" onClick={() => onEdit(event)} aria-label="Edit event" title="Edit event" className="flex h-10 w-10 items-center justify-center rounded-xl transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ background: 'var(--primary)', color: '#111' }}><EditIcon size={17} /></button>
       </div>
     </div>
 
