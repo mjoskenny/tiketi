@@ -178,6 +178,14 @@ function pathForPage(page: Page, extra?: unknown) {
 export default function App() {
   const { user, profile, organizer, loading, profileLoading, isOrganizer, teamMembership, agentAssignments, agentInvitations } = useAuth()
   const [page, setPage] = useState<Page>(() => pageFromPath(window.location.pathname))
+  const [keepOrganizerDashboardMounted, setKeepOrganizerDashboardMounted] = useState(() => pageFromPath(window.location.pathname) === 'dashboard')
+  const [keepAgentDashboardMounted, setKeepAgentDashboardMounted] = useState(() => pageFromPath(window.location.pathname) === 'agent-dashboard')
+  const [keepAdminDashboardMounted, setKeepAdminDashboardMounted] = useState(() => pageFromPath(window.location.pathname) === 'admin-dashboard')
+  const dashboardPaths = useRef({
+    organizer: window.location.pathname.startsWith('/dashboard') ? window.location.pathname : '/dashboard/analytics',
+    agent: window.location.pathname.startsWith('/agent-dashboard') ? window.location.pathname : '/agent-dashboard/overview',
+    admin: window.location.pathname.startsWith('/admin-dashboard') ? window.location.pathname : '/admin-dashboard',
+  })
   const [eventDetail, setEventDetail] = useState<Event | null>(null)
   const [resourceError, setResourceError] = useState('')
   const [resourceRetryToken, setResourceRetryToken] = useState(0)
@@ -326,12 +334,24 @@ export default function App() {
 
   const navigate = (target: string, extra?: unknown) => {
     const p = target as Page
+    if (page === 'dashboard' && window.location.pathname.startsWith('/dashboard')) dashboardPaths.current.organizer = window.location.pathname
+    if (page === 'agent-dashboard' && window.location.pathname.startsWith('/agent-dashboard')) dashboardPaths.current.agent = window.location.pathname
+    if (page === 'admin-dashboard' && window.location.pathname.startsWith('/admin-dashboard')) dashboardPaths.current.admin = window.location.pathname
+    if (p === 'dashboard') setKeepOrganizerDashboardMounted(true)
+    if (p === 'agent-dashboard') setKeepAgentDashboardMounted(true)
+    if (p === 'admin-dashboard') setKeepAdminDashboardMounted(true)
     if (p === 'event-detail' && extra) setEventDetail(extra as Event)
     if (p === 'organizer-profile' && extra) setOrganizerDetail(extra as Organizer)
     if (p === 'checkout' && extra) setCheckoutData(extra as typeof checkoutData)
     if ((p === 'ticket' || p === 'agent-ticket') && extra) setTicketData(extra as typeof ticketData)
     setPage(p)
-    const path = pathForPage(p, extra)
+    const path = p === 'dashboard' && page !== 'dashboard'
+      ? dashboardPaths.current.organizer
+      : p === 'agent-dashboard' && page !== 'agent-dashboard'
+        ? dashboardPaths.current.agent
+        : p === 'admin-dashboard' && page !== 'admin-dashboard'
+          ? dashboardPaths.current.admin
+          : pathForPage(p, extra)
     if (path && window.location.pathname !== path) window.history.pushState({}, '', path)
   }
 
@@ -527,7 +547,8 @@ export default function App() {
       {page === 'marketing' && <AboutPage navigate={navigate} />}
       {page === 'about' && <AboutInfoPage navigate={navigate} />}
       {(['help', 'contact', 'terms', ...(FEATURES.refunds ? ['refunds' as const] : []), 'privacy'] as const).includes(page as 'help' | 'contact' | 'terms' | 'privacy' | 'refunds') && <InfoPage kind={page as 'help' | 'contact' | 'terms' | 'privacy' | 'refunds'} navigate={navigate} onWithdrawCookieConsent={withdrawOptionalCookieConsent} />}
-      {page === 'dashboard' && (
+      {(page === 'dashboard' || keepOrganizerDashboardMounted) && <div style={{ display: page === 'dashboard' ? 'contents' : 'none' }}>
+      {(page === 'dashboard' || keepOrganizerDashboardMounted) && (
         !user
           ? <div className="flex items-center justify-center min-h-screen flex-col gap-4 pt-16">
               <p className="text-xl font-bold">Sign in to access the dashboard</p>
@@ -547,7 +568,9 @@ export default function App() {
                   <button onClick={() => navigate('home')} className="px-6 py-3 rounded-xl font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>Go Home</button>
                 </div>
       )}
-      {page === 'admin-dashboard' && (
+      </div>}
+      {(page === 'admin-dashboard' || keepAdminDashboardMounted) && <div style={{ display: page === 'admin-dashboard' ? 'contents' : 'none' }}>
+      {(page === 'admin-dashboard' || keepAdminDashboardMounted) && (
         !user
           ? <div className="flex min-h-screen items-center justify-center flex-col gap-4 pt-16"><p className="text-xl font-bold">Sign in to access admin tools</p><button onClick={() => navigate('auth-customer')} className="px-6 py-3 rounded-xl font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>Sign In</button></div>
           : profileLoading
@@ -556,7 +579,9 @@ export default function App() {
               ? <AdminDashboardPage navigate={navigate} />
               : <div className="flex min-h-screen items-center justify-center flex-col gap-4"><p className="text-xl font-bold">Admin access required.</p><p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>This account does not have platform admin privileges.</p></div>
       )}
-      {page === 'agent-dashboard' && (
+      </div>}
+      {(page === 'agent-dashboard' || keepAgentDashboardMounted) && <div style={{ display: page === 'agent-dashboard' ? 'contents' : 'none' }}>
+      {(page === 'agent-dashboard' || keepAgentDashboardMounted) && (
         !user
           ? <div className="flex min-h-screen items-center justify-center flex-col gap-4 pt-16"><p className="text-xl font-bold">Sign in to access agent tools</p><button onClick={() => navigate('auth-customer')} className="px-6 py-3 rounded-xl font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>Sign In</button></div>
           : profileLoading
@@ -565,6 +590,7 @@ export default function App() {
               ? <AgentDashboardPage navigate={navigate} />
               : <div className="flex min-h-screen items-center justify-center flex-col gap-4"><p className="text-xl font-bold">Agent access required.</p><p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>This account does not have an active agent assignment.</p></div>
       )}
+      </div>}
       {!['auth-customer', 'auth-organizer', 'checkin', 'dashboard', 'agent-dashboard', 'agent-ticket', 'admin-dashboard'].includes(page) && <Footer navigate={navigate} publicPlatformSettings={publicPlatformSettings} />}
     </div>
   )

@@ -3,7 +3,7 @@ import { signOut, supabase } from '../lib/supabase'
 import { fetchAllRows } from '../lib/supabasePagination'
 import { useAuth } from '../context/AuthContext'
 import { formatPrice } from '../data/events'
-import { BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, UsersIcon, UserIcon, KeyIcon, TagIcon, DollarSignIcon, TicketIcon, TrendingUpIcon, CheckIcon, ArrowLeftIcon, EyeIcon, LinkIcon, ShieldIcon } from '../components/Icon'
+import { BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, UsersIcon, UserIcon, KeyIcon, TagIcon, DollarSignIcon, TicketIcon, TrendingUpIcon, CheckIcon, ArrowLeftIcon, EyeIcon, LinkIcon, ShieldIcon, EditIcon, RefreshIcon, TrashIcon, XIcon } from '../components/Icon'
 import type { Event, Order, Customer, Transaction, OrganizerWithdrawal, OrganizerMember, OrganizerRole, Subscription, Ticket, AgentAssignment } from '../lib/types'
 import { FEATURES } from '../lib/features'
 import OrganizerEventViewPage from './OrganizerEventViewPage'
@@ -167,7 +167,7 @@ function EventPerformanceChart({ events, performance }: { events: Event[]; perfo
 }
 
 export default function OrganizerDashboardPage({ navigate }: Props) {
-  const { user, profile, organizer, teamMembership } = useAuth()
+  const { user, profile, organizer, teamMembership, refreshProfile } = useAuth()
   const [section, setSection] = useState<Section>(() => sectionFromPath(window.location.pathname))
   const [eventViewId, setEventViewId] = useState<string | null>(() => eventIdFromPath(window.location.pathname))
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -228,6 +228,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
   useEffect(() => {
     const handlePathChange = () => {
+      if (!window.location.pathname.startsWith('/dashboard')) return
       setSection(sectionFromPath(window.location.pathname))
       setEventViewId(eventIdFromPath(window.location.pathname))
     }
@@ -366,9 +367,13 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
       items.push(item)
       itemsByOrder.set(item.order_id, items)
     })
+    const normalizedAgentSales = (agentSales as unknown as Array<Omit<AgentOrderMeta, 'profiles'> & { profiles?: AgentOrderMeta['profiles'] | AgentOrderMeta['profiles'][] }>).map(item => ({
+      ...item,
+      profiles: Array.isArray(item.profiles) ? item.profiles[0] ?? null : item.profiles ?? null,
+    }))
     setEvents(ev as Event[])
     setOrders(loadedOrders.map(order => ({ ...order, order_items: itemsByOrder.get(order.id) ?? [] })))
-    setAgentOrderMeta(Object.fromEntries((agentSales as AgentOrderMeta[]).map(item => [item.order_id, item])))
+    setAgentOrderMeta(Object.fromEntries(normalizedAgentSales.map(item => [item.order_id, item])))
     setAgentAssignments((assignments.data ?? []) as AgentAssignment[])
     setCustomers(cust as Customer[])
     setMembers(mem.data ?? [])
@@ -413,17 +418,6 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'organizer_members', filter: `organizer_id=eq.${orgId}` }, () => { void load() })
       .subscribe()
     return () => { void supabase.removeChannel(channel) }
-  }, [orgId, load])
-
-  useEffect(() => {
-    if (!orgId) return
-    const refresh = () => { void load() }
-    const interval = window.setInterval(refresh, 60_000)
-    window.addEventListener('focus', refresh)
-    return () => {
-      window.clearInterval(interval)
-      window.removeEventListener('focus', refresh)
-    }
   }, [orgId, load])
 
   useEffect(() => {
@@ -734,7 +728,8 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     if (!teamMembership || teamMembership.status !== 'pending') return
     const { error } = await supabase.from('organizer_members').update({ status: 'active' }).eq('id', teamMembership.id)
     if (error) { setActionError(error.message); return }
-    window.location.reload()
+    await refreshProfile()
+    await load()
   }
 
   const changeSubscription = async (tier: Subscription['tier'], price: number) => {
@@ -989,6 +984,9 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
           <div className="flex items-center gap-2">
             {utilityPopup && <button className="fixed inset-0 z-10 cursor-default" aria-label="Close popup" onClick={() => setUtilityPopup(null)} />}
             <LanguageSwitcher bare />
+            <button type="button" onClick={() => void load()} disabled={dataLoading} aria-label="Refresh organizer dashboard" title="Refresh dashboard" className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors hover:bg-white/5 disabled:cursor-wait disabled:opacity-50" style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'var(--foreground)' }}>
+              <RefreshIcon size={16} className={dataLoading ? 'animate-spin' : ''} />
+            </button>
             <div className="relative z-20">
               <button onClick={() => setUtilityPopup(current => current === 'notifications' ? null : 'notifications')} aria-label="Notifications" title="Notifications" className="relative flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: utilityPopup === 'notifications' ? 'rgba(200,169,110,0.14)' : 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}>
                 <BellIcon size={18} />
@@ -1088,8 +1086,8 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                     {analyticsRange === 'custom' && <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--muted-foreground)' }}><label>From<input type="date" value={analyticsStart} onChange={event => setAnalyticsStart(event.target.value)} className="ml-1 rounded-lg border px-2 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.035)', borderColor: 'rgba(255,255,255,0.14)', color: 'var(--foreground)', backdropFilter: 'blur(18px)' }} /></label><label>To<input type="date" value={analyticsEnd} onChange={event => setAnalyticsEnd(event.target.value)} className="ml-1 rounded-lg border px-2 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.035)', borderColor: 'rgba(255,255,255,0.14)', color: 'var(--foreground)', backdropFilter: 'blur(18px)' }} /></label></div>}
                   </div>
                   {verificationStatus !== 'verified' && <div className="flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                    <div><p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Organizer verification</p><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>{verificationStatus === 'verified' ? 'Your organizer profile is verified.' : verificationStatus === 'pending' ? 'Your verification request is awaiting review.' : 'Verify your profile to show a trusted badge on organizer cards and profiles.'}</p></div>
-                    <button onClick={requestVerification} disabled={verificationStatus !== 'unverified'} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: verificationStatus === 'unverified' ? 'var(--primary)' : 'var(--muted)', color: verificationStatus === 'unverified' ? '#000' : 'var(--muted-foreground)' }}>{verificationStatus === 'verified' ? 'Verified' : verificationStatus === 'pending' ? 'Pending review' : 'Request verification'}</button>
+                    <div><p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Organizer verification</p><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>{verificationStatus === 'pending' ? 'Your verification request is awaiting review.' : 'Verify your profile to show a trusted badge on organizer cards and profiles.'}</p></div>
+                    <button onClick={requestVerification} disabled={verificationStatus !== 'unverified'} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: verificationStatus === 'unverified' ? 'var(--primary)' : 'var(--muted)', color: verificationStatus === 'unverified' ? '#000' : 'var(--muted-foreground)' }}>{verificationStatus === 'pending' ? 'Pending review' : 'Request verification'}</button>
                   </div>}
                   {/* KPI grid */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1308,21 +1306,24 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                           </div>
                         </div>
                         <div className="flex gap-2 flex-shrink-0 self-stretch sm:self-auto">
-                          <button onClick={() => openEventView(ev)} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--foreground)' }}>
-                            View
+                          <button type="button" onClick={() => openEventView(ev)} aria-label={`View ${ev.title}`} title="View event" className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--foreground)' }}>
+                            <EyeIcon size={15} />
                           </button>
-                          <button onClick={() => setEditingEvent(ev)} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background: 'rgba(249,112,21,0.12)', color: 'var(--primary)' }}>
-                            Edit
+                          <button type="button" onClick={() => setEditingEvent(ev)} aria-label={`Edit ${ev.title}`} title="Edit event" className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ background: 'rgba(249,112,21,0.12)', color: 'var(--primary)' }}>
+                            <EditIcon size={15} />
                           </button>
                           <button
+                            type="button"
                             onClick={() => toggleEventStatus(ev)}
-                            className="px-3 py-1.5 rounded-lg text-xs font-bold"
+                            aria-label={ev.status === 'published' ? `Unpublish ${ev.title}` : `Publish ${ev.title}`}
+                            title={ev.status === 'published' ? 'Unpublish event' : 'Publish event'}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg"
                             style={{ background: ev.status === 'published' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)', color: ev.status === 'published' ? '#ef4444' : '#22c55e' }}
                           >
-                            {ev.status === 'published' ? 'Unpublish' : 'Publish'}
+                            {ev.status === 'published' ? <XIcon size={15} /> : <CheckIcon size={15} />}
                           </button>
-                          <button onClick={() => deleteEvent(ev.id)} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>
-                            Delete
+                          <button type="button" onClick={() => deleteEvent(ev.id)} aria-label={`Delete ${ev.title}`} title="Delete event" className="flex h-9 w-9 items-center justify-center rounded-lg" style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>
+                            <TrashIcon size={15} />
                           </button>
                         </div>
                       </div>
@@ -1343,8 +1344,8 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                         {lastUpdated && ` · Updated ${lastUpdated.toLocaleTimeString()}`}
                       </p>
                     </div>
-                    <button type="button" onClick={() => void load()} disabled={dataLoading} className="rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-50" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>
-                      {dataLoading ? 'Refreshing…' : 'Refresh orders'}
+                    <button type="button" onClick={() => void load()} disabled={dataLoading} aria-label="Refresh orders" title="Refresh orders" className="flex h-9 w-9 items-center justify-center rounded-lg border disabled:cursor-wait disabled:opacity-50" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
+                      <RefreshIcon size={15} className={dataLoading ? 'animate-spin' : ''} />
                     </button>
                   </div>
                   <div className="overflow-x-auto">
@@ -1373,7 +1374,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                             <td className="px-4 py-3 text-xs font-bold" style={{ color: 'var(--primary)' }}>{formatPrice(o.total)}</td>
                             <td className="px-4 py-3"><Badge label={o.status} color={STATUS_COLORS[o.status] ?? '#888'} /></td>
                             <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted-foreground)' }}>{new Date(o.created_at).toLocaleDateString()}</td>
-                            <td className="px-4 py-3"><button onClick={() => setSelectedOrder(o)} className="rounded-lg px-2.5 py-1.5 text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>View order</button></td>
+                            <td className="px-4 py-3"><button type="button" onClick={() => setSelectedOrder(o)} aria-label={`View order ${o.id.slice(0, 8)}`} title="View order" className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}><EyeIcon size={14} /></button></td>
                           </tr>
                           )
                         })}

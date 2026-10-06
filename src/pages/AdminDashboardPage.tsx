@@ -9,6 +9,7 @@ import {
   DollarSignIcon,
   EyeIcon,
   KeyIcon,
+  RefreshIcon,
   ShieldIcon,
   TicketIcon,
   TrendingUpIcon,
@@ -396,7 +397,9 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
   }>({ revenue: [], operations: [], growth: [] })
 
   useEffect(() => {
-    const syncSectionWithPath = () => setSection(sectionFromPath(window.location.pathname))
+    const syncSectionWithPath = () => {
+      if (window.location.pathname.startsWith('/admin-dashboard')) setSection(sectionFromPath(window.location.pathname))
+    }
 
     window.addEventListener('popstate', syncSectionWithPath)
     return () => window.removeEventListener('popstate', syncSectionWithPath)
@@ -1015,13 +1018,8 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'organizer_withdrawals' }, scheduleRefresh)
       .subscribe()
-    const refresh = () => setRefreshTick(current => current + 1)
-    const interval = window.setInterval(refresh, 60_000)
-    window.addEventListener('focus', refresh)
     return () => {
       window.clearTimeout(refreshTimeout)
-      window.clearInterval(interval)
-      window.removeEventListener('focus', refresh)
       void supabase.removeChannel(channel)
     }
   }, [user?.id, profile?.role])
@@ -2087,8 +2085,8 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
               <EyeIcon size={14} /> View site
             </button>
             <LanguageSwitcher bare />
-            <button onClick={() => setRefreshTick(value => value + 1)} className="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold" style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'var(--foreground)' }} aria-label="Refresh admin data">
-              <ZapIcon size={14} /> Refresh
+            <button type="button" onClick={() => setRefreshTick(value => value + 1)} disabled={loading} className="flex h-9 w-9 items-center justify-center rounded-xl border disabled:cursor-wait disabled:opacity-50" style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'var(--foreground)' }} aria-label="Refresh admin data" title="Refresh dashboard">
+              <RefreshIcon size={16} className={loading ? 'animate-spin' : ''} />
             </button>
             <button onClick={exportCurrentSection} className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'var(--primary)', color: '#000' }}>
               <CheckIcon size={14} /> Export report
@@ -2117,7 +2115,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
             </div>
           ) : null}
 
-          {loading ? (
+          {loading && !lastUpdated ? (
             <div className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, index) => (

@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { signOut, supabase } from '../lib/supabase'
 import { fetchAllRows } from '../lib/supabasePagination'
 import { formatPrice } from '../data/events'
-import { BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, DollarSignIcon, TicketIcon, UserIcon, ArrowLeftIcon, EyeIcon } from '../components/Icon'
+import { BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, DollarSignIcon, TicketIcon, UserIcon, ArrowLeftIcon, EyeIcon, RefreshIcon } from '../components/Icon'
 import type { Event, TicketTier } from '../lib/types'
 import { sendOrderTicketEmails } from '../lib/ticketEmail'
 import { hasEventEnded } from '../lib/eventTime'
@@ -338,7 +338,9 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
   }, [user])
 
   useEffect(() => {
-    const handlePopState = () => setTab(sectionFromPath(window.location.pathname))
+    const handlePopState = () => {
+      if (window.location.pathname.startsWith('/agent-dashboard')) setTab(sectionFromPath(window.location.pathname))
+    }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
@@ -362,17 +364,6 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
       .subscribe()
 
     return () => { void supabase.removeChannel(channel) }
-  }, [loadAgentData, user])
-
-  useEffect(() => {
-    if (!user) return
-    const refresh = () => { void loadAgentData() }
-    const interval = window.setInterval(refresh, 60_000)
-    window.addEventListener('focus', refresh)
-    return () => {
-      window.clearInterval(interval)
-      window.removeEventListener('focus', refresh)
-    }
   }, [loadAgentData, user])
 
   const respond = async (id: string, accept: boolean) => {
@@ -678,6 +669,9 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button type="button" onClick={() => void loadAgentData()} disabled={loading} aria-label="Refresh agent dashboard" title="Refresh dashboard" className="flex h-9 w-9 items-center justify-center rounded-xl border disabled:cursor-wait disabled:opacity-50" style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'var(--foreground)' }}>
+              <RefreshIcon size={16} className={loading ? 'animate-spin' : ''} />
+            </button>
             <button onClick={() => navigate('home')} className="flex items-center gap-2 rounded-xl border px-2 py-2 text-xs font-bold sm:px-3" style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'var(--foreground)' }}>
               <EyeIcon size={14} /><span className="hidden sm:inline">View site</span>
             </button>
@@ -716,13 +710,13 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
         </header>
 
         <div className="flex-1 overflow-auto p-5">
-          {loading && (
+          {loading && !lastUpdated && (
             <div className="flex items-center justify-center py-20">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
             </div>
           )}
 
-          {!loading && (
+          {(!loading || lastUpdated) && (
             <>
               {tab === 'overview' && (
                 <div className="space-y-6">
