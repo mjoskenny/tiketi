@@ -3,8 +3,8 @@ import { CalendarIcon, MapPinIcon, ShieldIcon, TicketIcon, CheckIcon, ArrowLeftI
 import type { Event, TicketTier } from '../lib/types'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { sendOrderTicketEmails } from '../lib/ticketEmail'
 import { trackConsentedEvent, trackConsentedMarketingEvent } from '../lib/consentedTracking'
+import { projectId, publicAnonKey } from '../../utils/supabase/info'
 
 type CheckoutData = {
   event: Event
@@ -33,6 +33,23 @@ const DEFAULT_CHECKOUT_SETTINGS: CheckoutSettings = {
 
 function fmtPrice(n: number) { return n.toLocaleString() + ' BIF' }
 
+async function callPaymentFunction<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Sign in again to continue with payment.')
+  const response = await fetch(`https://${projectId}.supabase.co/functions/v1/server/make-server-4880c4b3/${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: publicAnonKey,
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify(body),
+  })
+  const result = await response.json().catch(() => ({})) as T & { error?: string }
+  if (!response.ok) throw new Error(result.error || 'Payment request could not be completed.')
+  return result
+}
+
 const PhoneIcon = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
     <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
@@ -54,9 +71,14 @@ export default function CheckoutPage({ data, navigate }: Props) {
   const [info, setInfo] = useState({ name: '', phone: '', email: '' })
   const [holders, setHolders] = useState<HolderEntry[]>([])
   const [mobileMoneyPhone, setMobileMoneyPhone] = useState('')
-  const [payMethod, setPayMethod] = useState<'mobilemoney' | 'card'>('mobilemoney')
+  const [payMethod, setPayMethod] = useState<'mobilemoney' | 'ihela' | 'card'>('mobilemoney')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [paymentProvider, setPaymentProvider] = useState('')
+  const [ihelaConfigured, setIhelaConfigured] = useState(false)
+  const [paymentConfigurationError, setPaymentConfigurationError] = useState('')
+  const [pendingIhela, setPendingIhela] = useState<{ orderId: string; billCode: string; confirmationUri?: string } | null>(null)
+  const [paymentCheckMessage, setPaymentCheckMessage] = useState('')
   const [checkoutSettings, setCheckoutSettings] = useState<CheckoutSettings>(DEFAULT_CHECKOUT_SETTINGS)
   const { user } = useAuth()
 
@@ -64,6 +86,21 @@ export default function CheckoutPage({ data, navigate }: Props) {
   const tiers: TicketTier[] = (event.ticket_tiers ?? []).filter(t => (quantities[t.name] ?? quantities[t.id] ?? 0) > 0)
   const serviceFee = Math.round(subtotal * (checkoutSettings.service_fee_percent / 100))
   const total = subtotal + serviceFee
+
+  useEffect(() => {
+    let active = true
+    fetch(`https://${projectId}.supabase.co/functions/v1/server/make-server-4880c4b3/payments/health`, {
+      headers: { apikey: publicAnonKey },
+    }).then(response => response.json()).then(result => {
+      if (!active) return
+      if (typeof result.provider === 'string' && result.provider !== 'unconfigured') setPaymentProvider(result.provider)
+      setIhelaConfigured(result.ihelaConfigured === true)
+      if (result.configured === false) setPaymentConfigurationError(result.error || 'No payment provider is configured on the Supabase Edge Function.')
+    }).catch(() => {
+      if (active) setPaymentConfigurationError('Could not reach the Supabase payment Edge Function.')
+    })
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -150,6 +187,7 @@ export default function CheckoutPage({ data, navigate }: Props) {
       return
     }
     if (payMethod === 'mobilemoney' && !checkoutSettings.mobile_money_enabled) { setError('Mobile Money payments are currently unavailable.'); return }
+    if (payMethod === 'ihela' && !checkoutSettings.mobile_money_enabled) { setError('Mobile Money payments are currently unavailable.'); return }
     if (payMethod === 'card' && !checkoutSettings.card_payments_enabled) { setError('Card payments are currently unavailable.'); return }
     const validationError = validateInfo()
     if (validationError) { setError(validationError); setStep(2); return }
@@ -159,74 +197,97 @@ export default function CheckoutPage({ data, navigate }: Props) {
     }
     setLoading(true)
     setError('')
-    const quantitiesByTierId = Object.fromEntries(tiers.map(tier => [tier.id, getQty(tier)]))
-    const { data: orderId, error: purchaseError } = await supabase.rpc('create_pending_ticket_order', {
-      p_event_id: event.id,
-      p_organizer_id: event.organizer_id,
-      p_quantities: quantitiesByTierId,
-      p_holder_name: info.name,
-      p_holder_email: info.email,
-      p_holder_phone: info.phone,
-      p_holder_details: Object.fromEntries(tiers.map(tier => [tier.id, holders.filter(holder => holder.tierId === tier.id).map(holder => ({ name: holder.name }))])),
-    })
-    if (purchaseError) {
-      setError(purchaseError.message)
-      setLoading(false)
-      return
-    }
+    try {
+      const quantitiesByTierId = Object.fromEntries(tiers.map(tier => [tier.id, getQty(tier)]))
+      const { data: orderId, error: purchaseError } = await supabase.rpc('create_pending_ticket_order', {
+        p_event_id: event.id,
+        p_organizer_id: event.organizer_id,
+        p_quantities: quantitiesByTierId,
+        p_holder_name: info.name,
+        p_holder_email: info.email,
+        p_holder_phone: info.phone,
+        p_holder_details: Object.fromEntries(tiers.map(tier => [tier.id, holders.filter(holder => holder.tierId === tier.id).map(holder => ({ name: holder.name }))])),
+      })
+      if (purchaseError) throw purchaseError
+      if (!orderId) throw new Error('Unable to create the ticket order.')
 
-    const { data: confirmedTickets, error: confirmationError } = await supabase.rpc('complete_test_ticket_order', {
-      p_order_id: orderId,
-      p_payment_method: payMethod === 'mobilemoney' ? 'mobile_money' : 'card',
-    })
-    if (confirmationError) {
-      setError(`Test payment could not be confirmed: ${confirmationError.message}`)
+      const session = await callPaymentFunction<{ provider: string; reference: string; checkoutUrl?: string; confirmationUri?: string }>(
+        'payments/initialize',
+        { orderId, method: payMethod === 'ihela' ? 'ihela' : payMethod === 'mobilemoney' ? 'mobile_money' : 'card', paymentPhone: mobileMoneyPhone },
+      )
       setLoading(false)
-      return
+      if (session.provider === 'ihela') {
+        setPendingIhela({ orderId, billCode: session.reference, confirmationUri: session.confirmationUri })
+        setPaymentCheckMessage('Waiting for iHela to confirm your payment. This page checks securely every few seconds.')
+        return
+      }
+      if (session.provider === 'demo') {
+        await callPaymentFunction('payments/demo/complete', { orderId })
+        window.sessionStorage.removeItem(`tiketi-checkout:${event.id}`)
+        navigate('my-tickets')
+        return
+      }
+      if (!session.checkoutUrl) throw new Error('The payment provider did not return a checkout link.')
+      window.location.assign(session.checkoutUrl)
+    } catch (paymentError) {
+      setError(paymentError instanceof Error ? paymentError.message : 'Unable to initialize payment.')
+      setLoading(false)
     }
-
-    setLoading(false)
-    window.sessionStorage.removeItem(`tiketi-checkout:${event.id}`)
-    const tickets = Array.isArray(confirmedTickets) ? confirmedTickets : []
-    const ticketQuantity = tickets.length
-    const purchasedItems = [...new Set(tickets.map((ticket: { ticket_tier_id?: string }) => ticket.ticket_tier_id).filter(Boolean))].map(tierId => {
-      const tier = tiers.find(item => item.id === tierId)
-      const quantity = tickets.filter((ticket: { ticket_tier_id?: string }) => ticket.ticket_tier_id === tierId).length
-      return { item_id: tierId, item_name: tier?.name ?? 'Ticket', price: tier?.price, quantity }
-    })
-    trackConsentedEvent('purchase', {
-      transaction_id: String(orderId),
-      currency: 'BIF',
-      value: total,
-      items: purchasedItems,
-    })
-    trackConsentedMarketingEvent('Purchase', {
-      content_ids: purchasedItems.map(item => item.item_id),
-      content_name: event.title,
-      content_type: 'product',
-      currency: 'BIF',
-      value: total,
-      num_items: ticketQuantity,
-    })
-    const emailDelivery = await sendOrderTicketEmails(orderId)
-    const firstTicket = tickets[0]
-    const firstTier = tiers.find(tier => tier.id === firstTicket?.ticket_tier_id) ?? tiers[0]
-    navigate('ticket', {
-      event,
-      info: { ...info, name: firstTicket?.holder_name ?? info.name },
-      tickets,
-      ticket: firstTicket?.qr_code ?? null,
-      ticketStatus: 'valid',
-      ticketType: firstTier?.name ?? 'REGULAR',
-      ticketKind: firstTier?.ticket_type,
-      ticketPrice: firstTier?.price ?? 0,
-      purchasedAt: firstTicket?.created_at,
-      ticketExtraInfo: firstTier?.extra_info ?? '',
-      ticketExpiry: firstTier?.expires_at ?? '',
-      ticketGroupSize: firstTier?.group_size ?? 1,
-      emailDelivery,
-    })
   }
+
+  useEffect(() => {
+    if (!pendingIhela) return
+    let active = true
+    let checking = false
+    let interval: number | undefined
+    const checkStatus = async () => {
+      if (!active || checking) return
+      checking = true
+      try {
+        const result = await callPaymentFunction<{ status: 'succeeded' | 'pending' | 'failed' | 'expired' }>(
+          'payments/ihela/status',
+          { orderId: pendingIhela.orderId },
+        )
+        if (!active) return
+        if (result.status === 'succeeded') {
+          active = false
+          if (interval !== undefined) window.clearInterval(interval)
+          window.sessionStorage.removeItem(`tiketi-checkout:${event.id}`)
+          const purchasedItems = tiers.map(tier => ({ item_id: tier.id, item_name: tier.name, price: tier.price, quantity: getQty(tier) }))
+          trackConsentedEvent('purchase', { transaction_id: pendingIhela.orderId, currency: 'BIF', value: total, items: purchasedItems })
+          trackConsentedMarketingEvent('Purchase', {
+            content_ids: purchasedItems.map(item => item.item_id),
+            content_name: event.title,
+            content_type: 'product',
+            currency: 'BIF',
+            value: total,
+            num_items: purchasedItems.reduce((sum, item) => sum + item.quantity, 0),
+          })
+          setPaymentCheckMessage('Payment confirmed. Your tickets are available in My Tickets and have been emailed to you.')
+          setPendingIhela(null)
+          navigate('my-tickets')
+          return
+        }
+        if (result.status === 'failed' || result.status === 'expired') {
+          active = false
+          if (interval !== undefined) window.clearInterval(interval)
+          setPaymentCheckMessage(result.status === 'expired' ? 'This iHela bill has expired.' : 'iHela could not complete this payment.')
+          return
+        }
+        setPaymentCheckMessage('Payment is still pending. Complete it in iHela; this page will update automatically.')
+      } catch (statusError) {
+        if (active) setError(statusError instanceof Error ? statusError.message : 'Unable to check payment status.')
+      } finally {
+        checking = false
+      }
+    }
+    void checkStatus()
+    interval = window.setInterval(() => { void checkStatus() }, 6000)
+    return () => {
+      active = false
+      window.clearInterval(interval)
+    }
+  }, [pendingIhela?.orderId])
 
   const stepDone = (n: number) => step > n
 
@@ -290,6 +351,7 @@ export default function CheckoutPage({ data, navigate }: Props) {
             {step === 2 && (
               <div>
                 <h2 className="text-2xl font-bold mb-6" style={{ fontFamily: 'Outfit, sans-serif' }}>Your information</h2>
+                {error && <div role="alert" className="mb-5 rounded-xl px-4 py-3 text-sm" style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)', color: '#fca5a5' }}>{error}</div>}
                 <div className="space-y-5">
                   {[
                     { key: 'name', label: 'Full name', type: 'text', placeholder: 'Jean Pierre Nzeyimana' },
@@ -300,7 +362,7 @@ export default function CheckoutPage({ data, navigate }: Props) {
                       <label className="block text-sm font-medium mb-1.5">{label}</label>
                       <input type={type} placeholder={placeholder}
                         value={info[key as keyof typeof info]}
-                        onChange={e => setInfo(i => ({ ...i, [key]: e.target.value }))}
+                        onChange={e => { setInfo(i => ({ ...i, [key]: e.target.value })); setError('') }}
                         className="w-full px-4 py-3.5 rounded-xl text-sm outline-none"
                         style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--foreground)' }}
                         onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)')}
@@ -312,7 +374,7 @@ export default function CheckoutPage({ data, navigate }: Props) {
                 <div className="mt-8 space-y-4">
                   <h3 className="font-bold">Ticket holders</h3>
                   <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Add a different name for each ticket.</p>
-                  {holders.map((holder, index) => <label key={holder.id} className="block text-sm font-medium">{holder.tierName} ticket {index + 1}<input value={holder.name} onChange={event => setHolders(current => current.map(item => item.id === holder.id ? { ...item, name: event.target.value } : item))} placeholder="Ticket holder name" className="mt-2 w-full px-4 py-3.5 rounded-xl text-sm outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--foreground)' }} /></label>)}
+                  {holders.map((holder, index) => <label key={holder.id} className="block text-sm font-medium">{holder.tierName} ticket {index + 1}<input value={holder.name} onChange={event => { setHolders(current => current.map(item => item.id === holder.id ? { ...item, name: event.target.value } : item)); setError('') }} placeholder="Ticket holder name" className="mt-2 w-full px-4 py-3.5 rounded-xl text-sm outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--foreground)' }} /></label>)}
                 </div>
                 <div className="mt-8 flex gap-3">
                   <button type="button" onClick={() => setCheckoutStep(1)} aria-label="Back to tickets" title="Back to tickets" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
@@ -332,14 +394,36 @@ export default function CheckoutPage({ data, navigate }: Props) {
               <div>
                 <h2 className="text-2xl font-bold mb-6" style={{ fontFamily: 'Outfit, sans-serif' }}>Payment</h2>
                 {error && <div className="mb-5 rounded-xl px-4 py-3 text-sm" style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)', color: '#fca5a5' }}>{error}</div>}
+                {paymentConfigurationError && <div role="status" className="mb-5 rounded-xl px-4 py-3 text-sm" style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.24)', color: '#fcd34d' }}>Payment setup needs attention: {paymentConfigurationError}</div>}
+                {pendingIhela ? (
+                  <div className="rounded-2xl p-5" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full border-2 border-current border-t-transparent animate-spin" style={{ color: 'var(--accent)' }} />
+                      <div>
+                        <h3 className="font-bold">Complete payment with iHela</h3>
+                        <p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Open iHela and pay this bill. Tickets are issued only after iHela confirms payment.</p>
+                      </div>
+                    </div>
+                    <div className="mt-5 rounded-xl p-4 text-center" style={{ background: 'var(--muted)' }}>
+                      <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>iHela bill code</p>
+                      <p className="mt-2 break-all font-mono text-xl font-black" style={{ color: 'var(--accent)' }}>{pendingIhela.billCode}</p>
+                      <button type="button" onClick={() => void navigator.clipboard?.writeText(pendingIhela.billCode)} className="mt-3 rounded-lg px-3 py-2 text-xs font-bold" style={{ background: 'var(--card)', color: 'var(--foreground)' }}>
+                        Copy bill code
+                      </button>
+                      {pendingIhela.confirmationUri && <a href={pendingIhela.confirmationUri} target="_blank" rel="noreferrer" className="ml-2 inline-block rounded-lg px-3 py-2 text-xs font-bold" style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}>Open iHela</a>}
+                    </div>
+                    <p role="status" className="mt-4 text-sm" style={{ color: 'var(--muted-foreground)' }}>{paymentCheckMessage}</p>
+                    <p className="mt-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>Order reference: {pendingIhela.orderId}</p>
+                  </div>
+                ) : <>
                 <div className="space-y-3 mb-6">
                   {[
-                    { id: 'mobilemoney' as const, label: 'Mobile Money', sub: 'Lumicash · EcoCash · Mobicash', Icon: PhoneIcon },
-                    { id: 'card' as const, label: 'Debit / Credit Card', sub: 'Visa · Mastercard', Icon: CreditCardIcon },
-                    { id: 'other' as const, label: 'Other methods', sub: 'Bank transfer · Agent', Icon: BankIcon },
-                  ].filter(method => method.id !== 'other' && (method.id === 'mobilemoney' ? checkoutSettings.mobile_money_enabled : checkoutSettings.card_payments_enabled)).map(({ id, label, sub, Icon }) => (
-                    <button key={id} onClick={() => setPayMethod(id === 'mobilemoney' ? 'mobilemoney' : 'card')}
-                      className="w-full flex items-center gap-4 p-4 rounded-xl text-left"
+                    { id: 'mobilemoney' as const, label: 'Mobile Money', sub: paymentProvider && paymentProvider !== 'unconfigured' ? 'Continue with your configured Mobile Money provider' : 'Lumicash · EcoCash · Mobicash', Icon: PhoneIcon, enabled: checkoutSettings.mobile_money_enabled },
+                    { id: 'ihela' as const, label: 'iHela', sub: ihelaConfigured ? 'Pay with an iHela bill code' : 'Unavailable until iHela sandbox is configured', Icon: PhoneIcon, enabled: checkoutSettings.mobile_money_enabled && ihelaConfigured },
+                    { id: 'card' as const, label: 'Debit / Credit Card', sub: 'Visa · Mastercard', Icon: CreditCardIcon, enabled: checkoutSettings.card_payments_enabled },
+                  ].filter(method => method.id === 'ihela' ? checkoutSettings.mobile_money_enabled : method.enabled).map(({ id, label, sub, Icon }) => (
+                    <button key={id} onClick={() => setPayMethod(id)} disabled={id === 'ihela' && !ihelaConfigured}
+                      className="w-full flex items-center gap-4 p-4 rounded-xl text-left disabled:cursor-not-allowed disabled:opacity-55"
                       style={{
                         background: payMethod === id ? 'rgba(200,169,110,0.06)' : 'var(--card)',
                         border: payMethod === id ? '2px solid var(--accent)' : '1px solid var(--border)',
@@ -366,13 +450,13 @@ export default function CheckoutPage({ data, navigate }: Props) {
                     <input type="tel" placeholder="+257 79 000 000" value={mobileMoneyPhone} onChange={e => setMobileMoneyPhone(e.target.value)}
                       className="w-full px-4 py-3 rounded-lg text-sm outline-none"
                       style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--foreground)' }} />
-                    <p className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>Placeholder only — no real Mobile Money payment will be requested.</p>
+                    <p className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>Your payment provider will securely process this payment.</p>
                   </div>
                 )}
 
-                <p className="mb-6 rounded-xl px-4 py-3 text-xs" style={{ background: 'rgba(200,169,110,0.08)', border: '1px solid rgba(200,169,110,0.2)', color: 'var(--accent)' }}>
-                  Payment placeholder mode is active. This test checkout does not charge a card or send a Mobile Money request.
-                </p>
+                {payMethod === 'ihela' && <p className="mb-6 rounded-xl px-4 py-3 text-xs" style={{ background: 'rgba(200,169,110,0.08)', border: '1px solid rgba(200,169,110,0.2)', color: 'var(--accent)' }}>iHela will generate a bill code for you to pay. Tickets are issued only after payment is confirmed.</p>}
+
+                {paymentProvider === 'demo' && <p className="mb-6 rounded-xl px-4 py-3 text-xs" style={{ background: 'rgba(200,169,110,0.08)', border: '1px solid rgba(200,169,110,0.2)', color: 'var(--accent)' }}>Demo payment mode is active. This does not charge a real payment method.</p>}
 
                 <div className="flex items-center justify-center gap-6 mb-6">
                   {[
@@ -395,9 +479,10 @@ export default function CheckoutPage({ data, navigate }: Props) {
                   <button onClick={handlePay} disabled={loading}
                     className="flex-1 py-4 rounded-xl font-bold text-sm transition-all"
                     style={{ background: 'var(--primary)', color: 'var(--primary-foreground)', opacity: loading ? 0.7 : 1 }}>
-                    {loading ? 'Confirming test checkout…' : `Confirm test payment ${fmtPrice(total)}`}
+                    {loading ? 'Starting secure payment…' : `Continue to payment · ${fmtPrice(total)}`}
                   </button>
                 </div>
+                </>}
               </div>
             )}
           </div>

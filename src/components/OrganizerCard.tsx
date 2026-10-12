@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ArrowRightIcon, CheckIcon, ShareNodesIcon } from './Icon'
 import type { Organizer } from '../lib/types'
 import { organizerShareUrl } from '../lib/share'
+import { ORGANIZER_COVER_PLACEHOLDER } from '../lib/profileMedia'
 import ShareDialog from './ShareDialog'
 
 export type OrganizerCardProps = {
@@ -18,7 +19,7 @@ export default function OrganizerCard({ organizer, eventCount, coverImage, onCli
   const initials = name.slice(0, 1).toUpperCase()
   const username = organizer.profiles?.username?.trim().replace(/^@/, '') || null
   const avatar = organizer.profiles?.profile_image || organizer.profiles?.avatar_url || organizer.logo_url || null
-  const banner = coverImage || organizer.profiles?.cover_image || null
+  const banner = coverImage || organizer.profiles?.cover_image || (organizer as any).cover_image || ORGANIZER_COVER_PLACEHOLDER
   const verified = organizer.verified || organizer.verification_status === 'verified'
 
   return (
@@ -29,7 +30,7 @@ export default function OrganizerCard({ organizer, eventCount, coverImage, onCli
     >
       <button type="button" onClick={onClick} aria-label={`View ${name} organizer profile`} className="organizer-card-main flex w-full flex-1 flex-col overflow-hidden rounded-[inherit] text-left">
       <span className="relative block h-32 w-full shrink-0 overflow-hidden rounded-t-2xl" style={{ background: 'var(--muted)' }}>
-        {banner && <img src={banner} alt="" className="h-full w-full rounded-t-2xl object-cover opacity-75 transition-transform duration-300 group-hover:scale-105" />}
+        <img src={banner} alt="" className="h-full w-full rounded-t-2xl object-cover opacity-75 transition-transform duration-300 group-hover:scale-105" />
         <span className="absolute inset-0 rounded-t-2xl bg-gradient-to-t from-black/55 to-transparent" />
       </span>
       <span className="organizer-card-details flex min-w-0 flex-1 items-center gap-3 px-4 py-4">

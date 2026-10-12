@@ -341,7 +341,18 @@ export default function App() {
     if (p === 'agent-dashboard') setKeepAgentDashboardMounted(true)
     if (p === 'admin-dashboard') setKeepAdminDashboardMounted(true)
     if (p === 'event-detail' && extra) setEventDetail(extra as Event)
-    if (p === 'organizer-profile' && extra) setOrganizerDetail(extra as Organizer)
+    if (p === 'organizer-profile' && extra) {
+      const candidate = extra as Partial<Organizer> & { profiles?: { cover_image?: string | null; profile_image?: string | null; avatar_url?: string | null } | null }
+      const needsFullOrganizerData = !candidate.user_id || !candidate.name || !candidate.city || (!candidate.description && !candidate.description_en && !candidate.description_fr) || (!candidate.profiles?.cover_image && !candidate.profiles?.profile_image && !candidate.profiles?.avatar_url && !candidate.logo_url)
+      if (candidate.id && needsFullOrganizerData) {
+        void (async () => {
+          const { data } = await supabase.from('organizers').select('*, profiles!organizers_user_id_fkey(*)').eq('id', candidate.id).maybeSingle()
+          setOrganizerDetail((data as Organizer) ?? (candidate as Organizer))
+        })()
+      } else {
+        setOrganizerDetail(candidate as Organizer)
+      }
+    }
     if (p === 'checkout' && extra) setCheckoutData(extra as typeof checkoutData)
     if ((p === 'ticket' || p === 'agent-ticket') && extra) setTicketData(extra as typeof ticketData)
     setPage(p)

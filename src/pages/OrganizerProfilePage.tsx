@@ -95,7 +95,20 @@ export default function OrganizerProfilePage({ organizer: initialOrganizer, navi
     if (!composeWindow) window.location.assign(composeUrl)
   }
   useEffect(() => {
-    if (!organizer.user_id) return
+    if (!organizer.id || !organizer.user_id) return
+
+    const needsDetailRefresh = !organizer.profiles?.cover_image && !organizer.profiles?.profile_image && !organizer.profiles?.avatar_url && !organizer.logo_url
+    if (needsDetailRefresh) {
+      const refreshOrganizer = async () => {
+        const { data } = await supabase
+          .from('organizers')
+          .select('*, profiles!organizers_user_id_fkey(*)')
+          .eq('id', organizer.id)
+          .maybeSingle()
+        if (data) setOrganizer(current => ({ ...current, ...data }))
+      }
+      void refreshOrganizer()
+    }
 
     const loadOrganizerProfile = async () => {
       const [{ data: profile }, { data: localizedBio }] = await Promise.all([supabase
@@ -197,7 +210,7 @@ export default function OrganizerProfilePage({ organizer: initialOrganizer, navi
     }
   }, [organizer.id, eventsRetryToken])
   const organizerUsername = organizer.profiles?.username?.trim().replace(/^@/, '') || null
-  const organizerCover = organizer.profiles?.cover_image || ORGANIZER_COVER_PLACEHOLDER
+  const organizerCover = organizer.profiles?.cover_image || (organizer as any).cover_image || organizer.logo_url || ORGANIZER_COVER_PLACEHOLDER
   const organizerAvatar = organizer.profiles?.profile_image || organizer.profiles?.avatar_url || organizer.logo_url || null
   const initials = displayName.slice(0, 1).toUpperCase()
   const sortedEvents = [...events].sort((a, b) => {

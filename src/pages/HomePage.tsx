@@ -88,7 +88,19 @@ export default function HomePage({ navigate }: Props) {
   useEffect(() => {
     const loadEvents = async () => {
       const { data } = await supabase.from('events').select(HOME_EVENT_SELECT).eq('status', 'published').order('created_at', { ascending: false }).limit(24)
-      setEvents(data ?? [])
+      const loadedEvents = (data ?? []) as Event[]
+      const organizerUserIds = [...new Set(loadedEvents.map(event => event.organizers?.user_id).filter((id): id is string => Boolean(id)))]
+      const { data: publicProfiles } = organizerUserIds.length
+        ? await supabase.from('public_profiles').select('id, full_name, username, profile_image, avatar_url, cover_image').in('id', organizerUserIds)
+        : { data: [] }
+      const profilesById = new Map((publicProfiles ?? []).map(profile => [profile.id, profile]))
+      setEvents(loadedEvents.map(event => {
+        if (!event.organizers) return event
+        const publicProfile = profilesById.get(event.organizers.user_id)
+        return publicProfile
+          ? { ...event, organizers: { ...event.organizers, profiles: { ...event.organizers.profiles, ...publicProfile } } }
+          : event
+      }))
       setLoading(false)
     }
     let trendingRequest = 0
@@ -161,8 +173,12 @@ export default function HomePage({ navigate }: Props) {
     events.reduce((groups, event) => {
       if (!event.organizers || !(event.organizers.verified || event.organizers.verification_status === 'verified')) return groups
       const current = groups.get(event.organizers.id)
-      const organizerCover = event.organizers.profiles?.cover_image ?? null
-      groups.set(event.organizers.id, { organizer: event.organizers, eventCount: (current?.eventCount ?? 0) + 1, coverImage: current?.coverImage ?? organizerCover })
+      const organizerCover = event.organizers.profiles?.cover_image ?? (event.organizers as Organizer & { cover_image?: string | null }).cover_image ?? null
+      groups.set(event.organizers.id, {
+        organizer: event.organizers,
+        eventCount: (current?.eventCount ?? 0) + 1,
+        coverImage: current?.coverImage ?? organizerCover,
+      })
       return groups
     }, new Map<string, { organizer: Organizer; eventCount: number; coverImage: string | null }>()),
   ).slice(0, 4)
@@ -245,7 +261,7 @@ export default function HomePage({ navigate }: Props) {
         {loading ? <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-[124px] rounded-2xl animate-pulse" style={{ background: 'var(--muted)' }} />)}</div> : filtered.length > 0 ? <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{homeAllEvents.map(ev => <EventCard key={ev.id} event={ev} listing rowLayout onClick={() => navigate('event-detail', ev)} />)}</div> : <div className="flex flex-col items-center justify-center py-24 gap-4"><div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}><SearchIcon size={22} style={{ color: 'var(--muted-foreground)' }} /></div><p className="font-semibold text-lg" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>No events found</p><p className="text-sm text-center max-w-xs" style={{ color: 'var(--muted-foreground)' }}>{events.length === 0 ? 'No published events yet. Check back soon or create your own.' : 'Try different filters or search terms.'}</p>{events.length > 0 && <button onClick={() => { setSearch(''); setActiveCategory('All'); setTimeFilter('all'); setPriceFilter('all') }} className="gradient-action px-5 py-2.5 rounded-xl text-sm font-semibold transition-all">Clear filters</button>}</div>}
         <div className="mt-6 flex justify-center"><button onClick={() => navigate('events')} className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--primary-light)' }}>{filtered.length > homeAllEvents.length ? 'View all events' : 'Explore all events'}<ArrowRightIcon size={15} /></button></div>
       </section>
-      {!loading && organizers.length > 0 && <section><SectionHeading title="Meet the organizers" subtitle="Discover the people behind the events" /><div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>{organizers.map(([id, item]) => <OrganizerCard key={id} organizer={item.organizer} eventCount={item.eventCount} coverImage={item.coverImage ?? ORGANIZER_COVER_PLACEHOLDER} onClick={() => navigate('organizer-profile', item.organizer)} />)}</div><div className="mt-6 flex justify-center"><button onClick={() => navigate('explore-organizers')} className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--primary-light)' }}>View all organizers<ArrowRightIcon size={15} /></button></div></section>}
+      {!loading && organizers.length > 0 && <section><SectionHeading title="Meet the organizers" subtitle="Discover the people behind the events" /><div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>{organizers.map(([id, item]) => <OrganizerCard key={id} organizer={item.organizer} eventCount={item.eventCount} coverImage={item.coverImage ?? null} onClick={() => navigate('organizer-profile', item.organizer)} />)}</div><div className="mt-6 flex justify-center"><button onClick={() => navigate('explore-organizers')} className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--primary-light)' }}>View all organizers<ArrowRightIcon size={15} /></button></div></section>}
       {!loading && <section className="relative rounded-3xl overflow-hidden p-8 md:p-10" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}><div className="absolute inset-0" aria-hidden style={{ background: 'radial-gradient(ellipse 60% 80% at 0% 50%, rgba(158,210,75,0.14) 0%, transparent 70%)' }} /><div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6"><div className="max-w-lg"><div className="flex items-center gap-2 mb-3"><SparkleIcon size={16} style={{ color: 'var(--accent)' }} /><span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--accent)', letterSpacing: '0.1em' }}>For Organizers</span></div><h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ letterSpacing: '-0.02em' }}>Have an event?</h2><p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.58)' }}>Create, sell and manage your tickets in one place. Reach thousands of people across Burundi and beyond.</p></div><div className="flex flex-col sm:flex-row gap-3 flex-shrink-0"><button onClick={() => navigate('auth-organizer')} className="gradient-action px-6 py-3 rounded-xl text-sm font-bold transition-all">Start for free</button><button onClick={() => navigate('organizers')} className="px-6 py-3 rounded-xl text-sm font-semibold transition-all" style={{ background: 'rgba(255,255,255,0.07)', border: '0', color: 'rgba(255,255,255,0.8)' }}>Learn more</button></div></div></section>}
     </div>
   </div>

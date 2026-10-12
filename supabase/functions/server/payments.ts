@@ -25,6 +25,7 @@ export type PaymentSession = {
   reference: string
   status: 'pending'
   checkoutUrl: string
+  confirmationUri?: string
   expiresAt?: string
 }
 
@@ -38,11 +39,21 @@ export type PaymentWebhook = {
   raw: unknown
 }
 
+export type PaymentStatusResult = {
+  status: 'succeeded' | 'failed' | 'expired' | 'pending'
+  reference: string
+  orderId: string
+  raw: unknown
+}
+
 export interface PaymentAdapter {
   readonly name: string
   createPayment(input: CreatePaymentInput): Promise<PaymentSession>
   verifyWebhook(request: Request): Promise<PaymentWebhook>
+  checkPaymentStatus?(reference: string, orderId: string): Promise<PaymentStatusResult>
 }
+
+const ihelaTokenCache = new Map<string, { accessToken: string; expiresAt: number }>()
 
 class DemoPaymentAdapter implements PaymentAdapter {
   readonly name = 'demo'
@@ -61,6 +72,130 @@ class DemoPaymentAdapter implements PaymentAdapter {
     const payload = await request.json() as { orderId?: string; reference?: string }
     if (!payload.orderId) throw new Error('Demo payment webhook requires orderId')
     return { provider: this.name, reference: payload.reference ?? `demo-${payload.orderId}`, orderId: payload.orderId, status: 'succeeded', raw: payload }
+  }
+}
+
+class IhelaPaymentAdapter implements PaymentAdapter {
+  readonly name = 'ihela'
+  private readonly apiUrl: string
+  private readonly clientId: string
+  private readonly clientSecret: string
+  private readonly merchantPin: string
+
+  constructor(private readonly env: Record<string, string | undefined>) {
+    this.apiUrl = (env.IHELA_API_URL?.trim() || 'https://api.ihela.bi/testenv').replace(/\/+$/, '')
+    this.clientId = env.IHELA_CLIENT_ID?.trim() || ''
+    this.clientSecret = env.IHELA_CLIENT_SECRET?.trim() || ''
+    this.merchantPin = env.IHELA_MERCHANT_PIN?.trim() || ''
+    if (!this.clientId || !this.clientSecret || !this.merchantPin) {
+      throw new Error('IHELA_CLIENT_ID, IHELA_CLIENT_SECRET, and IHELA_MERCHANT_PIN must be configured')
+    }
+  }
+
+  private async getAccessToken() {
+    const cacheKey = `${this.apiUrl}:${this.clientId}`
+    const cached = ihelaTokenCache.get(cacheKey)
+    if (cached && cached.expiresAt > Date.now()) return cached.accessToken
+    const credentials = btoa(`${this.clientId}:${this.clientSecret}`)
+    const form = new FormData()
+    form.set('grant_type', 'client_credentials')
+    const response = await fetch(`${this.apiUrl}/oAuth2/token/`, {
+      method: 'POST',
+      headers: { Authorization: `Basic ${credentials}`, Accept: 'application/json' },
+      body: form,
+    })
+    const payload = await response.json().catch(() => ({})) as Record<string, unknown>
+    if (!response.ok || typeof payload.access_token !== 'string') {
+      throw new Error(`iHela authentication failed (HTTP ${response.status})`)
+    }
+    const expiresIn = typeof payload.expires_in === 'number' && payload.expires_in > 0 ? payload.expires_in : 300
+    const expiresAt = Date.now() + Math.max(0, expiresIn - 30) * 1000
+    ihelaTokenCache.set(cacheKey, { accessToken: payload.access_token, expiresAt })
+    return payload.access_token
+  }
+
+  async createPayment(input: CreatePaymentInput): Promise<PaymentSession> {
+    if (input.method !== 'mobile_money') throw new Error('iHela currently supports Mobile Money payments only')
+    if (input.currency.toUpperCase() !== 'BIF' || !Number.isInteger(input.amount) || input.amount <= 0) {
+      throw new Error('iHela payments require a positive whole-number amount in BIF')
+    }
+
+    const accessToken = await this.getAccessToken()
+    const configuredRedirect = this.env.IHELA_REDIRECT_URI?.trim()
+    const redirect = new URL(configuredRedirect || input.returnUrl)
+    if (redirect.protocol !== 'https:' && redirect.hostname !== 'localhost' && redirect.hostname !== '127.0.0.1') {
+      throw new Error('iHela redirect URI must use HTTPS')
+    }
+    if (configuredRedirect) redirect.searchParams.set('order_id', input.orderId)
+    const response = await fetch(`${this.apiUrl}/api/v2/payments/bill-init/`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        amount: input.amount,
+        merchant_reference: input.orderId,
+        description: 'QPassa event ticket purchase',
+        merchant_description: `QPassa order ${input.orderId}`,
+        redirect_uri: redirect.toString(),
+        pin_code: this.merchantPin,
+      }),
+    })
+    const payload = await response.json().catch(() => ({})) as Record<string, unknown>
+    const data = (payload.response_data ?? {}) as Record<string, unknown>
+    const billCode = typeof data.code === 'string' ? data.code.trim() : ''
+    if (!response.ok || payload.success !== true || !billCode) {
+      const detail = typeof payload.response_message === 'string' ? payload.response_message : `HTTP ${response.status}`
+      throw new Error(`iHela bill creation failed: ${detail}`)
+    }
+
+    let confirmationUri: string | undefined
+    if (typeof data.confirmation_uri === 'string') {
+      try {
+        const candidate = new URL(data.confirmation_uri)
+        if (candidate.protocol === 'https:') confirmationUri = candidate.toString()
+      } catch {
+        confirmationUri = undefined
+      }
+    }
+    return {
+      provider: this.name,
+      reference: billCode,
+      status: 'pending',
+      checkoutUrl: confirmationUri ?? input.returnUrl,
+      confirmationUri,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    }
+  }
+
+  async checkPaymentStatus(billCode: string, orderId: string): Promise<PaymentStatusResult> {
+    const accessToken = await this.getAccessToken()
+    const response = await fetch(`${this.apiUrl}/api/v2/payments/bill-check/`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ bill_code: billCode, merchant_reference: orderId, pin_code: this.merchantPin }),
+    })
+    const payload = await response.json().catch(() => ({})) as Record<string, unknown>
+    const data = (payload.response_data ?? {}) as Record<string, unknown>
+    if (!response.ok || payload.success !== true) {
+      const detail = typeof payload.response_message === 'string' ? payload.response_message : `HTTP ${response.status}`
+      throw new Error(`iHela status check failed: ${detail}`)
+    }
+    if (data.bill_code !== billCode || data.merchant_reference !== orderId) {
+      throw new Error('iHela status response did not match the requested bill and order')
+    }
+
+    const status = typeof data.status === 'string' ? data.status.toLowerCase() : ''
+    const mappedStatus = status === 'paid'
+      ? 'succeeded'
+      : status === 'error'
+        ? 'failed'
+        : status === 'expired'
+          ? 'expired'
+          : 'pending'
+    return { status: mappedStatus, reference: billCode, orderId, raw: data }
+  }
+
+  async verifyWebhook(_request: Request): Promise<PaymentWebhook> {
+    throw new Error('iHela callbacks are not enabled until their callback signature and payload are confirmed; use authenticated status polling')
   }
 }
 
@@ -289,10 +424,14 @@ class UnconfiguredPaymentAdapter implements PaymentAdapter {
   }
 }
 
-export function createPaymentAdapter(env: Record<string, string | undefined> = Deno.env.toObject()): PaymentAdapter {
-  const provider = env.PAYMENT_PROVIDER?.trim().toLowerCase()
+export function createPaymentAdapter(
+  env: Record<string, string | undefined> = Deno.env.toObject(),
+  providerOverride?: string,
+): PaymentAdapter {
+  const provider = (providerOverride ?? env.PAYMENT_PROVIDER)?.trim().toLowerCase()
   if (!provider) return new UnconfiguredPaymentAdapter()
   if (provider === 'demo' || provider === 'test') return new DemoPaymentAdapter()
+  if (provider === 'ihela') return new IhelaPaymentAdapter(env)
   if (provider === 'unipesa' || provider === 'unipesa_pay' || provider === 'uni_pesa') {
     throw new Error('Unipesa payments are disabled until provider-side webhook verification is configured. Use dpo_pay for verified live payments.')
   }

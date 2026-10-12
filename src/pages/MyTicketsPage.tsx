@@ -6,6 +6,7 @@ import { TicketIcon } from '../components/Icon'
 import { FEATURES } from '../lib/features'
 import { getEventEndTimestamp, hasEventEnded } from '../lib/eventTime'
 import { formatLocaleDate } from '../lib/locale'
+import { projectId, publicAnonKey } from '../../utils/supabase/info'
 
 type Props = { navigate: (p: string) => void }
 type Tab = 'upcoming' | 'past' | 'cancelled'
@@ -21,10 +22,59 @@ export default function MyTicketsPage({ navigate }: Props) {
   const [showQR, setShowQR] = useState<string | null>(null)
   const [loadError, setLoadError] = useState('')
   const [actionMessage, setActionMessage] = useState('')
+  const [paymentReturnMessage, setPaymentReturnMessage] = useState('')
   const [refundTicket, setRefundTicket] = useState<Ticket | null>(null)
   const [refundReason, setRefundReason] = useState('')
   const [refundBusy, setRefundBusy] = useState(false)
   const [refundRequests, setRefundRequests] = useState<Record<string, RefundRequest>>({})
+
+  useEffect(() => {
+    const orderId = new URLSearchParams(window.location.search).get('order_id')
+    if (!orderId || !user) return
+    let active = true
+    let checking = false
+    let interval: number | undefined
+    const checkReturnedPayment = async () => {
+      if (!active || checking) return
+      checking = true
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.access_token) throw new Error('Sign in again to confirm your payment.')
+        const response = await fetch(`https://${projectId}.supabase.co/functions/v1/server/make-server-4880c4b3/payments/ihela/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: publicAnonKey, Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ orderId }),
+        })
+        const result = await response.json() as { status?: string; error?: string }
+        if (!response.ok) throw new Error(result.error || 'Unable to verify the iHela payment.')
+        if (!active) return
+        if (result.status === 'succeeded') {
+          active = false
+          if (interval !== undefined) window.clearInterval(interval)
+          setPaymentReturnMessage('Payment confirmed. Your tickets are now shown below and have been emailed to you.')
+          setRetryToken(value => value + 1)
+          window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
+        } else if (result.status === 'failed' || result.status === 'expired') {
+          active = false
+          if (interval !== undefined) window.clearInterval(interval)
+          setPaymentReturnMessage(result.status === 'expired' ? 'The iHela bill has expired.' : 'iHela did not complete this payment.')
+          window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
+        } else {
+          setPaymentReturnMessage('Your iHela payment is still pending. This page will check again automatically.')
+        }
+      } catch (error) {
+        if (active) setPaymentReturnMessage(error instanceof Error ? error.message : 'Unable to verify the iHela payment.')
+      } finally {
+        checking = false
+      }
+    }
+    void checkReturnedPayment()
+    interval = window.setInterval(() => { void checkReturnedPayment() }, 6000)
+    return () => {
+      active = false
+      window.clearInterval(interval)
+    }
+  }, [user?.id])
 
   useEffect(() => {
     if (!user) return
@@ -168,7 +218,7 @@ export default function MyTicketsPage({ navigate }: Props) {
             + Get Tickets
           </button>
         </div>
-        {actionMessage && <p className="mb-4 rounded-xl px-4 py-3 text-center text-xs" style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>{actionMessage}</p>}
+        {(actionMessage || paymentReturnMessage) && <p role="status" className="mb-4 rounded-xl px-4 py-3 text-center text-xs" style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>{paymentReturnMessage || actionMessage}</p>}
 
         {/* Tabs */}
         <div className="flex gap-1 p-1 rounded-xl mb-6" style={{ background: 'var(--muted)' }}>

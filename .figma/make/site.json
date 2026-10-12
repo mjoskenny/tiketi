@@ -1,7 +1,12 @@
 {
-  "description": "Create and customize professional websites effortlessly with intuitive tools designed for businesses and individuals seeking an online presence.",
+  "title": "QPassa | Discover. Book. Experience.",
+  "description": "Discover, book, and experience events in Burundi with QPassa.",
+  "language": "en",
+  "openGraph": {
+    "image": "/og-image.svg"
+  },
   "robots": {
-    "index": false
+    "index": true
   },
   "accessibility": {
     "addBypassLinks": false,

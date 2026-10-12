@@ -1,0 +1,100 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cream" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7F3EE"/>
+      <stop offset="1" stop-color="#EEE8E0"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="20" stdDeviation="18" flood-color="#15130F" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#cream)"/>
+
+  <g opacity="0.4">
+    <circle cx="80" cy="80" r="10" fill="#D7B68A"/>
+    <circle cx="120" cy="60" r="8" fill="#D7B68A"/>
+    <circle cx="980" cy="110" r="12" fill="#D7B68A"/>
+    <circle cx="1070" cy="170" r="10" fill="#D7B68A"/>
+    <circle cx="1120" cy="90" r="12" fill="#D7B68A"/>
+    <circle cx="1030" cy="520" r="12" fill="#D7B68A"/>
+    <circle cx="180" cy="540" r="10" fill="#D7B68A"/>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="90" y="60" width="1020" height="510" rx="28" fill="#FCFAF8"/>
+  </g>
+
+  <rect x="120" y="98" width="80" height="30" rx="15" fill="#F28A2E"/>
+  <text x="159" y="119" text-anchor="middle" font-size="16" font-family="Arial, Helvetica, sans-serif" font-weight="700" fill="#FFF">Q</text>
+  <text x="220" y="119" font-size="18" font-family="Arial, Helvetica, sans-serif" font-weight="700" fill="#1D1D1F">QPassa</text>
+
+  <g>
+    <rect x="760" y="90" width="92" height="28" rx="14" fill="#F4F1ED"/>
+    <text x="806" y="109" text-anchor="middle" font-size="12" font-family="Arial, Helvetica, sans-serif" font-weight="600" fill="#2D2A28">Discover</text>
+    <rect x="858" y="90" width="92" height="28" rx="14" fill="#F4F1ED"/>
+    <text x="904" y="109" text-anchor="middle" font-size="12" font-family="Arial, Helvetica, sans-serif" font-weight="600" fill="#2D2A28">Events</text>
+    <rect x="956" y="90" width="92" height="28" rx="14" fill="#F4F1ED"/>
+    <text x="1002" y="109" text-anchor="middle" font-size="12" font-family="Arial, Helvetica, sans-serif" font-weight="600" fill="#2D2A28">Tickets</text>
+  </g>
+
+  <rect x="1048" y="88" width="28" height="28" rx="14" fill="#EFE5D8"/>
+  <circle cx="1062" cy="102" r="10" fill="#D2B392"/>
+
+  <g>
+    <rect x="120" y="170" width="470" height="190" rx="24" fill="#F9F6F2"/>
+    <text x="154" y="215" font-size="15" font-family="Arial, Helvetica, sans-serif" font-weight="600" fill="#7F7A72">Discover what is happening near you</text>
+    <text x="154" y="282" font-size="30" font-family="Arial, Helvetica, sans-serif" font-weight="700" fill="#1A1A1C">
+      <tspan>Find</tspan>
+      <tspan fill="#E58C2B"> events nearby</tspan>
+    </text>
+    <text x="154" y="322" font-size="18" font-family="Arial, Helvetica, sans-serif" fill="#5C5652">Discover live experiences, artists,</text>
+    <text x="154" y="346" font-size="18" font-family="Arial, Helvetica, sans-serif" fill="#5C5652">and unforgettable moments all in one place.</text>
+  </g>
+
+  <g>
+    <rect x="620" y="170" width="430" height="82" rx="20" fill="#F4F0EC"/>
+    <rect x="638" y="188" width="330" height="48" rx="16" fill="#FFF"/>
+    <circle cx="662" cy="213" r="9" fill="#D7D0C9"/>
+    <text x="682" y="220" font-size="16" font-family="Arial, Helvetica, sans-serif" fill="#7C756F">Search events, artists, venues…</text>
+    <rect x="980" y="188" width="52" height="46" rx="16" fill="#E6D6C0"/>
+    <text x="1006" y="220" text-anchor="middle" font-size="14" font-family="Arial, Helvetica, sans-serif" font-weight="700" fill="#9B6A1E">Filters</text>
+  </g>
+
+  <g>
+    <rect x="120" y="390" width="930" height="120" rx="20" fill="#F6F1EA"/>
+    <rect x="140" y="406" width="160" height="32" rx="16" fill="#E8E0D4"/>
+    <text x="220" y="427" text-anchor="middle" font-size="15" font-family="Arial, Helvetica, sans-serif" font-weight="700" fill="#312E2C">Now</text>
+    <rect x="320" y="406" width="160" height="32" rx="16" fill="#F3E4D0"/>
+    <text x="400" y="427" text-anchor="middle" font-size="15" font-family="Arial, Helvetica, sans-serif" font-weight="700" fill="#ae6318">Today</text>
+    <rect x="500" y="406" width="160" height="32" rx="16" fill="#E8E0D4"/>
+    <text x="580" y="427" text-anchor="middle" font-size="15" font-family="Arial, Helvetica, sans-serif" font-weight="700" fill="#312E2C">Tomorrow</text>
+    <rect x="680" y="406" width="200" height="32" rx="16" fill="#E8E0D4"/>
+    <text x="780" y="427" text-anchor="middle" font-size="15" font-family="Arial, Helvetica, sans-serif" font-weight="700" fill="#312E2C">This weekend</text>
+
+    <rect x="140" y="454" width="210" height="38" rx="16" fill="#FFF"/>
+    <circle cx="166" cy="473" r="8" fill="#F1AC5D"/>
+    <text x="183" y="480" font-size="14" font-family="Arial, Helvetica, sans-serif" font-weight="700" fill="#2A2A2C">Live events</text>
+  </g>
+
+  <g>
+    <rect x="150" y="420" width="180" height="150" rx="16" fill="#F4EFEA"/>
+    <rect x="165" y="436" width="150" height="84" rx="12" fill="#E5DDD2"/>
+    <text x="176" y="540" font-size="17" font-family="Arial, Helvetica, sans-serif" font-weight="700" fill="#1C1B1A">Active events</text>
+    <text x="176" y="560" font-size="13" font-family="Arial, Helvetica, sans-serif" fill="#5C5652">Events happening near you</text>
+  </g>
+
+  <g>
+    <rect x="360" y="420" width="260" height="150" rx="16" fill="#F4EFEA"/>
+    <rect x="375" y="434" width="230" height="56" rx="12" fill="#D9D2CB"/>
+    <rect x="375" y="500" width="110" height="20" rx="10" fill="#E7DFD7"/>
+    <rect x="495" y="500" width="90" height="20" rx="10" fill="#E7DFD7"/>
+  </g>
+
+  <g>
+    <rect x="648" y="420" width="316" height="150" rx="16" fill="#F4EFEA"/>
+    <rect x="664" y="435" width="282" height="56" rx="12" fill="#D7CDBF"/>
+    <rect x="664" y="502" width="120" height="22" rx="11" fill="#E7DFD7"/>
+    <rect x="794" y="502" width="120" height="22" rx="11" fill="#E7DFD7"/>
+  </g>
+</svg>

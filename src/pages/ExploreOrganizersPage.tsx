@@ -19,7 +19,7 @@ export default function ExploreOrganizersPage({ navigate }: Props) {
       setLoading(true)
       setLoadError('')
       const [{ data: organizerData }, { data: eventData }] = await Promise.all([
-        supabase.from('organizers').select('*, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email)').order('name', { ascending: true }),
+        supabase.from('organizers').select('*').order('name', { ascending: true }),
         supabase.from('events').select('organizer_id, cover_image').eq('status', 'published').order('created_at', { ascending: false }),
       ])
 
@@ -28,6 +28,12 @@ export default function ExploreOrganizersPage({ navigate }: Props) {
         setLoading(false)
         return
       }
+
+      const organizerUserIds = [...new Set(organizerData.map(organizer => organizer.user_id))]
+      const { data: publicProfiles } = organizerUserIds.length
+        ? await supabase.from('public_profiles').select('id, full_name, username, profile_image, avatar_url, cover_image').in('id', organizerUserIds)
+        : { data: [] }
+      const profilesById = new Map((publicProfiles ?? []).map(profile => [profile.id, profile]))
 
       const covers = new Map<string, { coverImage: string | null; count: number }>()
       for (const event of eventData ?? []) {
@@ -38,19 +44,35 @@ export default function ExploreOrganizersPage({ navigate }: Props) {
         })
       }
 
-      setOrganizers(organizerData.filter(organizer => organizer.verified || organizer.verification_status === 'verified').map(organizer => ({
-        ...organizer,
-        cover_image: organizer.profiles?.cover_image || ORGANIZER_COVER_PLACEHOLDER,
-        logo_url: organizer.profiles?.profile_image || organizer.profiles?.avatar_url || organizer.logo_url || null,
-        profiles: {
-          ...(organizer.profiles ?? {}),
-          username: organizer.profiles?.username ?? null,
-          profile_image: organizer.profiles?.profile_image || organizer.profiles?.avatar_url || organizer.logo_url || null,
-          avatar_url: organizer.profiles?.profile_image || organizer.profiles?.avatar_url || organizer.logo_url || null,
-          cover_image: organizer.profiles?.cover_image || ORGANIZER_COVER_PLACEHOLDER,
-        },
-      event_count: covers.get(organizer.id)?.count ?? 0,
-      })))
+      const organizersByUser = new Map<string, OrganizerWithCover>()
+
+      for (const organizer of organizerData) {
+        if (!(organizer.verified || organizer.verification_status === 'verified')) continue
+
+        const publicProfile = profilesById.get(organizer.user_id)
+        const profile = { ...(organizer.profiles ?? {}), ...(publicProfile ?? {}) }
+        const resolvedCover = profile.cover_image ?? (organizer as Organizer & { cover_image?: string | null }).cover_image ?? null
+        const normalized = {
+          ...organizer,
+          cover_image: resolvedCover,
+          logo_url: profile.profile_image || profile.avatar_url || organizer.logo_url || null,
+          profiles: {
+            ...profile,
+            username: profile.username ?? null,
+            profile_image: profile.profile_image || profile.avatar_url || organizer.logo_url || null,
+            avatar_url: profile.profile_image || profile.avatar_url || organizer.logo_url || null,
+            cover_image: resolvedCover,
+          },
+          event_count: covers.get(organizer.id)?.count ?? 0,
+        } as OrganizerWithCover
+
+        const existing = organizersByUser.get(organizer.user_id)
+        if (!existing || (normalized.cover_image && !existing.cover_image) || (normalized.event_count > existing.event_count)) {
+          organizersByUser.set(organizer.user_id, normalized)
+        }
+      }
+
+      setOrganizers([...organizersByUser.values()].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '')))
       setLoading(false)
     }
 

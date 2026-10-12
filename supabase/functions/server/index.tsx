@@ -208,12 +208,24 @@ app.get("/make-server-4880c4b3/health", (c) => {
 });
 
 app.get("/make-server-4880c4b3/payments/health", (c) => {
+  const env = Deno.env.toObject();
+  const requestedProvider = env.MOBILE_MONEY_PAYMENT_PROVIDER?.trim().toLowerCase()
+    || (env.PAYMENT_PROVIDER?.trim().toLowerCase() === 'ihela' ? 'unconfigured' : env.PAYMENT_PROVIDER?.trim().toLowerCase())
+    || 'unconfigured';
+  let ihelaConfigured = false;
+  let ihelaError: string | undefined;
   try {
-    const adapter = createPaymentAdapter();
-    const configured = adapter.name !== 'unconfigured';
-    return c.json({ configured, provider: adapter.name }, configured ? 200 : 503);
+    createPaymentAdapter(env, 'ihela');
+    ihelaConfigured = true;
   } catch (error) {
-    return c.json({ configured: false, error: error instanceof Error ? error.message : "Payment provider unavailable" }, 503);
+    ihelaError = error instanceof Error ? error.message : 'iHela is not configured';
+  }
+  try {
+    const adapter = createPaymentAdapter(env, requestedProvider);
+    const configured = adapter.name !== 'unconfigured';
+    return c.json({ configured, provider: adapter.name, ihelaConfigured, ihelaError }, configured ? 200 : 503);
+  } catch (error) {
+    return c.json({ configured: false, provider: requestedProvider, error: error instanceof Error ? error.message : "Payment provider unavailable", ihelaConfigured, ihelaError }, 503);
   }
 });
 
@@ -228,8 +240,8 @@ async function initializePayment(c: Parameters<typeof app.post>[1]) {
     const { data: { user }, error: authError } = await userClient.auth.getUser(accessToken);
     if (authError || !user) return c.json({ error: 'Your session is invalid or expired' }, 401);
 
-    const input = await c.req.json() as { orderId?: string; method?: 'card' | 'mobile_money'; paymentPhone?: string };
-    if (!input.orderId || !['card', 'mobile_money'].includes(input.method ?? '')) {
+    const input = await c.req.json() as { orderId?: string; method?: 'card' | 'mobile_money' | 'ihela'; paymentPhone?: string };
+    if (!input.orderId || !['card', 'mobile_money', 'ihela'].includes(input.method ?? '')) {
       return c.json({ error: 'orderId and a supported payment method are required' }, 400);
     }
 
@@ -249,8 +261,17 @@ async function initializePayment(c: Parameters<typeof app.post>[1]) {
     if (input.method === 'card' && !settings.card_payments_enabled) return c.json({ error: 'Card payments are currently unavailable' }, 409);
     if (input.method === 'mobile_money' && !settings.mobile_money_enabled) return c.json({ error: 'Mobile Money payments are currently unavailable' }, 409);
 
-    const paymentPhone = input.method === 'mobile_money' ? (input.paymentPhone?.trim() || order.holder_phone || '') : order.holder_phone || '';
-    if (input.method === 'mobile_money' && !/^\+?[0-9 ()-]{8,20}$/.test(paymentPhone)) {
+    const env = Deno.env.toObject();
+    const mobileMoneyProvider = env.MOBILE_MONEY_PAYMENT_PROVIDER?.trim().toLowerCase()
+      || (env.PAYMENT_PROVIDER?.trim().toLowerCase() === 'ihela' ? 'unconfigured' : undefined);
+    const adapter = input.method === 'ihela'
+      ? createPaymentAdapter(env, 'ihela')
+      : input.method === 'mobile_money' && mobileMoneyProvider
+        ? createPaymentAdapter(env, mobileMoneyProvider)
+        : createPaymentAdapter(env);
+    const paymentMethod = input.method === 'ihela' ? 'mobile_money' : input.method;
+    const paymentPhone = paymentMethod === 'mobile_money' ? (input.paymentPhone?.trim() || order.holder_phone || '') : order.holder_phone || '';
+    if (paymentMethod === 'mobile_money' && adapter.name !== 'ihela' && !/^\+?[0-9 ()-]{8,20}$/.test(paymentPhone)) {
       return c.json({ error: 'A valid Mobile Money phone number is required' }, 400);
     }
 
@@ -260,11 +281,10 @@ async function initializePayment(c: Parameters<typeof app.post>[1]) {
     if (appUrl.protocol !== 'https:' && appUrl.hostname !== 'localhost' && appUrl.hostname !== '127.0.0.1') {
       return c.json({ error: 'Payment return URL must use HTTPS' }, 400);
     }
-    const returnUrl = new URL('/payment-return', appUrl);
+    const returnUrl = new URL('/my-tickets', appUrl);
     returnUrl.searchParams.set('order_id', order.id);
     const webhookUrl = Deno.env.get('PAYMENT_WEBHOOK_URL') || `${Deno.env.get('SUPABASE_URL')}/functions/v1/server/make-server-4880c4b3/payments/webhook`;
-    const adapter = createPaymentAdapter();
-    const method = input.method!;
+    const method = paymentMethod!;
     const session = await adapter.createPayment({
       orderId: order.id,
       amount: Number(order.total),
@@ -303,6 +323,80 @@ async function initializePayment(c: Parameters<typeof app.post>[1]) {
 
 app.post("/make-server-4880c4b3", initializePayment);
 app.post("/make-server-4880c4b3/payments/initialize", initializePayment);
+
+app.post("/make-server-4880c4b3/payments/ihela/status", async (c) => {
+  try {
+    const authorization = c.req.header('Authorization');
+    if (!authorization) return c.json({ error: 'Sign in is required to check payment status' }, 401);
+    const userClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authorization } },
+    });
+    const accessToken = authorization.replace(/^Bearer\s+/i, '');
+    const { data: { user }, error: authError } = await userClient.auth.getUser(accessToken);
+    if (authError || !user) return c.json({ error: 'Your session is invalid or expired' }, 401);
+
+    const { orderId } = await c.req.json() as { orderId?: string };
+    if (!orderId) return c.json({ error: 'orderId is required' }, 400);
+    const db = admin();
+    const { data: order, error: orderError } = await db.from('orders')
+      .select('id, customer_id, status, total, payment_provider, payment_method')
+      .eq('id', orderId)
+      .maybeSingle();
+    if (orderError || !order || order.customer_id !== user.id) return c.json({ error: 'Order not found' }, 404);
+    if (order.status === 'confirmed') return c.json({ status: 'succeeded' });
+    if (order.status !== 'pending' || order.payment_provider !== 'ihela') {
+      return c.json({ error: 'This order is not awaiting an iHela payment' }, 409);
+    }
+
+    const adapter = createPaymentAdapter(Deno.env.toObject(), 'ihela');
+    if (adapter.name !== 'ihela' || !adapter.checkPaymentStatus) {
+      return c.json({ error: 'iHela payment status checking is unavailable' }, 503);
+    }
+    const { data: attempt, error: attemptError } = await db.from('payment_attempts')
+      .select('id, provider_reference, amount, currency, status')
+      .eq('order_id', order.id)
+      .eq('provider', 'ihela')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (attemptError || !attempt?.provider_reference) return c.json({ error: 'No iHela bill was found for this order' }, 404);
+
+    const verified = await adapter.checkPaymentStatus(attempt.provider_reference, order.id);
+    if (verified.status === 'succeeded') {
+      if (Number(attempt.amount) !== Number(order.total) || attempt.currency.toUpperCase() !== 'BIF') {
+        throw new Error('Initialized iHela payment amount or currency does not match the order');
+      }
+      const { error: confirmationError } = await db.rpc('confirm_paid_ticket_order', {
+        p_order_id: order.id,
+        p_payment_reference: verified.reference,
+        p_provider: 'ihela',
+      });
+      if (confirmationError) throw confirmationError;
+      const { data: claimedAttempt, error: updateError } = await db.from('payment_attempts')
+        .update({ status: 'succeeded', provider_reference: verified.reference })
+        .eq('id', attempt.id)
+        .eq('status', 'pending')
+        .select('id')
+        .maybeSingle();
+      if (updateError) throw updateError;
+      if (claimedAttempt) {
+        const emailDelivery = await sendIssuedOrderEmails(db, order.id);
+        console.log('iHela payment confirmed', { orderId: order.id, ...emailDelivery });
+      }
+      return c.json({ status: 'succeeded' });
+    }
+
+    if (verified.status === 'failed' || verified.status === 'expired') {
+      await db.from('payment_attempts').update({ status: verified.status })
+        .eq('id', attempt.id)
+        .eq('status', 'pending');
+    }
+    return c.json({ status: verified.status });
+  } catch (error) {
+    console.error('iHela payment status check failed', error);
+    return c.json({ error: error instanceof Error ? error.message : 'Unable to check iHela payment status' }, 503);
+  }
+});
 
 async function sendOrderTickets(c: Context) {
   try {

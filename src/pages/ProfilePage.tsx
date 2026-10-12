@@ -49,7 +49,7 @@ export default function ProfilePage({ navigate }: Props) {
 
       const { data: organizers, error: organizersError } = await supabase
         .from('organizers')
-        .select('id, user_id, name, logo_url, profiles!organizers_user_id_fkey(full_name, username, avatar_url)')
+        .select('id, user_id, name, description, description_en, description_fr, logo_url, website, phone, city, verified, verification_status, subscription_tier, created_at, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email)')
         .in('id', organizerIds)
       if (organizersError) { setFollowingError(organizersError.message); return }
       const selfOrganizerIds = (organizers ?? []).filter(organizer => organizer.user_id === user.id).map(organizer => organizer.id)
