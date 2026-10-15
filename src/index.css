@@ -296,7 +296,8 @@ html:has(.attendee-auth-theme), body:has(.attendee-auth-theme), #root:has(.atten
 }
 @media (hover: none), (max-width: 640px) {
   .attendee-theme .tixian-event-card:hover { transform: none !important; box-shadow: none !important; }
-  .attendee-theme .tixian-event-card:hover img { transform: none !important; opacity: .7 !important; }
+  .attendee-theme .tixian-event-card:hover img { transform: none !important; }
+  .attendee-theme .tixian-event-card:not(.tixian-event-card-ended) img { opacity: 1 !important; }
   .attendee-theme .tixian-event-card:hover .event-card-details { transform: none !important; }
   .attendee-theme .tixian-event-card-listing:hover .event-card-details { background: rgba(9,9,9,.38) !important; }
   .attendee-theme .tixian-event-card:not(.tixian-event-card-listing):hover .event-card-details { background: rgba(17,17,17,.85) !important; }
@@ -591,6 +592,12 @@ button[style*="124,58,237"],
 .trending-events-track:hover {
   animation-play-state: paused;
 }
+.trending-events-marquee:active .trending-events-track {
+  animation-play-state: paused;
+}
+.trending-events-marquee::-webkit-scrollbar {
+  display: none;
+}
 @keyframes trending-scroll {
   from { transform: translate3d(0, 0, 0); }
   to { transform: translate3d(-50%, 0, 0); }
@@ -673,18 +680,6 @@ button[style*="124,58,237"],
   border: 1px solid rgba(255,255,255,.15);
   box-shadow: 0 16px 28px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.08);
 }
-.tixian-event-card-trending .trending-card-title-inline::before {
-  content: '';
-  position: absolute;
-  left: -10%;
-  top: -32%;
-  width: 120%;
-  height: 150%;
-  background: linear-gradient(180deg, rgba(0,0,0,0.38), rgba(0,0,0,0));
-  z-index: -1;
-  border-radius: 0.8rem;
-  pointer-events: none;
-}
 .tixian-event-card-trending .event-card-details-trending > * {
   position: relative;
   z-index: 1;
@@ -727,6 +722,10 @@ button[style*="124,58,237"],
 .tixian-event-card:hover .event-card-action,
 .tixian-event-card:focus-within .event-card-action { opacity: 1; transform: translateY(0); }
 @media (hover: none), (max-width: 640px) { .event-card-action { opacity: 1; transform: none; } }
+@media (hover: none), (max-width: 640px) {
+  .tixian-event-card:not(.tixian-event-card-ended) > div:first-child > img { opacity: 1 !important; }
+  .tixian-event-card:not(.tixian-event-card-ended):hover > div:first-child > img { opacity: 1 !important; transform: none !important; }
+}
 @media (prefers-reduced-motion: reduce) {
   .tixian-event-card,
   .tixian-event-card *,

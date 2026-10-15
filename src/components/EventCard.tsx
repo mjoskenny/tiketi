@@ -138,9 +138,9 @@ export default function EventCard({ event, onClick, size = 'md', compact = false
   return <>
   <article onClick={onClick} className={`tixian-event-card group relative isolate flex aspect-[4/5] shrink-0 cursor-pointer flex-col overflow-hidden rounded-[2rem] border bg-[#111] transition-all duration-500 ${trending ? 'tixian-event-card-trending' : ''} ${ended ? 'tixian-event-card-ended border-white/15 hover:-translate-y-0 hover:border-white/25 hover:shadow-[0_20px_45px_-24px_rgba(255,255,255,0.2)]' : 'border-white/5 hover:-translate-y-1 hover:border-white/15 hover:shadow-[0_24px_55px_-20px_rgba(255,120,40,0.28)]'} ${listing ? 'tixian-event-card-listing' : ''} ${fullWidthMobile ? 'event-card-full-mobile' : ''}`} style={{ width: cardWidth }}>
     <div className="absolute inset-0 overflow-hidden">
-      <img src={img} alt={event.title} className={`h-full w-full object-cover transition-all duration-700 ease-out ${ended ? 'grayscale opacity-45' : 'opacity-70 group-hover:scale-110 group-hover:opacity-100'}`} loading="lazy" />
+      <img src={img} alt={event.title} className={`h-full w-full object-cover transition-all duration-700 ease-out ${ended ? 'grayscale opacity-45' : 'opacity-100 group-hover:scale-110'}`} loading="lazy" />
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent opacity-80" />
-      <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-black/20 to-transparent" />
     </div>
 
     {!trending && <div className="absolute left-4 right-4 top-4 z-20 flex items-start justify-between gap-3 sm:left-5 sm:right-5 sm:top-5">
@@ -158,7 +158,7 @@ export default function EventCard({ event, onClick, size = 'md', compact = false
         <span className="trending-date-day mt-0.5 text-[1.2rem] font-black leading-none tracking-[-0.08em] text-white">{dateDayNumber}</span>
         <span className="trending-date-month mt-0.5 text-[6px] font-semibold uppercase tracking-[0.18em] text-white/55">{dateMonthName}</span>
       </div>
-      <div className="max-w-[calc(100%-78px)]">
+      <div className="relative isolate max-w-[calc(100%-78px)]">
         <h3 data-locale-ignore className="trending-card-title-inline line-clamp-2 text-[0.58rem] font-black uppercase leading-[1.02] tracking-[-0.05em] text-white">{event.title}</h3>
       </div>
     </div>}
