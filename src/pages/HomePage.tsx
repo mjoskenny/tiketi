@@ -56,12 +56,9 @@ function Pill({ active, onClick, children }: { active: boolean; onClick: () => v
   )
 }
 
-function SectionHeading({ title, subtitle }: { title: string; subtitle?: string }) {
-  return <div className="home-section-heading flex items-end justify-between mb-5">
-    <div>
-      <h2 className="text-xl font-bold" style={{ letterSpacing: '-0.025em' }}>{title}</h2>
-      {subtitle && <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>{subtitle}</p>}
-    </div>
+function SectionHeading({ title }: { title: string }) {
+  return <div className="home-section-heading flex items-end justify-between mb-2.5">
+    <h2 className="text-base font-bold">{title}</h2>
   </div>
 }
 
@@ -73,8 +70,6 @@ export default function HomePage({ navigate }: Props) {
   const [events, setEvents] = useState<Event[]>([])
   const [trendingEvents, setTrendingEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
-  const [eventsLoadError, setEventsLoadError] = useState('')
-  const [loadAttempt, setLoadAttempt] = useState(0)
   const [search, setSearch] = useState('')
   const [timeFilter, setTimeFilter] = useState<QuickFilter>('all')
   const [activeCategory, setActiveCategory] = useState('All')
@@ -88,42 +83,22 @@ export default function HomePage({ navigate }: Props) {
   }, [])
 
   useEffect(() => {
-    let isActive = true
-    let initialLoadFinished = false
-    const loadingTimeout = window.setTimeout(() => {
-      if (!isActive || initialLoadFinished) return
-      setEventsLoadError('Events are taking longer than expected to load. Check your connection and try again.')
-      setLoading(false)
-    }, 8000)
-
     const loadEvents = async () => {
-      try {
-        const { data, error } = await supabase.from('events').select(HOME_EVENT_SELECT).eq('status', 'published').order('created_at', { ascending: false }).limit(24)
-        if (error) throw error
-        const loadedEvents = (data ?? []) as Event[]
-        const organizerUserIds = [...new Set(loadedEvents.map(event => event.organizers?.user_id).filter((id): id is string => Boolean(id)))]
-        const { data: publicProfiles, error: profilesError } = organizerUserIds.length
-          ? await supabase.from('public_profiles').select('id, full_name, username, profile_image, avatar_url, cover_image').in('id', organizerUserIds)
-          : { data: [], error: null }
-        if (profilesError) console.warn('Unable to load public organizer profile details', profilesError)
-        const profilesById = new Map((publicProfiles ?? []).map(profile => [profile.id, profile]))
-        if (!isActive) return
-        setEvents(loadedEvents.map(event => {
-          if (!event.organizers) return event
-          const publicProfile = profilesById.get(event.organizers.user_id)
-          return publicProfile
-            ? { ...event, organizers: { ...event.organizers, profiles: { ...event.organizers.profiles, ...publicProfile } } }
-            : event
-        }))
-        setEventsLoadError('')
-      } catch (error) {
-        console.error('Unable to load published events', error)
-        if (isActive) setEventsLoadError('We could not load events right now. Check your connection and try again.')
-      } finally {
-        initialLoadFinished = true
-        window.clearTimeout(loadingTimeout)
-        if (isActive) setLoading(false)
-      }
+      const { data } = await supabase.from('events').select(HOME_EVENT_SELECT).eq('status', 'published').order('created_at', { ascending: false }).limit(24)
+      const loadedEvents = (data ?? []) as Event[]
+      const organizerUserIds = [...new Set(loadedEvents.map(event => event.organizers?.user_id).filter((id): id is string => Boolean(id)))]
+      const { data: publicProfiles } = organizerUserIds.length
+        ? await supabase.from('public_profiles').select('id, full_name, username, profile_image, avatar_url, cover_image').in('id', organizerUserIds)
+        : { data: [] }
+      const profilesById = new Map((publicProfiles ?? []).map(profile => [profile.id, profile]))
+      setEvents(loadedEvents.map(event => {
+        if (!event.organizers) return event
+        const publicProfile = profilesById.get(event.organizers.user_id)
+        return publicProfile
+          ? { ...event, organizers: { ...event.organizers, profiles: { ...event.organizers.profiles, ...publicProfile } } }
+          : event
+      }))
+      setLoading(false)
     }
     let trendingRequest = 0
     const loadTrendingEvents = async () => {
@@ -167,14 +142,12 @@ export default function HomePage({ navigate }: Props) {
       .subscribe()
 
     return () => {
-      isActive = false
-      window.clearTimeout(loadingTimeout)
       trendingRequest += 1
       void supabase.removeChannel(eventsChannel)
       void supabase.removeChannel(profilesChannel)
       void supabase.removeChannel(ticketTiersChannel)
     }
-  }, [loadAttempt])
+  }, [])
 
   const filtered = events.filter(e => {
     const matchCat = activeCategory === 'All' || e.category === activeCategory
@@ -213,7 +186,7 @@ export default function HomePage({ navigate }: Props) {
     <div className="relative overflow-hidden hero-shell" style={{ paddingTop: 64 }}>
       <div className="hero-blur hero-blur-one" aria-hidden="true" />
       <div className="hero-blur hero-blur-two" aria-hidden="true" />
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pt-12 pb-10 md:pt-20 md:pb-16">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pt-12 pb-4 md:pt-20 md:pb-0">
         <div className="home-hero-content max-w-4xl mx-auto">
           <div className="text-center mb-8 md:mb-10">
             <p className="hero-kicker">Discover what is happening near you</p>
@@ -255,19 +228,15 @@ export default function HomePage({ navigate }: Props) {
         </div>
       </div>
     </div>
-    {eventsLoadError && <div role="alert" className="mx-auto mt-5 flex max-w-7xl flex-col gap-3 rounded-2xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6" style={{ borderColor: 'rgba(248,113,113,0.28)', background: 'rgba(248,113,113,0.08)', color: 'var(--foreground)' }}>
-      <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>{eventsLoadError}</p>
-      <button type="button" onClick={() => { setEventsLoadError(''); setLoading(true); setLoadAttempt(attempt => attempt + 1) }} className="shrink-0 rounded-xl px-4 py-2 text-sm font-bold" style={{ background: 'var(--primary)', color: '#000' }}>Try again</button>
-    </div>}
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 pb-8 space-y-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 pb-8 space-y-6">
       {!anyActive && <>
-        <section aria-label="Live events">
+        {!loading && liveNowEvents.length > 0 && <section aria-label="Live events">
           <div className="mb-5">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-400/25 bg-orange-500/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-orange-400">
               <span aria-hidden className="h-1.5 w-1.5 animate-pulse rounded-full bg-orange-400 shadow-[0_0_10px_#fb923c]" />Live
             </span>
           </div>
-          {loading ? <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>{[1, 2, 3, 4].map(i => <div key={i} className="flex w-[84px] shrink-0 flex-col items-center gap-2"><div className="h-[76px] w-[76px] animate-pulse rounded-full" style={{ background: 'var(--muted)' }} /><div className="h-3 w-16 animate-pulse rounded" style={{ background: 'var(--muted)' }} /></div>)}</div> : liveNowEvents.length > 0 ? <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+          <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
             {liveNowEvents.map(ev => {
               const image = ev.cover_image || ev.organizers?.profiles?.profile_image || ev.organizers?.profiles?.avatar_url || ev.organizers?.logo_url || ORGANIZER_COVER_PLACEHOLDER
               return <button key={ev.id} type="button" onClick={() => navigate('event-detail', ev)} aria-label={`Live now: ${ev.title}`} className="group flex w-[84px] shrink-0 flex-col items-center gap-2 text-center">
@@ -278,18 +247,18 @@ export default function HomePage({ navigate }: Props) {
                 <span className="line-clamp-2 w-full text-[11px] font-semibold leading-tight text-white/85 group-hover:text-white">{ev.title}</span>
               </button>
             })}
-          </div> : <p className="rounded-xl border border-dashed border-white/10 px-4 py-4 text-sm text-white/45">No events are live right now. Check back soon.</p>}
-        </section>
-        {loading ? <section><SectionHeading title="Trending events" subtitle="Popular picks, ranked by live ticket sales" /><div className="flex gap-4 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{[1, 2, 3].map(i => <div key={i} className="aspect-[4/5] rounded-[2rem] animate-pulse flex-shrink-0" style={{ width: 220, background: 'var(--muted)' }} />)}</div></section> : trendingEvents.length > 0 ? <section><SectionHeading title="Trending events" subtitle="Popular picks, ranked by live ticket sales" /><div className="trending-events-marquee overflow-hidden pb-3"><div className="trending-events-track flex min-w-max gap-4 py-1" style={{ width: 'max-content' }}>{[...trendingEvents, ...trendingEvents].map((ev, index) => <div key={`${ev.id}-${index}`} className="shrink-0"><EventCard event={ev} poster listing timerBadge trending onClick={() => navigate('event-detail', ev)} /></div>)}</div></div></section> : null}
-        {loading ? <section><SectionHeading title="Active events" /><div className="flex gap-4 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{[1, 2, 3].map(i => <div key={i} className="aspect-[4/5] rounded-[2rem] animate-pulse flex-shrink-0" style={{ width: 327, background: 'var(--muted)' }} />)}</div></section> : <section><SectionHeading title="Active events" subtitle="Events happening near you" />{activeEvents.length > 0 ? <div className="flex min-w-0 gap-4 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{activeEvents.map(ev => <EventCard key={ev.id} event={ev} poster onClick={() => navigate('event-detail', ev)} />)}</div> : <EmptySection />}</section>}
-        {freeEvents.length > 0 && <section><SectionHeading title="Free to attend" subtitle="Good times, no ticket required" /><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">{freeEvents.map(ev => <EventCard key={ev.id} event={ev} onClick={() => navigate('event-detail', ev)} />)}</div></section>}
+          </div>
+        </section>}
+        {loading ? <section><SectionHeading title="Trending events" /><div className="flex gap-4 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{[1, 2, 3].map(i => <div key={i} className="aspect-[4/5] rounded-[2rem] animate-pulse flex-shrink-0" style={{ width: 220, background: 'var(--muted)' }} />)}</div></section> : trendingEvents.length > 0 ? <section><SectionHeading title="Trending events" /><div className="trending-events-marquee overflow-hidden pb-3"><div className="trending-events-track flex min-w-max gap-4 py-1" style={{ width: 'max-content' }}>{[...trendingEvents, ...trendingEvents].map((ev, index) => <div key={`${ev.id}-${index}`} className="shrink-0"><EventCard event={ev} poster listing timerBadge trending onClick={() => navigate('event-detail', ev)} /></div>)}</div></div></section> : null}
+        {loading ? <section><SectionHeading title="Active events" /><div className="flex gap-4 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{[1, 2, 3].map(i => <div key={i} className="aspect-[4/5] rounded-[2rem] animate-pulse flex-shrink-0" style={{ width: 327, background: 'var(--muted)' }} />)}</div></section> : <section><SectionHeading title="Active events" />{activeEvents.length > 0 ? <div className="flex min-w-0 gap-4 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{activeEvents.map(ev => <EventCard key={ev.id} event={ev} poster onClick={() => navigate('event-detail', ev)} />)}</div> : <EmptySection />}</section>}
+        {freeEvents.length > 0 && <section><SectionHeading title="Free to attend" /><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">{freeEvents.map(ev => <EventCard key={ev.id} event={ev} onClick={() => navigate('event-detail', ev)} />)}</div></section>}
       </>}
       <section>
-        <div className="flex items-end justify-between gap-4 mb-5"><div><h2 className="text-xl font-bold" style={{ letterSpacing: '-0.025em' }}>{anyActive ? 'Search results' : 'All events'}</h2><p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>{loading ? 'Loading...' : `${filtered.length} event${filtered.length !== 1 ? 's' : ''} to explore`}</p></div>{anyActive && !loading && <button onClick={() => { setSearch(''); setActiveCategory('All'); setTimeFilter('all'); setPriceFilter('all') }} className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full" style={{ color: 'var(--accent)', background: 'rgba(199,243,107,0.1)', border: '0' }}><XIcon size={11} />Clear all</button>}</div>
+        <div className="home-section-heading flex items-center justify-between gap-4 mb-1"><h2 className="text-base font-bold">{anyActive ? 'Search results' : 'All events'}</h2>{anyActive && !loading && <button onClick={() => { setSearch(''); setActiveCategory('All'); setTimeFilter('all'); setPriceFilter('all') }} className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full" style={{ color: 'var(--accent)', background: 'rgba(199,243,107,0.1)', border: '0' }}><XIcon size={11} />Clear all</button>}</div>
         {loading ? <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-[124px] rounded-2xl animate-pulse" style={{ background: 'var(--muted)' }} />)}</div> : filtered.length > 0 ? <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{homeAllEvents.map(ev => <EventCard key={ev.id} event={ev} listing rowLayout onClick={() => navigate('event-detail', ev)} />)}</div> : <div className="flex flex-col items-center justify-center py-24 gap-4"><div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}><SearchIcon size={22} style={{ color: 'var(--muted-foreground)' }} /></div><p className="font-semibold text-lg" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>No events found</p><p className="text-sm text-center max-w-xs" style={{ color: 'var(--muted-foreground)' }}>{events.length === 0 ? 'No published events yet. Check back soon or create your own.' : 'Try different filters or search terms.'}</p>{events.length > 0 && <button onClick={() => { setSearch(''); setActiveCategory('All'); setTimeFilter('all'); setPriceFilter('all') }} className="gradient-action px-5 py-2.5 rounded-xl text-sm font-semibold transition-all">Clear filters</button>}</div>}
         <div className="mt-6 flex justify-center"><button onClick={() => navigate('events')} className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--primary-light)' }}>{filtered.length > homeAllEvents.length ? 'View all events' : 'Explore all events'}<ArrowRightIcon size={15} /></button></div>
       </section>
-      {!loading && organizers.length > 0 && <section><SectionHeading title="Meet the organizers" subtitle="Discover the people behind the events" /><div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>{organizers.map(([id, item]) => <OrganizerCard key={id} organizer={item.organizer} eventCount={item.eventCount} coverImage={item.coverImage ?? null} onClick={() => navigate('organizer-profile', item.organizer)} />)}</div><div className="mt-6 flex justify-center"><button onClick={() => navigate('explore-organizers')} className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--primary-light)' }}>View all organizers<ArrowRightIcon size={15} /></button></div></section>}
+      {!loading && organizers.length > 0 && <section><SectionHeading title="Meet the organizers" /><div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>{organizers.map(([id, item]) => <OrganizerCard key={id} organizer={item.organizer} eventCount={item.eventCount} coverImage={item.coverImage ?? null} onClick={() => navigate('organizer-profile', item.organizer)} />)}</div><div className="mt-6 flex justify-center"><button onClick={() => navigate('explore-organizers')} className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--primary-light)' }}>View all organizers<ArrowRightIcon size={15} /></button></div></section>}
       {!loading && <section className="relative rounded-3xl overflow-hidden p-8 md:p-10" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}><div className="absolute inset-0" aria-hidden style={{ background: 'radial-gradient(ellipse 60% 80% at 0% 50%, rgba(158,210,75,0.14) 0%, transparent 70%)' }} /><div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6"><div className="max-w-lg"><div className="flex items-center gap-2 mb-3"><SparkleIcon size={16} style={{ color: 'var(--accent)' }} /><span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--accent)', letterSpacing: '0.1em' }}>For Organizers</span></div><h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ letterSpacing: '-0.02em' }}>Have an event?</h2><p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.58)' }}>Create, sell and manage your tickets in one place. Reach thousands of people across Burundi and beyond.</p></div><div className="flex flex-col sm:flex-row gap-3 flex-shrink-0"><button onClick={() => navigate('auth-organizer')} className="gradient-action px-6 py-3 rounded-xl text-sm font-bold transition-all">Start for free</button><button onClick={() => navigate('organizers')} className="px-6 py-3 rounded-xl text-sm font-semibold transition-all" style={{ background: 'rgba(255,255,255,0.07)', border: '0', color: 'rgba(255,255,255,0.8)' }}>Learn more</button></div></div></section>}
     </div>
   </div>

@@ -230,7 +230,7 @@ html:has(.attendee-auth-theme), body:has(.attendee-auth-theme), #root:has(.atten
   border-radius: 9999px;
   background: #080808 !important;
 }
-.attendee-theme .home-search-filter-row { box-sizing: border-box; width: min(100%, 760px); margin-inline: auto; align-items: stretch; gap: .5rem; padding: .25rem; }
+.attendee-theme .home-search-filter-row { box-sizing: border-box; width: min(100%, 760px); margin-inline: auto; align-items: stretch; gap: .5rem; padding: .55rem; }
 .attendee-theme .home-search-filter-row > .search-shell { border: 0 !important; border-radius: 0; background: transparent !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 .attendee-theme .attendee-bottom-nav-surface { background: rgba(9,9,9,.38) !important; border-color: rgba(255,255,255,.16) !important; -webkit-backdrop-filter: blur(24px) saturate(135%) !important; backdrop-filter: blur(24px) saturate(135%) !important; }
 .attendee-theme .home-search-filter-select { width: clamp(5.8rem, 12vw, 9rem); flex: 0 0 auto; }
@@ -489,14 +489,9 @@ html:has(.attendee-auth-theme), body:has(.attendee-auth-theme), #root:has(.atten
 }
 
 .home-section-heading h2 {
-  font-size: 1.35rem;
-  line-height: 1.12;
-  letter-spacing: -0.04em;
-}
-
-.home-section-heading p {
-  font-size: 0.8rem;
-  line-height: 1.45;
+  font-size: 1.25rem;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
 }
 
 .search-shell {
@@ -566,7 +561,6 @@ button[style*="124,58,237"],
   .hero-copy { max-width: 21rem; font-size: 0.875rem; }
   .hero-kicker { font-size: 0.62rem; }
   .home-section-heading { align-items: flex-start; }
-  .home-section-heading h2 { font-size: 1.2rem; }
 }
 
 .event-detail-page {
@@ -1151,7 +1145,7 @@ button {
 
   .hero-title,
   .organizer-hero-copy h1 {
-    font-size: 2.625rem !important;
+    font-size: 2.325rem !important;
   }
 }
 
@@ -1177,10 +1171,9 @@ button {
 
 /* Second-pass rhythm and density refinements. */
 .home-section-heading {
-  margin-bottom: 2rem !important;
+  margin-bottom: 1rem !important;
 }
 
-.home-section-heading h2,
 .event-section-heading h2,
 .sinc-event-description h2,
 .sinc-location-section h2,
@@ -1192,6 +1185,12 @@ button {
   font-size: 1.5rem !important;
   line-height: 1.15 !important;
   letter-spacing: -0.02em !important;
+}
+
+.home-section-heading h2 {
+  font-size: 1.12rem !important;
+  line-height: 1.25 !important;
+  letter-spacing: -0.01em !important;
 }
 
 .group.relative > div:last-child {
