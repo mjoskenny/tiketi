@@ -186,7 +186,7 @@ export default function HomePage({ navigate }: Props) {
     <div className="relative overflow-hidden hero-shell" style={{ paddingTop: 64 }}>
       <div className="hero-blur hero-blur-one" aria-hidden="true" />
       <div className="hero-blur hero-blur-two" aria-hidden="true" />
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pt-12 pb-4 md:pt-20 md:pb-0">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pt-12 pb-6 md:pt-20 md:pb-6">
         <div className="home-hero-content max-w-4xl mx-auto">
           <div className="text-center mb-8 md:mb-10">
             <p className="hero-kicker">Discover what is happening near you</p>
