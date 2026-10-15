@@ -73,6 +73,8 @@ export default function HomePage({ navigate }: Props) {
   const [events, setEvents] = useState<Event[]>([])
   const [trendingEvents, setTrendingEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
+  const [eventsLoadError, setEventsLoadError] = useState('')
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [search, setSearch] = useState('')
   const [timeFilter, setTimeFilter] = useState<QuickFilter>('all')
   const [activeCategory, setActiveCategory] = useState('All')
@@ -86,22 +88,42 @@ export default function HomePage({ navigate }: Props) {
   }, [])
 
   useEffect(() => {
-    const loadEvents = async () => {
-      const { data } = await supabase.from('events').select(HOME_EVENT_SELECT).eq('status', 'published').order('created_at', { ascending: false }).limit(24)
-      const loadedEvents = (data ?? []) as Event[]
-      const organizerUserIds = [...new Set(loadedEvents.map(event => event.organizers?.user_id).filter((id): id is string => Boolean(id)))]
-      const { data: publicProfiles } = organizerUserIds.length
-        ? await supabase.from('public_profiles').select('id, full_name, username, profile_image, avatar_url, cover_image').in('id', organizerUserIds)
-        : { data: [] }
-      const profilesById = new Map((publicProfiles ?? []).map(profile => [profile.id, profile]))
-      setEvents(loadedEvents.map(event => {
-        if (!event.organizers) return event
-        const publicProfile = profilesById.get(event.organizers.user_id)
-        return publicProfile
-          ? { ...event, organizers: { ...event.organizers, profiles: { ...event.organizers.profiles, ...publicProfile } } }
-          : event
-      }))
+    let isActive = true
+    let initialLoadFinished = false
+    const loadingTimeout = window.setTimeout(() => {
+      if (!isActive || initialLoadFinished) return
+      setEventsLoadError('Events are taking longer than expected to load. Check your connection and try again.')
       setLoading(false)
+    }, 8000)
+
+    const loadEvents = async () => {
+      try {
+        const { data, error } = await supabase.from('events').select(HOME_EVENT_SELECT).eq('status', 'published').order('created_at', { ascending: false }).limit(24)
+        if (error) throw error
+        const loadedEvents = (data ?? []) as Event[]
+        const organizerUserIds = [...new Set(loadedEvents.map(event => event.organizers?.user_id).filter((id): id is string => Boolean(id)))]
+        const { data: publicProfiles, error: profilesError } = organizerUserIds.length
+          ? await supabase.from('public_profiles').select('id, full_name, username, profile_image, avatar_url, cover_image').in('id', organizerUserIds)
+          : { data: [], error: null }
+        if (profilesError) console.warn('Unable to load public organizer profile details', profilesError)
+        const profilesById = new Map((publicProfiles ?? []).map(profile => [profile.id, profile]))
+        if (!isActive) return
+        setEvents(loadedEvents.map(event => {
+          if (!event.organizers) return event
+          const publicProfile = profilesById.get(event.organizers.user_id)
+          return publicProfile
+            ? { ...event, organizers: { ...event.organizers, profiles: { ...event.organizers.profiles, ...publicProfile } } }
+            : event
+        }))
+        setEventsLoadError('')
+      } catch (error) {
+        console.error('Unable to load published events', error)
+        if (isActive) setEventsLoadError('We could not load events right now. Check your connection and try again.')
+      } finally {
+        initialLoadFinished = true
+        window.clearTimeout(loadingTimeout)
+        if (isActive) setLoading(false)
+      }
     }
     let trendingRequest = 0
     const loadTrendingEvents = async () => {
@@ -145,12 +167,14 @@ export default function HomePage({ navigate }: Props) {
       .subscribe()
 
     return () => {
+      isActive = false
+      window.clearTimeout(loadingTimeout)
       trendingRequest += 1
       void supabase.removeChannel(eventsChannel)
       void supabase.removeChannel(profilesChannel)
       void supabase.removeChannel(ticketTiersChannel)
     }
-  }, [])
+  }, [loadAttempt])
 
   const filtered = events.filter(e => {
     const matchCat = activeCategory === 'All' || e.category === activeCategory
@@ -231,6 +255,10 @@ export default function HomePage({ navigate }: Props) {
         </div>
       </div>
     </div>
+    {eventsLoadError && <div role="alert" className="mx-auto mt-5 flex max-w-7xl flex-col gap-3 rounded-2xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6" style={{ borderColor: 'rgba(248,113,113,0.28)', background: 'rgba(248,113,113,0.08)', color: 'var(--foreground)' }}>
+      <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>{eventsLoadError}</p>
+      <button type="button" onClick={() => { setEventsLoadError(''); setLoading(true); setLoadAttempt(attempt => attempt + 1) }} className="shrink-0 rounded-xl px-4 py-2 text-sm font-bold" style={{ background: 'var(--primary)', color: '#000' }}>Try again</button>
+    </div>}
     <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 pb-8 space-y-12">
       {!anyActive && <>
         <section aria-label="Live events">
