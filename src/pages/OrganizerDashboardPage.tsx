@@ -280,6 +280,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
         .from('notifications')
         .select('id, type, title, body, created_at, read_at, event_id, recipient_scope')
         .eq('user_id', user.id)
+        .eq('organizer_id', orgId)
         .eq('recipient_scope', 'organizer')
         .order('created_at', { ascending: false })
         .limit(50)
@@ -293,8 +294,15 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   }, [orgId, user?.id])
 
   const openOrganizerNotification = async (notification: OrganizerNotification) => {
-    await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', notification.id)
-    setOrganizerNotifications(current => current.map(item => item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item))
+    if (!user?.id || !orgId) return
+    const readAt = new Date().toISOString()
+    const { error } = await supabase.from('notifications').update({ read_at: readAt })
+      .eq('id', notification.id)
+      .eq('user_id', user.id)
+      .eq('organizer_id', orgId)
+      .eq('recipient_scope', 'organizer')
+    if (error) { setActionError(error.message); return }
+    setOrganizerNotifications(current => current.map(item => item.id === notification.id ? { ...item, read_at: readAt } : item))
     setUtilityPopup(null)
     const title = notification.title.toLowerCase()
     if (title.includes('member') || title.includes('role') || title.includes('permission') || title.includes('invite')) selectSection('members')
@@ -306,12 +314,13 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   }
 
   const markAllOrganizerNotificationsRead = async () => {
-    if (!user?.id) return
+    if (!user?.id || !orgId) return
     const readAt = new Date().toISOString()
     const { error } = await supabase
       .from('notifications')
       .update({ read_at: readAt })
       .eq('user_id', user.id)
+      .eq('organizer_id', orgId)
       .eq('recipient_scope', 'organizer')
       .is('read_at', null)
     if (error) { setActionError(error.message); return }

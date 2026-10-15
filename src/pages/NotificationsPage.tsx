@@ -23,7 +23,7 @@ type Notif = {
 const SAMPLE: Notif[] = []
 
 export default function NotificationsPage({ navigate }: Props) {
-  const { user, organizer, isOrganizer, teamMembership } = useAuth()
+  const { user } = useAuth()
   const [tab, setTab] = useState<NotifTab>('all')
   const [notifs, setNotifs] = useState<Notif[]>(SAMPLE)
   const [loadError, setLoadError] = useState('')
@@ -37,6 +37,7 @@ export default function NotificationsPage({ navigate }: Props) {
         .from('notifications')
         .select('id, type, title, body, read_at, created_at, event_id, ticket_id, recipient_scope')
         .eq('user_id', user.id)
+        .eq('recipient_scope', 'attendee')
         .order('created_at', { ascending: false })
       if (error) { setLoadError('Notifications are not available yet. Apply the notifications database migration.'); return }
       setLoadError('')
@@ -51,7 +52,7 @@ export default function NotificationsPage({ navigate }: Props) {
 
   const markAllRead = async () => {
     if (!user) return
-    const { error } = await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('user_id', user.id).is('read_at', null)
+    const { error } = await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('user_id', user.id).eq('recipient_scope', 'attendee').is('read_at', null)
     if (error) { setLoadError('Notifications are not available yet. Apply the notifications database migration.'); return }
     setNotifs(current => current.map(notification => ({ ...notification, read: true })))
   }
@@ -84,10 +85,10 @@ export default function NotificationsPage({ navigate }: Props) {
 
   const openNotification = async (notification: Notif) => {
     if (!notification.read) {
-      const readQuery = supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', notification.id)
-      const { error: readError } = isOrganizer && organizer?.id
-        ? await readQuery.eq('organizer_id', organizer.id)
-        : await readQuery.eq('user_id', user.id)
+      const { error: readError } = await supabase.from('notifications').update({ read_at: new Date().toISOString() })
+        .eq('id', notification.id)
+        .eq('user_id', user.id)
+        .eq('recipient_scope', 'attendee')
       if (readError) { setLoadError(readError.message); return }
       setNotifs(current => current.map(item => item.id === notification.id ? { ...item, read: true } : item))
     }
