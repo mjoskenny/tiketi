@@ -89,19 +89,61 @@ function fallbackOrganizer(user: User): Organizer {
   }
 }
 
-async function ensureOrganizerAccount(user: User): Promise<Organizer | null> {
+const organizerAccountLoads = new Map<string, Promise<Organizer | null>>()
+
+function ensureOrganizerAccount(user: User): Promise<Organizer | null> {
+  const inFlight = organizerAccountLoads.get(user.id)
+  if (inFlight) return inFlight
+
+  const load = loadOrCreateOrganizerAccount(user).finally(() => {
+    if (organizerAccountLoads.get(user.id) === load) organizerAccountLoads.delete(user.id)
+  })
+  organizerAccountLoads.set(user.id, load)
+  return load
+}
+
+async function loadOrCreateOrganizerAccount(user: User): Promise<Organizer | null> {
   const profileImage = user.user_metadata?.profile_image ?? user.user_metadata?.avatar_url ?? null
 
-  const { data: existing } = await supabase
+  const { data: existingOrganizers, error: organizerLookupError } = await supabase
     .from('organizers')
     .select('*, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email)')
     .eq('user_id', user.id)
-    .maybeSingle()
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
 
-  // This runs on every authenticated reload. An existing organizer must never
-  // be reset from auth metadata, because profile settings are stored in
-  // `profiles` and are deliberately independent from the JWT metadata.
-  if (existing) return existing
+  // Older accounts can have duplicate organizer rows. maybeSingle() fails for
+  // those accounts, which used to make every reload create another empty row.
+  // Reuse the organizer that owns the most saved events, then choose the oldest
+  // row deterministically when there is no event history to distinguish them.
+  if (!organizerLookupError && existingOrganizers?.length) {
+    if (existingOrganizers.length === 1) return existingOrganizers[0]
+
+    const { data: savedEvents, error: eventLookupError } = await supabase
+      .from('events')
+      .select('organizer_id')
+      .in('organizer_id', existingOrganizers.map(existing => existing.id))
+    const eventCountByOrganizer = new Map<string, number>()
+    if (!eventLookupError) {
+      for (const event of savedEvents ?? []) {
+        eventCountByOrganizer.set(event.organizer_id, (eventCountByOrganizer.get(event.organizer_id) ?? 0) + 1)
+      }
+    }
+
+    existingOrganizers.sort((left, right) =>
+      (eventCountByOrganizer.get(right.id) ?? 0) - (eventCountByOrganizer.get(left.id) ?? 0)
+      || new Date(left.created_at).getTime() - new Date(right.created_at).getTime()
+      || left.id.localeCompare(right.id),
+    )
+    return existingOrganizers[0]
+  }
+
+  // Never create a new organizer if the lookup failed; that can orphan saved
+  // events by assigning future sessions to a different organizer ID.
+  if (organizerLookupError) {
+    console.error('Unable to load the existing organizer account', organizerLookupError)
+    return fallbackOrganizer(user)
+  }
 
   const name = user.user_metadata?.full_name?.trim() || user.email?.split('@')[0] || 'Organizer'
   const { data: created } = await supabase

@@ -556,12 +556,18 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     const sale = Array.isArray(commission.agent_sales) ? commission.agent_sales[0] : commission.agent_sales
     if (sale?.order_id) commissionAmountByOrder.set(sale.order_id, (commissionAmountByOrder.get(sale.order_id) ?? 0) + (Number(commission.amount) || 0))
   })
+  // Order total can include a customer-facing fee on older checkout flows.
+  // Organizer proceeds are based on ticket subtotal, less the fee and the
+  // commission amount actually recorded for that sale (not today's rates).
+  const ticketSubtotalForOrder = (order: Order) => Number(order.subtotal)
+    || (order.order_items ?? []).reduce((sum, item) => sum + (Number(item.total_price) || 0), 0)
   const serviceFeeForOrder = (order: Order) => Math.max(0, Number(order.service_fee) || 0)
   const agentCommissionForOrder = (order: Order) => commissionAmountByOrder.get(order.id) ?? 0
-  const revenueForOrder = (order: Order) => Math.max(0, order.total - serviceFeeForOrder(order) - agentCommissionForOrder(order) - (processedRefundAmountByOrder.get(order.id) ?? 0))
+  const revenueForOrder = (order: Order) => Math.max(0, ticketSubtotalForOrder(order) - serviceFeeForOrder(order) - agentCommissionForOrder(order) - (processedRefundAmountByOrder.get(order.id) ?? 0))
   const totalRevenue = confirmedOrders.reduce((sum, order) => sum + revenueForOrder(order), 0)
   const totalPlatformCommission = confirmedOrders.reduce((sum, order) => sum + serviceFeeForOrder(order), 0)
   const totalAgentCommission = confirmedOrders.reduce((sum, order) => sum + agentCommissionForOrder(order), 0)
+  const totalProcessedRefunds = [...processedRefundAmountByOrder.values()].reduce((sum, amount) => sum + amount, 0)
   const netRevenueByOrder = Object.fromEntries(confirmedOrders.map(order => [order.id, revenueForOrder(order)]))
   const totalTicketsSold = Math.max(0, confirmedOrders.reduce((total, order) => total + (order.order_items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0), 0) - processedRefundTicketIds.size)
   const publishedEvents = events.filter(e => e.status === 'published').length
@@ -1129,7 +1135,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                   {/* KPI grid */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <StatCard Icon={TicketIcon} label="Tickets Sold" value={totalTicketsSold.toLocaleString()} />
-                    <StatCard Icon={DollarSignIcon} label="Net Ticket Revenue" value={formatPrice(totalRevenue)} sub="Confirmed sales less processed refunds" />
+                    <StatCard Icon={DollarSignIcon} label="Net Ticket Revenue" value={formatPrice(totalRevenue)} sub={`Ticket subtotal − ${formatPrice(totalPlatformCommission)} fees − ${formatPrice(totalAgentCommission)} agent commissions − ${formatPrice(totalProcessedRefunds)} refunds`} />
                     <StatCard Icon={CalendarIcon} label="Published Events" value={publishedEvents.toString()} />
                     <StatCard Icon={UsersIcon} label="Customers" value={customers.length.toString()}
                       sub={`Avg order: ${avgOrderValue > 0 ? formatPrice(avgOrderValue) : '—'}`} />

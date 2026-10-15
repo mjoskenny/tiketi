@@ -38,6 +38,7 @@ type Section =
   | 'agents'
   | 'reports'
   | 'settings'
+type AdminDateRange = '7d' | '30d' | '90d' | 'year' | 'all'
 
 type HealthMetrics = {
   users: { signupsToday: number; repeatBuyers: number; adminAccounts: number }
@@ -344,7 +345,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
   const [recentOrders, setRecentOrders] = useState<Array<{ customer: string; event: string; value: string; status: string }>>([])
   const [recentPayouts, setRecentPayouts] = useState<Array<{ organizer: string; amount: string; status: string; method: string }>>([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d')
+  const [dateRange, setDateRange] = useState<AdminDateRange>('year')
   const [sortMode, setSortMode] = useState<'recent' | 'name' | 'value'>('recent')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [refreshTick, setRefreshTick] = useState(0)
@@ -474,12 +475,13 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
     '90d': 90 * 24 * 60 * 60 * 1000,
   } as const
 
-  const withinDateRange = (value: string | null | undefined, targetRange: '7d' | '30d' | '90d' | 'all' = dateRange) => {
+  const withinDateRange = (value: string | null | undefined, targetRange: AdminDateRange = dateRange) => {
     if (!value) return false
 
     const date = new Date(value)
     if (Number.isNaN(date.getTime())) return false
     if (targetRange === 'all') return date.getTime() <= Date.now()
+    if (targetRange === 'year') return date.getFullYear() === new Date().getFullYear() && date.getTime() <= Date.now()
 
     const now = Date.now()
     const cutoff = rangeWindowMs[targetRange]
@@ -517,9 +519,33 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
           fetchAllRows((from, to) => supabase.from('organizer_withdrawals').select('id, organizer_id, amount, payment_method, payment_reference, status, note, requested_at, organizers:organizer_id(name)').order('requested_at', { ascending: false }).range(from, to)),
         ])
 
+        const organizersByAccount = new Map<string, typeof allOrganizers>()
+        ;(allOrganizers as Array<{ id: string; user_id?: string | null }>).forEach(organizer => {
+          const accountId = organizer.user_id ?? organizer.id
+          const group = organizersByAccount.get(accountId) ?? []
+          group.push(organizer)
+          organizersByAccount.set(accountId, group)
+        })
+        const canonicalOrganizer = (group: typeof allOrganizers) => [...group].sort((left, right) => {
+          const statusRank = (organizer: typeof left) => organizerVerificationStatus(organizer) === 'verified' ? 2 : organizerVerificationStatus(organizer) === 'pending' ? 1 : 0
+          return statusRank(right) - statusRank(left)
+            || new Date(left.created_at ?? 0).getTime() - new Date(right.created_at ?? 0).getTime()
+            || left.id.localeCompare(right.id)
+        })[0]
+        const uniqueOrganizerAccounts = [...organizersByAccount.values()].map(group => ({
+          organizer: canonicalOrganizer(group),
+          createdAt: group.reduce<string | null>((earliest, organizer) => {
+            if (!organizer.created_at) return earliest
+            return !earliest || new Date(organizer.created_at).getTime() < new Date(earliest).getTime() ? organizer.created_at : earliest
+          }, null),
+          verificationStatus: group.some(organizer => organizerVerificationStatus(organizer) === 'verified')
+            ? 'verified'
+            : group.some(organizer => organizerVerificationStatus(organizer) === 'pending') ? 'pending' : 'unverified',
+          group,
+        }))
         const events = allEvents.filter(event => withinDateRange(event.created_at as string | null))
         const profiles = allProfiles.filter(profileRow => withinDateRange(profileRow.created_at as string | null))
-        const organizers = allOrganizers.filter(organizer => withinDateRange(organizer.created_at as string | null))
+        const organizers = uniqueOrganizerAccounts.filter(account => withinDateRange(account.createdAt)).map(account => account.organizer)
         const orders = allOrders.filter(order => withinDateRange(order.created_at as string | null))
         // Inventory is a current snapshot; filtering old tiers by creation date hides active ticket stock.
         const ticketTiers = allTicketTiers
@@ -527,8 +553,17 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
         const agentSales = allAgentSales.filter(sale => withinDateRange(sale.created_at as string | null))
         const withdrawals = allWithdrawals.filter(withdrawal => withinDateRange(withdrawal.requested_at as string | null))
 
-        const previousWindowStart = dateRange === 'all' ? null : Date.now() - (rangeWindowMs[dateRange] * 2)
-        const previousWindowEnd = dateRange === 'all' ? null : Date.now() - rangeWindowMs[dateRange]
+        const currentYear = new Date().getFullYear()
+        const previousWindowStart = dateRange === 'all'
+          ? null
+          : dateRange === 'year'
+            ? new Date(currentYear - 1, 0, 1).getTime()
+            : Date.now() - (rangeWindowMs[dateRange] * 2)
+        const previousWindowEnd = dateRange === 'all'
+          ? null
+          : dateRange === 'year'
+            ? new Date(currentYear, 0, 1).getTime()
+            : Date.now() - rangeWindowMs[dateRange]
         const previousOrders = dateRange === 'all'
           ? []
           : allOrders.filter(order => {
@@ -552,9 +587,9 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
             })
         const previousOrganizers = dateRange === 'all'
           ? []
-          : allOrganizers.filter(organizer => {
-              if (!organizer.created_at) return false
-              const value = new Date(organizer.created_at).getTime()
+          : uniqueOrganizerAccounts.filter(account => {
+              if (!account.createdAt) return false
+              const value = new Date(account.createdAt).getTime()
               return value >= previousWindowStart! && value < previousWindowEnd!
             })
 
@@ -563,14 +598,16 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
         const toOrderItemValue = (order: { order_items?: Array<{ total_price?: number | null }> | null }) => (order.order_items ?? []).reduce((sum, item) => sum + (Number(item.total_price) || 0), 0)
         const ticketValueForOrder = (order: { subtotal?: number | null; order_items?: Array<{ total_price?: number | null }> | null }) => Number(order.subtotal) || toOrderItemValue(order)
         const serviceFeeForOrder = (order: { service_fee?: number | null }) => Math.max(0, Number(order.service_fee) || 0)
-        const ordersById = new Map((allOrders as Array<{ id: string; order_items?: Array<{ ticket_tier_id?: string | null; unit_price?: number | null }> | null }>).map(order => [order.id, order]))
+        const ordersById = new Map((allOrders as Array<{ id: string; order_items?: Array<{ ticket_tier_id?: string | null; quantity?: number | null; unit_price?: number | null; total_price?: number | null }> | null }>).map(order => [order.id, order]))
         const ticketsById = new Map((allTickets as Array<{ id: string; ticket_tier_id?: string | null }>).map(ticket => [ticket.id, ticket]))
         const refundAmountByOrder = new Map<string, number>()
         ;(allRefunds as Array<{ order_id: string; ticket_id?: string | null; status?: string | null }>).filter(refund => refund.status === 'processed').forEach(refund => {
           const ticket = refund.ticket_id ? ticketsById.get(refund.ticket_id) : undefined
           const order = ordersById.get(refund.order_id)
           const item = ticket ? order?.order_items?.find(orderItem => orderItem.ticket_tier_id === ticket.ticket_tier_id) : undefined
-          const amount = Math.max(0, Number(item?.unit_price) || 0)
+          const itemQuantity = Math.max(1, Number(item?.quantity) || 1)
+          const itemTotal = Number(item?.total_price) || (Number(item?.unit_price) || 0) * itemQuantity
+          const amount = Math.max(0, Math.round(itemTotal / itemQuantity))
           refundAmountByOrder.set(refund.order_id, (refundAmountByOrder.get(refund.order_id) ?? 0) + amount)
         })
         const commissionAmountByOrder = new Map<string, number>()
@@ -641,28 +678,38 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
           }
         })
 
-        const organizerRowsData = (allOrganizers as Array<{ name?: string | null; id?: string; verified?: boolean | null; verification_status?: string | null; created_at?: string | null }>).map(organizerRow => {
-          const organizerEvents = (events as Array<{ organizer_id?: string | null }>).filter(event => event.organizer_id === organizerRow.id).length
-          const organizerSales = (orders as Array<{ id: string; organizer_id?: string | null; subtotal?: number | null; order_items?: Array<{ total_price?: number | null }> | null; status?: string | null }>).filter(order => order.organizer_id === organizerRow.id && order.status === 'confirmed').reduce((sum, order) => sum + netTicketRevenueForOrder(order), 0)
+        const organizerRowsData = uniqueOrganizerAccounts.map(account => {
+          const group = account.group
+          const organizerRow = account.organizer
+          const organizerIds = new Set(group.map(organizer => organizer.id))
+          const organizerEvents = (events as Array<{ organizer_id?: string | null }>).filter(event => organizerIds.has(event.organizer_id ?? '')).length
+          const organizerSales = (orders as Array<{ id: string; organizer_id?: string | null; subtotal?: number | null; order_items?: Array<{ total_price?: number | null }> | null; status?: string | null }>).filter(order => organizerIds.has(order.organizer_id ?? '') && order.status === 'confirmed').reduce((sum, order) => sum + netTicketRevenueForOrder(order), 0)
           return {
             name: organizerRow.name ?? 'Unnamed organizer',
             events: `${organizerEvents}`,
             revenue: formatMoneyShort(organizerSales),
-            verification: organizerVerificationStatus(organizerRow) === 'verified' ? 'Verified' : organizerVerificationStatus(organizerRow) === 'pending' ? 'Pending review' : 'Unverified',
+            verification: account.verificationStatus === 'verified' ? 'Verified' : account.verificationStatus === 'pending' ? 'Pending review' : 'Unverified',
           }
         })
 
-        const verificationRequestsData = (allOrganizers as Array<{ id?: string; name?: string | null; city?: string | null; phone?: string | null; website?: string | null; verification_status?: string | null; verified?: boolean | null; verification_requested_at?: string | null }>)
-          .filter(organizer => organizer.id && organizerVerificationStatus(organizer) === 'pending')
-          .sort((left, right) => new Date(left.verification_requested_at ?? 0).getTime() - new Date(right.verification_requested_at ?? 0).getTime())
-          .map(organizer => ({
-            id: organizer.id!,
-            name: organizer.name ?? 'Unnamed organizer',
-            city: organizer.city ?? null,
-            phone: organizer.phone ?? null,
-            website: organizer.website ?? null,
-            requestedAt: organizer.verification_requested_at ?? null,
-          }))
+        const verificationRequestsData = [...organizersByAccount.values()]
+          .map(group => group.filter(organizer => organizerVerificationStatus(organizer) === 'pending'))
+          .filter(group => group.length > 0)
+          .map(group => {
+            const organizer = [...group].sort((left, right) =>
+              new Date(left.verification_requested_at ?? 0).getTime() - new Date(right.verification_requested_at ?? 0).getTime()
+              || left.id.localeCompare(right.id),
+            )[0]
+            return {
+              id: organizer.id,
+              name: organizer.name ?? 'Unnamed organizer',
+              city: organizer.city ?? null,
+              phone: organizer.phone ?? null,
+              website: organizer.website ?? null,
+              requestedAt: organizer.verification_requested_at ?? null,
+            }
+          })
+          .sort((left, right) => new Date(left.requestedAt ?? 0).getTime() - new Date(right.requestedAt ?? 0).getTime())
 
         const eventRowsData = (events as Array<{ id: string; organizer_id: string; title?: string | null; description?: string | null; date?: string | null; time?: string | null; end_time?: string | null; venue?: string | null; category?: string | null; city?: string | null; organizers?: { name?: string | null } | null; capacity?: number | null; status?: string | null }>).map(eventRow => ({
           id: eventRow.id,
@@ -766,7 +813,6 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
         const allTicketsById = new Map((allTickets as Array<{ id: string; ticket_tier_id?: string | null }>).map(ticket => [ticket.id, ticket]))
         const monthlyCounts = Array(12).fill(0) as number[]
         const monthlySales = Array(12).fill(0) as number[]
-        const currentYear = new Date().getFullYear()
         ;(allOrders as Array<{ id: string; status?: string | null; created_at?: string | null; subtotal?: number | null; service_fee?: number | null; order_items?: Array<{ total_price?: number | null }> | null }>).forEach(order => {
           if (order.status !== 'confirmed' || !order.created_at) return
           const createdAt = new Date(order.created_at)
@@ -867,9 +913,9 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
             adminAccounts: (allProfiles as Array<{ role?: string | null }>).filter(profileRow => profileRow.role === 'admin').length,
           },
           organizers: {
-            awaitingVerification: (allOrganizers as Array<{ verified?: boolean | null; verification_status?: string | null }>).filter(organizer => organizerVerificationStatus(organizer) === 'pending').length,
-            verified: (allOrganizers as Array<{ verified?: boolean | null; verification_status?: string | null }>).filter(organizer => organizerVerificationStatus(organizer) === 'verified').length,
-            unverified: (allOrganizers as Array<{ verified?: boolean | null; verification_status?: string | null }>).filter(organizer => organizerVerificationStatus(organizer) === 'unverified').length,
+            awaitingVerification: uniqueOrganizerAccounts.filter(account => account.verificationStatus === 'pending').length,
+            verified: uniqueOrganizerAccounts.filter(account => account.verificationStatus === 'verified').length,
+            unverified: uniqueOrganizerAccounts.filter(account => account.verificationStatus === 'unverified').length,
           },
           events: {
             published: (events as Array<{ status?: string | null }>).filter(event => event.status === 'published').length,
@@ -1516,10 +1562,11 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Date</label>
-                  <select value={dateRange} onChange={event => setDateRange(event.target.value as '7d' | '30d' | '90d' | 'all')} className="rounded-lg border px-2 py-2 text-xs" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
+                  <select value={dateRange} onChange={event => setDateRange(event.target.value as AdminDateRange)} className="rounded-lg border px-2 py-2 text-xs" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
                     <option value="7d">7d</option>
                     <option value="30d">30d</option>
                     <option value="90d">90d</option>
+                    <option value="year">Year to date</option>
                     <option value="all">All</option>
                   </select>
                   <label className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Sort</label>
@@ -1577,10 +1624,11 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
                   <input value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Search all organizers" className="w-full bg-transparent text-sm outline-none" style={{ color: 'var(--foreground)' }} />
                 </div>
                 <div className="flex items-center gap-2">
-                  <select value={dateRange} onChange={event => setDateRange(event.target.value as '7d' | '30d' | '90d' | 'all')} className="rounded-lg border px-2 py-2 text-xs" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
+                  <select value={dateRange} onChange={event => setDateRange(event.target.value as AdminDateRange)} className="rounded-lg border px-2 py-2 text-xs" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
                     <option value="7d">7d</option>
                     <option value="30d">30d</option>
                     <option value="90d">90d</option>
+                    <option value="year">Year to date</option>
                     <option value="all">All</option>
                   </select>
                   <button onClick={() => setSortDirection(current => current === 'asc' ? 'desc' : 'asc')} className="rounded-lg border px-2 py-2 text-[10px] font-bold uppercase" style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}>{sortDirection === 'asc' ? 'Asc' : 'Desc'}</button>
@@ -1607,10 +1655,11 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
                   <input value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Filter events" className="w-full bg-transparent text-sm outline-none" style={{ color: 'var(--foreground)' }} />
                 </div>
                 <div className="flex items-center gap-2">
-                  <select value={dateRange} onChange={event => setDateRange(event.target.value as '7d' | '30d' | '90d' | 'all')} className="rounded-lg border px-2 py-2 text-xs" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
+                  <select value={dateRange} onChange={event => setDateRange(event.target.value as AdminDateRange)} className="rounded-lg border px-2 py-2 text-xs" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
                     <option value="7d">7d</option>
                     <option value="30d">30d</option>
                     <option value="90d">90d</option>
+                    <option value="year">Year to date</option>
                     <option value="all">All</option>
                   </select>
                   <button onClick={() => setSortDirection(current => current === 'asc' ? 'desc' : 'asc')} className="rounded-lg border px-2 py-2 text-[10px] font-bold uppercase" style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}>{sortDirection === 'asc' ? 'Asc' : 'Desc'}</button>
@@ -1683,10 +1732,11 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
                   <input value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Filter orders" className="w-full bg-transparent text-sm outline-none" style={{ color: 'var(--foreground)' }} />
                 </div>
                 <div className="flex items-center gap-2">
-                  <select value={dateRange} onChange={event => setDateRange(event.target.value as '7d' | '30d' | '90d' | 'all')} className="rounded-lg border px-2 py-2 text-xs" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
+                  <select value={dateRange} onChange={event => setDateRange(event.target.value as AdminDateRange)} className="rounded-lg border px-2 py-2 text-xs" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
                     <option value="7d">7d</option>
                     <option value="30d">30d</option>
                     <option value="90d">90d</option>
+                    <option value="year">Year to date</option>
                     <option value="all">All</option>
                   </select>
                   <button onClick={() => setSortDirection(current => current === 'asc' ? 'desc' : 'asc')} className="rounded-lg border px-2 py-2 text-[10px] font-bold uppercase" style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}>{sortDirection === 'asc' ? 'Asc' : 'Desc'}</button>
@@ -1755,10 +1805,11 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
                   <input value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Filter payments" className="w-full bg-transparent text-sm outline-none" style={{ color: 'var(--foreground)' }} />
                 </div>
                 <div className="flex items-center gap-2">
-                  <select value={dateRange} onChange={event => setDateRange(event.target.value as '7d' | '30d' | '90d' | 'all')} className="rounded-lg border px-2 py-2 text-xs" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
+                  <select value={dateRange} onChange={event => setDateRange(event.target.value as AdminDateRange)} className="rounded-lg border px-2 py-2 text-xs" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
                     <option value="7d">7d</option>
                     <option value="30d">30d</option>
                     <option value="90d">90d</option>
+                    <option value="year">Year to date</option>
                     <option value="all">All</option>
                   </select>
                   <button onClick={() => setSortDirection(current => current === 'asc' ? 'desc' : 'asc')} className="rounded-lg border px-2 py-2 text-[10px] font-bold uppercase" style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}>{sortDirection === 'asc' ? 'Asc' : 'Desc'}</button>
@@ -1779,10 +1830,11 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
                   <input value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Filter payouts" className="w-full bg-transparent text-sm outline-none" style={{ color: 'var(--foreground)' }} />
                 </div>
                 <div className="flex items-center gap-2">
-                  <select value={dateRange} onChange={event => setDateRange(event.target.value as '7d' | '30d' | '90d' | 'all')} className="rounded-lg border px-2 py-2 text-xs" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
+                  <select value={dateRange} onChange={event => setDateRange(event.target.value as AdminDateRange)} className="rounded-lg border px-2 py-2 text-xs" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
                     <option value="7d">7d</option>
                     <option value="30d">30d</option>
                     <option value="90d">90d</option>
+                    <option value="year">Year to date</option>
                     <option value="all">All</option>
                   </select>
                   <button onClick={() => setSortDirection(current => current === 'asc' ? 'desc' : 'asc')} className="rounded-lg border px-2 py-2 text-[10px] font-bold uppercase" style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}>{sortDirection === 'asc' ? 'Asc' : 'Desc'}</button>
@@ -1832,10 +1884,11 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
                   <input value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Filter agents" className="w-full bg-transparent text-sm outline-none" style={{ color: 'var(--foreground)' }} />
                 </div>
                 <div className="flex items-center gap-2">
-                  <select value={dateRange} onChange={event => setDateRange(event.target.value as '7d' | '30d' | '90d' | 'all')} className="rounded-lg border px-2 py-2 text-xs" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
+                  <select value={dateRange} onChange={event => setDateRange(event.target.value as AdminDateRange)} className="rounded-lg border px-2 py-2 text-xs" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
                     <option value="7d">7d</option>
                     <option value="30d">30d</option>
                     <option value="90d">90d</option>
+                    <option value="year">Year to date</option>
                     <option value="all">All</option>
                   </select>
                   <button onClick={() => setSortDirection(current => current === 'asc' ? 'desc' : 'asc')} className="rounded-lg border px-2 py-2 text-[10px] font-bold uppercase" style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}>{sortDirection === 'asc' ? 'Asc' : 'Desc'}</button>
@@ -1890,7 +1943,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
               </section>
             </div>
             <section className="min-w-0 rounded-2xl border p-5" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-              <div className="mb-5"><h3 className="font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Order status mix</h3><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{dateRange === 'all' ? 'All time' : `Last ${dateRange.replace('d', ' days')}`} · {orderRows.length.toLocaleString()} real orders</p></div>
+              <div className="mb-5"><h3 className="font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Order status mix</h3><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{dateRange === 'all' ? 'All time' : dateRange === 'year' ? `Year to date (${new Date().getFullYear()})` : `Last ${dateRange.replace('d', ' days')}`} · {orderRows.length.toLocaleString()} real orders</p></div>
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{orderStatuses.map(status => {
                 const count = ordersByStatus[status.key] ?? 0
                 return <div key={status.key} className="min-w-0 rounded-xl border p-3" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.025)' }}><div className="flex items-center justify-between gap-2"><span className="truncate text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{status.label}</span><strong className="text-sm" style={{ color: status.color }}>{count.toLocaleString()}</strong></div><div className="mt-3 h-2 overflow-hidden rounded-full" style={{ background: 'var(--muted)' }}><div className="h-full rounded-full" style={{ width: `${count ? Math.max(3, count / maxStatusOrders * 100) : 0}%`, background: status.color }} /></div></div>
@@ -1901,7 +1954,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
                 <div className="min-w-0"><h3 className="font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>{report.label} report</h3><p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--muted-foreground)' }}>{filteredReportRows.length.toLocaleString()} matching rows · {report.snapshot ? 'current inventory snapshot' : `${dateRange} selected range`} · data refreshed {lastUpdated?.toLocaleTimeString() ?? 'loading'}</p></div>
                 <div className="flex min-w-0 flex-wrap gap-2">
                   <select aria-label="Report dataset" value={reportDatasetKey} onChange={event => { setReportDatasetKey(event.target.value as ReportDatasetKey); setReportSortColumn(0); setReportSortDirection('asc') }} className="min-w-0 flex-1 rounded-xl border px-3 py-2 text-xs sm:flex-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>{(Object.keys(reportDatasets) as ReportDatasetKey[]).map(key => <option key={key} value={key}>{reportDatasets[key].label}</option>)}</select>
-                  <select aria-label="Report date range" value={dateRange} onChange={event => setDateRange(event.target.value as '7d' | '30d' | '90d' | 'all')} className="rounded-xl border px-3 py-2 text-xs" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }}><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option><option value="90d">Last 90 days</option><option value="all">All time</option></select>
+                  <select aria-label="Report date range" value={dateRange} onChange={event => setDateRange(event.target.value as AdminDateRange)} className="rounded-xl border px-3 py-2 text-xs" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }}><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option><option value="90d">Last 90 days</option><option value="year">Year to date</option><option value="all">All time</option></select>
                   <button type="button" onClick={exportCurrentSection} disabled={!filteredReportRows.length} className="rounded-xl px-3 py-2 text-xs font-bold disabled:opacity-50" style={{ background: 'var(--primary)', color: '#000' }}>Export CSV</button>
                 </div>
               </div>
