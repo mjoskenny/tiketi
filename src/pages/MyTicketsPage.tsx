@@ -182,6 +182,7 @@ export default function MyTicketsPage({ navigate }: Props) {
   const viewTicket = (ticket: Ticket) => {
     const tier = (ticket as any).ticket_tiers
     navigate('ticket', {
+      ticketId: ticket.id,
       event: ticketEvent(ticket),
       info: { name: ticket.holder_name ?? profile?.full_name ?? 'Guest', phone: ticket.holder_phone ?? profile?.phone ?? '', email: ticket.holder_email ?? profile?.email ?? user?.email ?? '' },
       ticket: ticket.qr_code,

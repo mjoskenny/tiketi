@@ -2,7 +2,35 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { ArrowLeftIcon, BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, DownloadIcon, ShareNodesIcon, TicketIcon, UserIcon } from '../components/Icon'
 import { hasEventEnded } from '../lib/eventTime'
-import { formatLocaleDate, formatLocaleDateTime } from '../lib/locale'
+import { formatLocaleDate, formatLocaleDateTime, formatLocaleTime } from '../lib/locale'
+
+function isMidnightPlaceholder(value: string) {
+  return /^0{1,2}:0{1,2}(?::0{1,2})?(?:\+\d{2}:\d{2}|Z)?$/i.test(value.trim()) || /^0{1,2}$/i.test(value.trim())
+}
+
+function formatTicketTime(value: string | undefined) {
+  if (!value) return '—'
+  const raw = String(value).trim()
+  if (!raw || isMidnightPlaceholder(raw)) return '—'
+  const timeOnly = raw.match(/(\d{1,2}:\d{2})(?::\d{2})?/i)?.[1]
+  const numericHours = raw.match(/^(\d{1,2})$/)?.[1]
+  if (timeOnly) return timeOnly
+  if (numericHours) {
+    const hour = Number(numericHours)
+    if (hour === 0) return '—'
+    return `${String(hour).padStart(2, '0')}:00`
+  }
+  const dateValue = new Date(raw)
+  if (!Number.isNaN(dateValue.getTime())) {
+    const formatted = formatLocaleTime(dateValue, { hour: 'numeric', minute: '2-digit' })
+    return formatted === '12:00 AM' ? '—' : formatted
+  }
+  return raw
+}
+
+function formatTicketPrice(value: number) {
+  return value <= 0 ? 'Free' : `${value.toLocaleString()} BIF`
+}
 import { LanguageSwitcher } from '../components/LocaleContent'
 
 type AgentTicketData = {
@@ -44,7 +72,8 @@ export default function AgentTicketPage({ data, navigate }: Props) {
   const ticketCode = data.ticket ?? ''
   const image = event.cover_image ?? event.image ?? ''
   const date = (event.date ?? '') as string
-  const time = ((event.time as string | undefined)?.slice(0, 5)) ?? ''
+  const rawTime = typeof event.time === 'string' ? event.time : undefined
+  const time = formatTicketTime(rawTime)
   const venue = (event.venue ?? '') as string
   const ticketType = data.ticketType ?? 'REGULAR'
   const ticketPrice = data.ticketPrice ?? 0
@@ -52,7 +81,7 @@ export default function AgentTicketPage({ data, navigate }: Props) {
   const ticketExtraInfo = data.ticketExtraInfo?.trim() || ''
   const ticketExpiry = data.ticketExpiry ? formatLocaleDate(`${data.ticketExpiry}T00:00:00`, { day: 'numeric', month: 'short', year: 'numeric' }) : ''
   const ticketGroupSize = data.ticketGroupSize && data.ticketGroupSize > 1 ? data.ticketGroupSize : null
-  const status = event.status === 'cancelled' || data.ticketStatus === 'cancelled' ? 'CANCELLED' : data.ticketStatus === 'used' ? 'USED' : hasEventEnded(date, time, event.end_time) ? 'EXPIRED' : 'VALID'
+  const status = event.status === 'cancelled' || data.ticketStatus === 'cancelled' ? 'CANCELLED' : data.ticketStatus === 'used' ? 'USED' : hasEventEnded(date, rawTime, event.end_time) ? 'EXPIRED' : 'VALID'
 
   const createPdf = async () => {
     const { jsPDF } = await import('jspdf')
@@ -85,7 +114,7 @@ export default function AgentTicketPage({ data, navigate }: Props) {
     pdf.text(ticketType.slice(0, 15), 163, 54)
     pdf.setTextColor(25, 25, 25)
     pdf.setFontSize(7)
-    pdf.text(date || '—', 103, 54); pdf.text(time || '—', 137, 54)
+    pdf.text(date || '—', 103, 54); pdf.text(time === '—' ? 'TBA' : time, 137, 54)
     pdf.setTextColor(100, 100, 100)
     pdf.setFontSize(6)
     pdf.text('VENUE', 103, 62)
@@ -106,7 +135,7 @@ export default function AgentTicketPage({ data, navigate }: Props) {
     pdf.text('PRICE', 103, 99)
     pdf.setTextColor(25, 25, 25)
     pdf.setFontSize(7)
-    pdf.text(`${ticketPrice.toLocaleString()} BIF`, 103, 105)
+    pdf.text(formatTicketPrice(ticketPrice), 103, 105)
     pdf.setTextColor(100, 100, 100)
     pdf.text('PURCHASED', 145, 99)
     pdf.setTextColor(25, 25, 25)

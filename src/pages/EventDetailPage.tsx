@@ -28,8 +28,11 @@ function formatDate(value: string) {
 }
 
 function formatEventTime(value?: string | null) {
-  const start = value?.match(/^(\d{1,2}:\d{2})/)?.[1]
-  return start || 'TBA'
+  if (!value) return 'TBA'
+  const raw = String(value).trim()
+  if (!raw || /^0{1,2}:0{1,2}(?::0{1,2})?(?:\+\d{2}:\d{2}|Z)?$/i.test(raw) || /^0{1,2}$/i.test(raw)) return 'TBA'
+  const match = raw.match(/^(\d{1,2}:\d{2})(?::\d{2})?/i)?.[1]
+  return match || 'TBA'
 }
 
 function formatPrice(value: number) { return value === 0 ? 'Free' : `BIF ${value.toLocaleString()}` }

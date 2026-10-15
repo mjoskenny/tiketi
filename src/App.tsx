@@ -143,6 +143,7 @@ function pageFromPath(pathname: string): Page {
   if (normalizedPath.startsWith('/events/') || normalizedPath.startsWith('/event/')) return 'event-detail'
   if (normalizedPath.startsWith('/organizers/') || normalizedPath.startsWith('/organizer/')) return 'organizer-profile'
   if (normalizedPath.startsWith('/checkout/')) return 'checkout'
+  if (normalizedPath === '/ticket' || normalizedPath.startsWith('/ticket/')) return 'ticket'
   if (normalizedPath === '/dashboard' || normalizedPath.startsWith('/dashboard/')) return 'dashboard'
   if (normalizedPath === '/agent-dashboard' || normalizedPath.startsWith('/agent-dashboard/')) return 'agent-dashboard'
   if (normalizedPath === '/admin-dashboard' || normalizedPath.startsWith('/admin-dashboard/')) return 'admin-dashboard'
@@ -168,8 +169,11 @@ function pathForPage(page: Page, extra?: unknown) {
     const steps = ['tickets', 'info', 'payment']
     return `/checkout/${checkout.event.id}/${steps[(checkout.checkoutStep ?? 1) - 1] ?? steps[0]}`
   }
-  if (page === 'ticket' && extra && typeof extra === 'object' && 'event' in extra) {
-    return `/ticket/${(extra as { event: { id: string } }).event.id}`
+  if (page === 'ticket' && extra && typeof extra === 'object') {
+    const candidate = extra as { ticketId?: string | null; ticket_id?: string | null }
+    const ticketId = candidate.ticketId ?? candidate.ticket_id
+    if (ticketId) return `/ticket/${ticketId}`
+    return '/ticket'
   }
   if (page === 'agent-dashboard') return '/agent-dashboard/overview'
   return PAGE_PATHS[page]
@@ -201,8 +205,11 @@ export default function App() {
   const [ticketData, setTicketData] = useState<{
     event: Event
     info: { name: string; phone: string; email: string }
+    ticketId?: string
     emailDelivery?: { sentCount: number; total: number; failedCount: number; reason?: string }
   } | null>(null)
+  const [ticketResourceLoading, setTicketResourceLoading] = useState(false)
+  const [ticketResourceError, setTicketResourceError] = useState('')
 
   useEffect(() => {
     if (window.location.pathname === '/discover-events') {
@@ -300,6 +307,54 @@ export default function App() {
     }
     void loadSharedResource()
   }, [page, eventDetail, organizerDetail, resourceRetryToken])
+
+  useEffect(() => {
+    if (page !== 'ticket') return
+    const ticketId = window.location.pathname.split('/').filter(Boolean)[1]
+    if (!ticketId) return
+    if (ticketData?.ticketId === ticketId) {
+      setTicketResourceLoading(false)
+      return
+    }
+
+    let active = true
+    setTicketResourceLoading(true)
+    setTicketResourceError('')
+    void (async () => {
+      const { data, error } = await supabase
+        .from('tickets')
+        .select('*, events(*), ticket_tiers(*)')
+        .eq('id', ticketId)
+        .maybeSingle()
+      if (!active) return
+      if (error || !data?.events) {
+        setTicketResourceError(error?.message ?? 'Ticket not found or you do not have access to it.')
+        setTicketResourceLoading(false)
+        return
+      }
+
+      setTicketData({
+        ticketId: data.id,
+        event: data.events as Event,
+        info: {
+          name: data.holder_name ?? profile?.full_name ?? 'Guest',
+          phone: data.holder_phone ?? profile?.phone ?? '',
+          email: data.holder_email ?? profile?.email ?? user?.email ?? '',
+        },
+        ticket: data.qr_code,
+        ticketStatus: data.status,
+        ticketType: data.ticket_tiers?.name ?? 'REGULAR',
+        ticketKind: data.ticket_tiers?.ticket_type,
+        ticketPrice: data.ticket_tiers?.price ?? 0,
+        purchasedAt: data.created_at,
+        ticketExtraInfo: data.ticket_tiers?.extra_info ?? '',
+        ticketExpiry: data.ticket_tiers?.expires_at ?? '',
+        ticketGroupSize: data.ticket_tiers?.group_size ?? 1,
+      } as any)
+      setTicketResourceLoading(false)
+    })()
+    return () => { active = false }
+  }, [page, user?.id, ticketData?.ticketId, resourceRetryToken])
 
   useEffect(() => {
     if (!NO_NAV.has(page)) window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -533,6 +588,13 @@ export default function App() {
         </div>
       )}
       {page === 'ticket' && ticketData && <DigitalTicketPage data={ticketData as any} navigate={navigate} />}
+      {page === 'ticket' && !ticketData && (ticketResourceLoading || ticketResourceError) && (
+        <div className="flex min-h-screen items-center justify-center flex-col gap-4 px-4 pt-16 text-center">
+          <p className="text-xl font-bold">{ticketResourceLoading ? 'Loading ticket…' : 'Unable to load this ticket'}</p>
+          {ticketResourceError && <p className="max-w-md text-sm" style={{ color: 'var(--muted-foreground)' }}>{ticketResourceError}</p>}
+          {ticketResourceError && <div className="flex gap-3"><button onClick={() => setResourceRetryToken(current => current + 1)} className="rounded-xl px-5 py-3 text-sm font-bold" style={{ background: 'var(--primary)', color: '#000' }}>Try again</button><button onClick={() => navigate('my-tickets')} className="rounded-xl px-5 py-3 text-sm font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>My tickets</button></div>}
+        </div>
+      )}
       {page === 'agent-ticket' && ticketData && <AgentTicketPage data={ticketData as any} navigate={navigate} />}
       {page === 'my-tickets' && (
         user

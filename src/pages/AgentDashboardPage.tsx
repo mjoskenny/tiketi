@@ -267,6 +267,7 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [ticketFeeRates, setTicketFeeRates] = useState({ nonConsumable: 5, consumable: 4, table: 5, free: 0 })
   const [withdrawAmount, setWithdrawAmount] = useState('50000')
   const [paymentMethod, setPaymentMethod] = useState('mobile_money')
   const [form, setForm] = useState<SaleForm>({ assignmentId: '', tierId: '', quantity: '1', name: '', phone: '', email: '', paymentMode: 'mobile_money' })
@@ -288,6 +289,34 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
     if (!tiers.length) return null
     return tiers.find(tier => tier.id === form.tierId) ?? tiers[0]
   }, [form.tierId, tiers])
+
+  useEffect(() => {
+    let active = true
+    supabase.rpc('get_public_ticket_fee_settings').then(({ data }) => {
+      const settings = Array.isArray(data) ? data[0] : data
+      if (!active || !settings) return
+      setTicketFeeRates({
+        nonConsumable: Number(settings.service_fee_non_consumable_percent ?? 5),
+        consumable: Number(settings.service_fee_consumable_percent ?? 4),
+        table: Number(settings.service_fee_table_percent ?? 5),
+        free: Number(settings.service_fee_free_percent ?? 0),
+      })
+    })
+    return () => { active = false }
+  }, [])
+
+  const selectedTierFeeRate = selectedTier
+    ? selectedTier.price <= 0
+      ? ticketFeeRates.free
+      : (selectedTier.group_size ?? 1) > 1 || selectedTier.name.toLowerCase().includes('table')
+        ? ticketFeeRates.table
+        : selectedTier.ticket_type === 'consumable'
+          ? ticketFeeRates.consumable
+          : ticketFeeRates.nonConsumable
+    : 0
+  const selectedTierQuantity = Math.max(1, Number(form.quantity) || 1)
+  const selectedTierSubtotal = (selectedTier?.price ?? 0) * selectedTierQuantity
+  const selectedTierServiceFee = Math.round(selectedTierSubtotal * selectedTierFeeRate / 100)
 
   useEffect(() => {
     if (!agentAssignments.length) return
@@ -883,7 +912,7 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
                     <aside className="h-fit rounded-2xl border p-5 lg:sticky lg:top-24" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
                       <h3 className="font-bold">Order summary</h3><div className="mt-4 flex items-center gap-3"><div className="h-12 w-12 overflow-hidden rounded-xl" style={{ background: 'var(--muted)' }}>{activeAssignment?.events?.cover_image && <img src={activeAssignment.events.cover_image} alt="" className="h-full w-full object-cover" />}</div><div className="min-w-0"><p className="truncate text-sm font-bold">{activeAssignment?.events?.title ?? 'Event'}</p><p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{selectedTier?.name ?? 'Ticket tier'} × {form.quantity}</p></div></div>
                       <div className="my-4 border-t" style={{ borderColor: 'var(--border)' }} />
-                      <div className="flex items-center justify-between text-sm"><span style={{ color: 'var(--muted-foreground)' }}>Tickets</span><strong>{selectedTier ? price(selectedTier.price * Math.max(1, Number(form.quantity) || 1)) : '—'}</strong></div><div className="mt-2 flex items-center justify-between text-sm"><span style={{ color: 'var(--muted-foreground)' }}>Service fee</span><strong>{selectedTier ? price(Math.round(selectedTier.price * Math.max(1, Number(form.quantity) || 1) * .05)) : '—'}</strong></div><div className="mt-4 flex items-center justify-between border-t pt-4 text-base" style={{ borderColor: 'var(--border)' }}><span className="font-bold">Total</span><strong style={{ color: 'var(--primary)' }}>{selectedTier ? price(Math.round(selectedTier.price * Math.max(1, Number(form.quantity) || 1) * 1.05)) : '—'}</strong></div>
+                      <div className="flex items-center justify-between text-sm"><span style={{ color: 'var(--muted-foreground)' }}>Tickets</span><strong>{selectedTier ? price(selectedTierSubtotal) : '—'}</strong></div><div className="mt-2 flex items-center justify-between text-sm"><span style={{ color: 'var(--muted-foreground)' }}>Organizer commission ({selectedTierFeeRate}%)</span><strong>{selectedTier ? price(selectedTierServiceFee) : '—'}</strong></div><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Deducted from organizer proceeds; not added to the customer total.</p><div className="mt-4 flex items-center justify-between border-t pt-4 text-base" style={{ borderColor: 'var(--border)' }}><span className="font-bold">Customer pays</span><strong style={{ color: 'var(--primary)' }}>{selectedTier ? price(selectedTierSubtotal) : '—'}</strong></div>
                       <div className="mt-5 space-y-2"><p className="text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--muted-foreground)' }}>Payment method</p>{([['mobile_money', 'Mobile money', 'Payment prompt on the customer phone'], ['card', 'Card', 'Secure card checkout'], ['bank', 'Bank transfer', 'Secure payment provider checkout'], ['cash', 'Cash', 'Organizer confirmation required']] as const).map(([value, label, description]) => { const selected = form.paymentMode === value; return <button key={value} type="button" data-selected={selected} onClick={() => setForm((current) => ({ ...current, paymentMode: value }))} className="agent-glass-option flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-[border-color,box-shadow,background,transform] hover:-translate-y-0.5" style={{ background: selected ? 'rgba(249,112,21,0.14)' : 'rgba(255,255,255,0.045)', borderColor: selected ? 'var(--primary)' : 'rgba(255,255,255,0.12)', boxShadow: selected ? '0 0 0 1px var(--primary), 0 10px 24px rgba(249,112,21,0.1)' : 'inset 0 1px 0 rgba(255,255,255,0.08)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}><span className="flex h-4 w-4 items-center justify-center rounded-full border" style={{ borderColor: selected ? 'var(--primary)' : 'var(--muted-foreground)', background: selected ? 'var(--primary)' : 'transparent' }}>{selected && <span className="h-1.5 w-1.5 rounded-full" style={{ background: '#000' }} />}</span><span><span className="block text-xs font-bold">{label}</span><span className="mt-0.5 block text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{description}</span></span></button> })}</div>
                       {error && <p className="mt-3 text-xs text-red-400">{error}</p>}{message && <p className="mt-3 text-xs" style={{ color: 'var(--primary)' }}>{message}</p>}
                       {eventHasEnded(activeAssignment?.events) && <p className="mt-3 rounded-xl px-3 py-3 text-xs" style={{ background: 'rgba(239,68,68,.1)', color: '#f87171' }}>This event has ended. New ticket purchases are disabled.</p>}

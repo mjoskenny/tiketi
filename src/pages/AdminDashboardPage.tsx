@@ -59,6 +59,9 @@ type PlatformSettings = {
   contact_address: string
   checkout_notice: string
   service_fee_percent: number
+  service_fee_consumable_percent: number
+  service_fee_table_percent: number
+  service_fee_free_percent: number
   ticket_sales_enabled: boolean
   mobile_money_enabled: boolean
   card_payments_enabled: boolean
@@ -170,6 +173,9 @@ const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   contact_address: 'Bujumbura, Burundi',
   checkout_notice: '',
   service_fee_percent: 5,
+  service_fee_consumable_percent: 4,
+  service_fee_table_percent: 5,
+  service_fee_free_percent: 0,
   ticket_sales_enabled: true,
   mobile_money_enabled: true,
   card_payments_enabled: true,
@@ -412,7 +418,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
     const loadPlatformSettings = async () => {
       setSettingsLoading(true)
       setSettingsError('')
-      const { data, error } = await supabase.from('platform_settings').select('id, platform_name, support_email, support_phone, contact_whatsapp, contact_address, checkout_notice, service_fee_percent, ticket_sales_enabled, mobile_money_enabled, card_payments_enabled, maintenance_mode, maintenance_message, marketplace_enabled, max_tickets_per_order, require_verified_organizers_to_publish, refund_requests_enabled, checkin_enabled, social_instagram_url, social_instagram_active, social_facebook_url, social_facebook_active, social_x_url, social_x_active, social_tiktok_url, social_tiktok_active, social_whatsapp_url, social_whatsapp_active, google_analytics_id, meta_pixel_id, updated_at').eq('id', true).maybeSingle()
+      const { data, error } = await supabase.from('platform_settings').select('id, platform_name, support_email, support_phone, contact_whatsapp, contact_address, checkout_notice, service_fee_percent, service_fee_consumable_percent, service_fee_table_percent, service_fee_free_percent, ticket_sales_enabled, mobile_money_enabled, card_payments_enabled, maintenance_mode, maintenance_message, marketplace_enabled, max_tickets_per_order, require_verified_organizers_to_publish, refund_requests_enabled, checkin_enabled, social_instagram_url, social_instagram_active, social_facebook_url, social_facebook_active, social_x_url, social_x_active, social_tiktok_url, social_tiktok_active, social_whatsapp_url, social_whatsapp_active, google_analytics_id, meta_pixel_id, updated_at').eq('id', true).maybeSingle()
 
       if (!isMounted) return
       if (error) {
@@ -427,6 +433,9 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
           contact_address: data.contact_address ?? DEFAULT_PLATFORM_SETTINGS.contact_address,
           checkout_notice: data.checkout_notice ?? '',
           service_fee_percent: Number(data.service_fee_percent ?? DEFAULT_PLATFORM_SETTINGS.service_fee_percent),
+          service_fee_consumable_percent: Number(data.service_fee_consumable_percent ?? DEFAULT_PLATFORM_SETTINGS.service_fee_consumable_percent),
+          service_fee_table_percent: Number(data.service_fee_table_percent ?? DEFAULT_PLATFORM_SETTINGS.service_fee_table_percent),
+          service_fee_free_percent: Number(data.service_fee_free_percent ?? DEFAULT_PLATFORM_SETTINGS.service_fee_free_percent),
           ticket_sales_enabled: data.ticket_sales_enabled ?? true,
           mobile_money_enabled: data.mobile_money_enabled ?? true,
           card_payments_enabled: data.card_payments_enabled ?? true,
@@ -497,7 +506,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
         const [allEvents, allProfiles, allOrganizers, allOrders, allTicketTiers, allTransactions, allAgentSales, allTickets, allRefunds, allCommissions, allWithdrawals] = await Promise.all([
           fetchAllRows((from, to) => supabase.from('events').select('id, status, organizer_id, created_at, title, description, date, time, end_time, venue, category, city, capacity, organizers:organizer_id(name)').order('created_at', { ascending: false }).range(from, to)),
           fetchAllRows((from, to) => supabase.from('profiles').select('id, email, created_at, full_name, role').order('created_at', { ascending: false }).range(from, to)),
-          fetchAllRows((from, to) => supabase.from('organizers').select('id, user_id, verified, verification_status, verification_requested_at, verification_note, verification_reviewed_at, created_at, name, city, phone, website').order('created_at', { ascending: false }).range(from, to)),
+          fetchAllRows((from, to) => supabase.from('organizers').select('id, user_id, verified, verification_status, verification_requested_at, verification_note, verification_reviewed_at, created_at, name, city, phone, website').order('created_at', { ascending: false }).order('id', { ascending: true }).range(from, to)),
           fetchAllRows((from, to) => supabase.from('orders').select('id, customer_id, organizer_id, event_id, status, subtotal, service_fee, total, payment_method, created_at, profiles:customer_id(full_name), events:event_id(title), order_items:order_items(quantity, total_price, unit_price, ticket_tier_id)').order('created_at', { ascending: false }).range(from, to)),
           fetchAllRows((from, to) => supabase.from('ticket_tiers').select('id, name, sold, price, quantity, event_id, created_at, events:event_id(title)').order('created_at', { ascending: false }).range(from, to)),
           fetchAllRows((from, to) => supabase.from('transactions').select('id, organizer_id, type, amount, currency, status, created_at, reference, organizers:organizer_id(name)').order('created_at', { ascending: false }).range(from, to)),
@@ -632,7 +641,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
           }
         })
 
-        const organizerRowsData = (organizers as Array<{ name?: string | null; id?: string; verified?: boolean | null; verification_status?: string | null; created_at?: string | null }>).map(organizerRow => {
+        const organizerRowsData = (allOrganizers as Array<{ name?: string | null; id?: string; verified?: boolean | null; verification_status?: string | null; created_at?: string | null }>).map(organizerRow => {
           const organizerEvents = (events as Array<{ organizer_id?: string | null }>).filter(event => event.organizer_id === organizerRow.id).length
           const organizerSales = (orders as Array<{ id: string; organizer_id?: string | null; subtotal?: number | null; order_items?: Array<{ total_price?: number | null }> | null; status?: string | null }>).filter(order => order.organizer_id === organizerRow.id && order.status === 'confirmed').reduce((sum, order) => sum + netTicketRevenueForOrder(order), 0)
           return {
@@ -821,7 +830,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
           organizers: {
             label: 'Organizers',
             columns: ['Organizer', 'City', 'Events', 'Net revenue (BIF)', 'Verification', 'Created'],
-            rows: (organizers as Array<{ id?: string; name?: string | null; city?: string | null; created_at?: string | null }>).map(row => [row.name ?? 'Unnamed organizer', row.city ?? '—', eventsByOrganizer.get(row.id ?? '') ?? 0, organizerRevenue.get(row.id ?? '') ?? 0, organizerVerificationStatus(row), row.created_at ?? '—']),
+            rows: (allOrganizers as Array<{ id?: string; name?: string | null; city?: string | null; created_at?: string | null }>).map(row => [row.name ?? 'Unnamed organizer', row.city ?? '—', eventsByOrganizer.get(row.id ?? '') ?? 0, organizerRevenue.get(row.id ?? '') ?? 0, organizerVerificationStatus(row), row.created_at ?? '—']),
           },
         }
 
@@ -1063,14 +1072,19 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
     const maintenanceMessage = platformSettings.maintenance_message.trim()
     const googleAnalyticsId = platformSettings.google_analytics_id.trim()
     const metaPixelId = platformSettings.meta_pixel_id.trim()
-    const serviceFeePercent = Number(platformSettings.service_fee_percent)
+    const feeRates = {
+      service_fee_percent: Number(platformSettings.service_fee_percent),
+      service_fee_consumable_percent: Number(platformSettings.service_fee_consumable_percent),
+      service_fee_table_percent: Number(platformSettings.service_fee_table_percent),
+      service_fee_free_percent: Number(platformSettings.service_fee_free_percent),
+    }
     const maxTicketsPerOrder = Number(platformSettings.max_tickets_per_order)
 
     if (!platformName) { setSettingsError('Enter a platform name.'); return }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail)) { setSettingsError('Enter a valid support email address.'); return }
     if (!supportPhone) { setSettingsError('Enter a support phone number for your contact details.'); return }
     if (!contactAddress) { setSettingsError('Enter a contact address for your public footer.'); return }
-    if (!Number.isFinite(serviceFeePercent) || serviceFeePercent < 0 || serviceFeePercent > 100) { setSettingsError('Service fee must be between 0% and 100%.'); return }
+    if (Object.values(feeRates).some(rate => !Number.isFinite(rate) || rate < 0 || rate > 100)) { setSettingsError('Each ticket category service fee must be between 0% and 100%.'); return }
     if (!Number.isInteger(maxTicketsPerOrder) || maxTicketsPerOrder < 1 || maxTicketsPerOrder > 100) { setSettingsError('Tickets per order must be a whole number between 1 and 100.'); return }
     if (!platformSettings.mobile_money_enabled && !platformSettings.card_payments_enabled) { setSettingsError('Keep at least one payment method enabled.'); return }
     if (googleAnalyticsId && !/^G-[A-Z0-9]+$/i.test(googleAnalyticsId)) { setSettingsError(i18n.t('Enter a valid Google Analytics 4 measurement ID (G-XXXXXXXXXX).')); return }
@@ -1090,7 +1104,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
       maintenance_message: maintenanceMessage,
       google_analytics_id: googleAnalyticsId,
       meta_pixel_id: metaPixelId,
-      service_fee_percent: serviceFeePercent,
+      ...feeRates,
       max_tickets_per_order: maxTicketsPerOrder,
     }
     const { error } = await supabase.from('platform_settings').upsert({ ...nextSettings, updated_by: user?.id }, { onConflict: 'id' })
@@ -1560,7 +1574,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div className="flex flex-1 items-center gap-2 rounded-xl border px-3 py-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border)' }}>
                   <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Search</span>
-                  <input value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Filter organizers" className="w-full bg-transparent text-sm outline-none" style={{ color: 'var(--foreground)' }} />
+                  <input value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Search all organizers" className="w-full bg-transparent text-sm outline-none" style={{ color: 'var(--foreground)' }} />
                 </div>
                 <div className="flex items-center gap-2">
                   <select value={dateRange} onChange={event => setDateRange(event.target.value as '7d' | '30d' | '90d' | 'all')} className="rounded-lg border px-2 py-2 text-xs" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
@@ -1573,7 +1587,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
                   <button onClick={exportCurrentSection} className="rounded-xl px-3 py-2 text-[10px] font-bold uppercase tracking-wide" style={{ background: 'var(--primary)', color: '#000' }}>Export CSV</button>
                 </div>
               </div>
-              <TableCard title="Organizers" subtitle="Account activity" columns={['Name', 'Events', 'Revenue', 'Verification']} rows={organizersTable.length ? organizersTable : [['No matching organizers', '0', 'BIF 0', 'Pending']]} />
+              <TableCard title="Organizers" subtitle={`${organizersTable.length} organizer accounts · activity metrics use the selected date range`} columns={['Name', 'Events', 'Revenue', 'Verification']} rows={organizersTable.length ? organizersTable : [['No matching organizers', '0', 'BIF 0', 'Pending']]} />
             </div>
               {renderSimpleList('Verification queue', [
                 { label: 'Awaiting verification', value: healthMetrics.organizers.awaitingVerification.toLocaleString() },
@@ -1938,7 +1952,15 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--muted-foreground)' }}>Checkout controls</p>
                   <h3 className="mt-1 text-lg font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Sales and payment rules</h3>
                   <div className="mt-5 space-y-3">
-                    <label className="block rounded-xl border p-4 text-sm font-bold" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.025)' }}>Organizer service fee (%)<span className="mt-1 block text-xs font-normal leading-5" style={{ color: 'var(--muted-foreground)' }}>Deducted server-side from organizer proceeds on each new order. Customers pay the ticket price only.</span><input type="number" min="0" max="100" step="0.01" value={platformSettings.service_fee_percent} onChange={event => updatePlatformSetting('service_fee_percent', Number(event.target.value))} className="mt-3 w-full rounded-lg border px-3 py-2 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
+                    <p className="rounded-xl border p-4 text-xs leading-5" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.025)', color: 'var(--muted-foreground)' }}>These commission rates are deducted from organizer proceeds server-side. They are not added to the customer’s ticket checkout total. Free tickets have a zero price, so a percentage rate results in no monetary deduction.</p>
+                    {([
+                      ['service_fee_percent', 'Non-consumable tickets', 'Standard admission, VIP, and other non-consumable ticket tiers.'],
+                      ['service_fee_consumable_percent', 'Consumable tickets', 'Tickets redeemed for food, drinks, or other venue credit.'],
+                      ['service_fee_table_percent', 'Table / group tickets', 'Table tiers and tiers that issue multiple tickets per purchase.'],
+                      ['service_fee_free_percent', 'Free tickets', 'Rate published for free ticket tiers; a zero ticket price still produces a zero monetary commission.'],
+                    ] as const).map(([key, label, description]) => (
+                      <label key={key} className="block rounded-xl border p-4 text-sm font-bold" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.025)' }}>{label} commission (%)<span className="mt-1 block text-xs font-normal leading-5" style={{ color: 'var(--muted-foreground)' }}>{description}</span><input type="number" min="0" max="100" step="0.01" value={platformSettings[key]} onChange={event => updatePlatformSetting(key, Number(event.target.value))} className="mt-3 w-full rounded-lg border px-3 py-2 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
+                    ))}
                     <ToggleSetting label="Ticket sales" description="Allow customers to create new checkout orders." checked={platformSettings.ticket_sales_enabled} onChange={value => updatePlatformSetting('ticket_sales_enabled', value)} />
                     <ToggleSetting label="Mobile Money" description="Make Mobile Money available in checkout and test payment confirmation." checked={platformSettings.mobile_money_enabled} onChange={value => updatePlatformSetting('mobile_money_enabled', value)} />
                     <ToggleSetting label="Card payments" description="Make card payments available in checkout and test payment confirmation." checked={platformSettings.card_payments_enabled} onChange={value => updatePlatformSetting('card_payments_enabled', value)} />

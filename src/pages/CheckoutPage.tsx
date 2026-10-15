@@ -4,6 +4,7 @@ import type { Event, TicketTier } from '../lib/types'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { trackConsentedEvent, trackConsentedMarketingEvent } from '../lib/consentedTracking'
+import { sendOrderTicketEmails } from '../lib/ticketEmail'
 import { projectId, publicAnonKey } from '../../utils/supabase/info'
 
 type CheckoutData = {
@@ -19,7 +20,6 @@ type CheckoutSettings = {
   ticket_sales_enabled: boolean
   mobile_money_enabled: boolean
   card_payments_enabled: boolean
-  service_fee_percent: number
   checkout_notice: string | null
 }
 
@@ -27,11 +27,10 @@ const DEFAULT_CHECKOUT_SETTINGS: CheckoutSettings = {
   ticket_sales_enabled: true,
   mobile_money_enabled: true,
   card_payments_enabled: true,
-  service_fee_percent: 0,
   checkout_notice: null,
 }
 
-function fmtPrice(n: number) { return n.toLocaleString() + ' BIF' }
+function fmtPrice(n: number) { return n <= 0 ? 'Free' : n.toLocaleString() + ' BIF' }
 
 async function callPaymentFunction<T>(path: string, body: Record<string, unknown>): Promise<T> {
   const { data: { session } } = await supabase.auth.getSession()
@@ -84,8 +83,8 @@ export default function CheckoutPage({ data, navigate }: Props) {
 
   const { event, quantities, subtotal } = data
   const tiers: TicketTier[] = (event.ticket_tiers ?? []).filter(t => (quantities[t.name] ?? quantities[t.id] ?? 0) > 0)
-  const serviceFee = Math.round(subtotal * (checkoutSettings.service_fee_percent / 100))
-  const total = subtotal + serviceFee
+  const total = subtotal
+  const isFreeEvent = total <= 0
 
   useEffect(() => {
     let active = true
@@ -107,13 +106,12 @@ export default function CheckoutPage({ data, navigate }: Props) {
     const loadCheckoutSettings = async () => {
       const { data: settingsData } = await supabase.rpc('get_public_platform_checkout_settings')
       const settings = Array.isArray(settingsData) ? settingsData[0] : settingsData
-      if (!isMounted || !settings) return
+      if (!isMounted) return
       setCheckoutSettings({
-        ticket_sales_enabled: settings.ticket_sales_enabled ?? true,
-        mobile_money_enabled: settings.mobile_money_enabled ?? true,
-        card_payments_enabled: settings.card_payments_enabled ?? true,
-        service_fee_percent: Number(settings.service_fee_percent) || 0,
-        checkout_notice: settings.checkout_notice ?? null,
+        ticket_sales_enabled: settings?.ticket_sales_enabled ?? true,
+        mobile_money_enabled: settings?.mobile_money_enabled ?? true,
+        card_payments_enabled: settings?.card_payments_enabled ?? true,
+        checkout_notice: settings?.checkout_notice ?? null,
       })
     }
     void loadCheckoutSettings()
@@ -180,8 +178,91 @@ export default function CheckoutPage({ data, navigate }: Props) {
 
   function getQty(t: TicketTier) { return quantities[t.name] ?? quantities[t.id] ?? 0 }
 
+  const handleFreeCheckout = async () => {
+    if (!user) { navigate('auth-customer'); return }
+    if (!checkoutSettings.ticket_sales_enabled) {
+      setError(checkoutSettings.checkout_notice || 'Ticket sales are currently paused. Please try again later.')
+      return
+    }
+    const validationError = validateInfo()
+    if (validationError) { setError(validationError); setStep(2); return }
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const quantitiesByTierId = Object.fromEntries(tiers.map(tier => [tier.id, getQty(tier)]))
+      const { data: orderId, error: purchaseError } = await supabase.rpc('create_pending_ticket_order', {
+        p_event_id: event.id,
+        p_organizer_id: event.organizer_id,
+        p_quantities: quantitiesByTierId,
+        p_holder_name: info.name,
+        p_holder_email: info.email,
+        p_holder_phone: info.phone,
+        p_holder_details: Object.fromEntries(tiers.map(tier => [tier.id, holders.filter(holder => holder.tierId === tier.id).map(holder => ({ name: holder.name }))])),
+      })
+      if (purchaseError) throw purchaseError
+      if (!orderId) throw new Error('Unable to create the free ticket reservation.')
+
+      const { data: completed, error: completionError } = await supabase.rpc('complete_test_ticket_order', {
+        p_order_id: orderId,
+        p_payment_method: 'free',
+      })
+      if (completionError || !completed?.[0]) throw completionError ?? new Error('Your free reservation could not be confirmed.')
+
+      const purchasedItems = tiers.map(tier => ({ item_id: tier.id, item_name: tier.name, price: tier.price, quantity: getQty(tier) }))
+      trackConsentedEvent('purchase', { transaction_id: orderId, currency: 'BIF', value: 0, items: purchasedItems })
+      trackConsentedMarketingEvent('Purchase', {
+        content_ids: purchasedItems.map(item => item.item_id),
+        content_name: event.title,
+        content_type: 'product',
+        currency: 'BIF',
+        value: 0,
+        num_items: purchasedItems.reduce((sum, item) => sum + item.quantity, 0),
+      })
+      const emailDelivery = await sendOrderTicketEmails(orderId)
+      window.sessionStorage.removeItem(`tiketi-checkout:${event.id}`)
+      const firstTicket = completed[0]
+      const firstTicketTier = tiers.find(tier => tier.id === firstTicket.ticket_tier_id) ?? tiers[0]
+      navigate('ticket', {
+        event,
+        info,
+        tickets: completed.map(ticket => ({
+          id: ticket.ticket_id,
+          qr_code: ticket.qr_code,
+          holder_name: ticket.holder_name,
+          holder_email: ticket.holder_email,
+          ticket_tier_id: ticket.ticket_tier_id,
+          created_at: ticket.created_at,
+        })),
+        ticketId: firstTicket.ticket_id,
+        ticket: firstTicket.qr_code,
+        ticketStatus: 'valid',
+        ticketType: firstTicketTier?.name,
+        ticketKind: firstTicketTier?.ticket_type,
+        ticketPrice: firstTicketTier?.price ?? 0,
+        purchasedAt: firstTicket.created_at,
+        ticketExtraInfo: firstTicketTier?.extra_info ?? '',
+        ticketExpiry: firstTicketTier?.expires_at ?? '',
+        ticketGroupSize: firstTicketTier?.group_size ?? 1,
+        emailDelivery,
+      })
+    } catch (checkoutError) {
+      const message = typeof checkoutError === 'object' && checkoutError !== null && 'message' in checkoutError
+        ? String(checkoutError.message)
+        : 'Unable to complete the free reservation.'
+      setError(message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handlePay = async () => {
     if (!user) { navigate('auth-customer'); return }
+    if (isFreeEvent) {
+      await handleFreeCheckout()
+      return
+    }
     if (!checkoutSettings.ticket_sales_enabled) {
       setError(checkoutSettings.checkout_notice || 'Ticket sales are currently paused. Please try again later.')
       return
@@ -297,7 +378,7 @@ export default function CheckoutPage({ data, navigate }: Props) {
 
         {/* Step indicators */}
         <div className="flex items-center gap-3 mb-10">
-          {[{ n: 1, label: 'Tickets' }, { n: 2, label: 'Your info' }, { n: 3, label: 'Payment' }].map(({ n, label }, i) => (
+          {[{ n: 1, label: 'Tickets' }, { n: 2, label: 'Your info' }, { n: 3, label: isFreeEvent ? 'Confirm' : 'Payment' }].map(({ n, label }, i) => (
             <div key={n} className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
@@ -390,7 +471,27 @@ export default function CheckoutPage({ data, navigate }: Props) {
               </div>
             )}
 
-            {step === 3 && (
+            {step === 3 && isFreeEvent ? (
+              <div>
+                <h2 className="text-2xl font-bold mb-6" style={{ fontFamily: 'Outfit, sans-serif' }}>Free reservation</h2>
+                {error && <div className="mb-5 rounded-xl px-4 py-3 text-sm" style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)', color: '#fca5a5' }}>{error}</div>}
+                <div className="rounded-2xl p-5 mb-6" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                  <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>This event is free. No payment is required, and your tickets will be confirmed immediately.</p>
+                </div>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setCheckoutStep(2)} aria-label="Back to your information" title="Back to your information"
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+                    style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>
+                    <ArrowLeftIcon size={18} />
+                  </button>
+                  <button onClick={handleFreeCheckout} disabled={loading}
+                    className="flex-1 py-4 rounded-xl font-bold text-sm transition-all"
+                    style={{ background: 'var(--primary)', color: 'var(--primary-foreground)', opacity: loading ? 0.7 : 1 }}>
+                    {loading ? 'Confirming your tickets…' : 'Complete free reservation'}
+                  </button>
+                </div>
+              </div>
+            ) : step === 3 && (
               <div>
                 <h2 className="text-2xl font-bold mb-6" style={{ fontFamily: 'Outfit, sans-serif' }}>Payment</h2>
                 {error && <div className="mb-5 rounded-xl px-4 py-3 text-sm" style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)', color: '#fca5a5' }}>{error}</div>}
@@ -501,11 +602,8 @@ export default function CheckoutPage({ data, navigate }: Props) {
                 <div className="flex justify-between pt-2 border-t" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>
                   <span>Subtotal</span><span>{fmtPrice(subtotal)}</span>
                 </div>
-                <div className="flex justify-between" style={{ color: 'var(--muted-foreground)' }}>
-                  <span>Service fee ({checkoutSettings.service_fee_percent}%)</span><span>{fmtPrice(serviceFee)}</span>
-                </div>
                 <div className="flex justify-between font-bold text-base pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
-                  <span>Total</span>
+                  <span>Total you pay</span>
                   <span style={{ color: 'var(--accent)' }}>{fmtPrice(total)}</span>
                 </div>
               </div>

@@ -10,6 +10,7 @@ import { currentLocale, formatLocaleDate } from '../lib/locale'
 type Props = {
   event: Event | null
   orders: Order[]
+  netRevenueByOrder?: Record<string, number>
   tickets: Ticket[]
   agentOrderMeta: Record<string, { payment_mode: string }>
   canCheckIn: boolean
@@ -83,7 +84,7 @@ function TicketCircle({ capacity, reserved, scanned }: { capacity: number; reser
   </div>
 }
 
-export default function OrganizerEventViewPage({ event, orders, tickets, agentOrderMeta, canCheckIn, canRecordTransaction, onTicketsChanged, onSaleRecorded, loading, onBack, onEdit, navigate }: Props) {
+export default function OrganizerEventViewPage({ event, orders, netRevenueByOrder = {}, tickets, agentOrderMeta, canCheckIn, canRecordTransaction, onTicketsChanged, onSaleRecorded, loading, onBack, onEdit, navigate }: Props) {
   const [checkInOpen, setCheckInOpen] = useState(false)
   const [customerSearch, setCustomerSearch] = useState('')
   const [customerStatus, setCustomerStatus] = useState('all')
@@ -111,6 +112,9 @@ export default function OrganizerEventViewPage({ event, orders, tickets, agentOr
       : []
   const eventOrders = orders.filter(order => order.event_id === event.id)
   const confirmedOrders = eventOrders.filter(order => order.status === 'confirmed')
+  const netValueForOrder = (order: Order) => netRevenueByOrder[order.id] ?? order.total
+  const platformCommission = confirmedOrders.reduce((sum, order) => sum + Math.max(0, Number(order.service_fee) || 0), 0)
+  const agentCommission = confirmedOrders.reduce((sum, order) => sum + Math.max(0, netRevenueByOrder[order.id] === undefined ? 0 : (order.total - Math.max(0, Number(order.service_fee) || 0) - netRevenueByOrder[order.id])), 0)
   const eventTickets = tickets.filter(ticket => ticket.event_id === event.id)
   const maxTickets = tiers.length
     ? tiers.reduce((sum, tier) => sum + tier.quantity * Math.max(1, tier.group_size ?? 1), 0)
@@ -121,10 +125,10 @@ export default function OrganizerEventViewPage({ event, orders, tickets, agentOr
   const salesProgress = maxTickets > 0 ? Math.min(100, Math.round((ticketsReserved / maxTickets) * 100)) : 0
   const netInAppSales = confirmedOrders
     .filter(order => order.payment_method !== 'cash')
-    .reduce((sum, order) => sum + order.total, 0)
+    .reduce((sum, order) => sum + netValueForOrder(order), 0)
   const cashSales = confirmedOrders
     .filter(order => order.payment_method === 'cash' || agentOrderMeta[order.id]?.payment_mode === 'cash')
-    .reduce((sum, order) => sum + order.total, 0)
+    .reduce((sum, order) => sum + netValueForOrder(order), 0)
   const trafficOrders = eventOrders.filter(order => order.status === 'confirmed')
   const selectedTier = tiers.find(tier => tier.id === selectedTierId) ?? tiers[0]
   const saleQuantity = Number(quantity)
@@ -230,10 +234,12 @@ export default function OrganizerEventViewPage({ event, orders, tickets, agentOr
       </div>
     </section>
 
-    <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+    <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {[
-        { label: 'Net In-App Sales', value: formatPrice(netInAppSales), note: 'Confirmed in-app orders', Icon: DollarSignIcon, color: 'var(--primary)' },
-        { label: 'Cash Sales', value: formatPrice(cashSales), note: 'Confirmed cash orders', Icon: DollarSignIcon, color: '#86efac' },
+        { label: 'Net In-App Sales', value: formatPrice(netInAppSales), note: 'After fees, agent commissions, and processed refunds', Icon: DollarSignIcon, color: 'var(--primary)' },
+        { label: 'Net Cash Sales', value: formatPrice(cashSales), note: 'After fees, agent commissions, and processed refunds', Icon: DollarSignIcon, color: '#86efac' },
+        { label: 'Platform Commissions', value: formatPrice(platformCommission), note: 'Deducted from organizer proceeds', Icon: DollarSignIcon, color: '#c4a7ff' },
+        { label: 'Agent Commissions', value: formatPrice(agentCommission), note: 'Earned by ticket agents', Icon: UsersIcon, color: '#7dd3fc' },
       ].map(({ label, value, note, Icon, color }) => <div key={label} className="rounded-2xl border p-4 sm:p-5" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
         <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: `${color}18`, color }}><Icon size={17} /></div>
         <p className="mt-4 break-words text-lg font-black sm:text-2xl">{value}</p><p className="mt-1 text-xs font-semibold">{label}</p><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{note}</p>
@@ -297,7 +303,17 @@ export default function OrganizerEventViewPage({ event, orders, tickets, agentOr
           <div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Event overview</p><h2 className="mt-1 text-lg font-bold">Details</h2></div><TrendingUpIcon size={18} /></div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Detail Icon={CalendarIcon} label="Date" value={formatDate(event.date)} />
-            <Detail Icon={ClockIcon} label="Time" value={`${event.time?.slice(0, 5) || 'TBA'}${event.end_time ? ` – ${event.end_time.slice(0, 5)}` : ''}`} />
+            <Detail Icon={ClockIcon} label="Time" value={(() => {
+              const start = event.time ? String(event.time).trim() : ''
+              const end = event.end_time ? String(event.end_time).trim() : ''
+              const formatTime = (value: string) => {
+                if (!value || /^0{1,2}:0{1,2}(?::0{1,2})?(?:\+\d{2}:\d{2}|Z)?$/i.test(value) || /^0{1,2}$/i.test(value)) return 'TBA'
+                return value.slice(0, 5)
+              }
+              const startLabel = formatTime(start)
+              const endLabel = formatTime(end)
+              return startLabel === 'TBA' && endLabel === 'TBA' ? 'TBA' : `${startLabel}${endLabel && endLabel !== 'TBA' ? ` – ${endLabel}` : ''}`
+            })()} />
             <Detail Icon={MapPinIcon} label="Venue" value={`${event.venue}${event.city ? `, ${event.city}` : ''}`} />
             <Detail Icon={UsersIcon} label="Capacity" value={`${event.capacity.toLocaleString()} guests`} />
           </div>

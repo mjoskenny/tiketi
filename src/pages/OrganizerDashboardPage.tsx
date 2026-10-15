@@ -185,7 +185,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [withdrawals, setWithdrawals] = useState<OrganizerWithdrawal[]>([])
-  const [commissions, setCommissions] = useState<Array<{ amount: number; status: string }>>([])
+  const [commissions, setCommissions] = useState<Array<{ amount: number; status: string; agent_sales?: { order_id?: string | null } | Array<{ order_id?: string | null }> | null }>>([])
   const [refundRequests, setRefundRequests] = useState<RefundRequest[]>([])
   const [checkinTickets, setCheckinTickets] = useState<Ticket[]>([])
   const [organizerNotifications, setOrganizerNotifications] = useState<OrganizerNotification[]>([])
@@ -213,6 +213,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const [actionError, setActionError] = useState('')
   const [dashboardLoadError, setDashboardLoadError] = useState(false)
   const [verificationStatus, setVerificationStatus] = useState<'unverified' | 'pending' | 'verified'>(organizer?.verification_status ?? (organizer?.verified ? 'verified' : 'unverified'))
+  const [verificationSubmitting, setVerificationSubmitting] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [editingAgentAssignment, setEditingAgentAssignment] = useState<AgentAssignment | null>(null)
 
@@ -328,10 +329,18 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   }
 
   const requestVerification = async () => {
-    if (!orgId || verificationStatus !== 'unverified') return
-    const { error } = await supabase.from('organizers').update({ verification_status: 'pending', verification_requested_at: new Date().toISOString() }).eq('id', orgId)
-    if (error) setActionError(error.message)
-    else setVerificationStatus('pending')
+    if (!orgId || !isOwner || verificationStatus !== 'unverified' || verificationSubmitting) return
+    setVerificationSubmitting(true)
+    setActionError('')
+    try {
+      const { error } = await supabase.rpc('request_organizer_verification', { p_organizer_id: orgId })
+      if (error) throw error
+      setVerificationStatus('pending')
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Unable to submit the verification request.')
+    } finally {
+      setVerificationSubmitting(false)
+    }
   }
 
   const load = useCallback(async () => {
@@ -352,7 +361,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
       supabase.from('agent_assignments').select('*, events(*, ticket_tiers(*)), profiles(full_name, email)').eq('organizer_id', orgId).order('created_at', { ascending: false }),
       fetchAllRows((from, to) => supabase.from('refund_requests').select('*, profiles!customer_id(full_name, email), events(title)').eq('organizer_id', orgId).order('created_at', { ascending: false }).range(from, to)),
       fetchAllRows((from, to) => supabase.from('organizer_withdrawals').select('*').eq('organizer_id', orgId).order('requested_at', { ascending: false }).range(from, to)),
-      fetchAllRows((from, to) => supabase.from('commissions').select('amount, status').eq('organizer_id', orgId).range(from, to)),
+      fetchAllRows((from, to) => supabase.from('commissions').select('amount, status, agent_sales(order_id)').eq('organizer_id', orgId).range(from, to)),
     ])
     const failedQueries = [
       ['team', mem.error], ['roles', rol.error],
@@ -385,7 +394,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     setSubscriptions(sub.data ?? [])
     setTransactions(txn as Transaction[])
     setWithdrawals(payoutRequests as OrganizerWithdrawal[])
-    setCommissions(commissionRows as Array<{ amount: number; status: string }>)
+    setCommissions(commissionRows as typeof commissions)
     setRefundRequests(refunds as RefundRequest[])
     setCheckinTickets(tickets as Ticket[])
     setLastUpdated(new Date())
@@ -535,10 +544,25 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     }
     const order = orders.find(item => item.id === request.order_id)
     const orderItem = order?.order_items?.find(item => item.ticket_tier_id === ticket?.ticket_tier_id)
-    if (orderItem) processedRefundAmountByOrder.set(request.order_id, (processedRefundAmountByOrder.get(request.order_id) ?? 0) + orderItem.unit_price)
+    if (orderItem) {
+      const quantity = Math.max(1, Number(orderItem.quantity) || 1)
+      const ticketValue = Number(orderItem.total_price) || Number(orderItem.unit_price) * quantity
+      const perTicketAmount = Math.round(ticketValue / quantity)
+      processedRefundAmountByOrder.set(request.order_id, (processedRefundAmountByOrder.get(request.order_id) ?? 0) + perTicketAmount)
+    }
   })
-  const revenueForOrder = (order: Order) => Math.max(0, order.total - (processedRefundAmountByOrder.get(order.id) ?? 0))
+  const commissionAmountByOrder = new Map<string, number>()
+  commissions.filter(commission => commission.status !== 'reversed').forEach(commission => {
+    const sale = Array.isArray(commission.agent_sales) ? commission.agent_sales[0] : commission.agent_sales
+    if (sale?.order_id) commissionAmountByOrder.set(sale.order_id, (commissionAmountByOrder.get(sale.order_id) ?? 0) + (Number(commission.amount) || 0))
+  })
+  const serviceFeeForOrder = (order: Order) => Math.max(0, Number(order.service_fee) || 0)
+  const agentCommissionForOrder = (order: Order) => commissionAmountByOrder.get(order.id) ?? 0
+  const revenueForOrder = (order: Order) => Math.max(0, order.total - serviceFeeForOrder(order) - agentCommissionForOrder(order) - (processedRefundAmountByOrder.get(order.id) ?? 0))
   const totalRevenue = confirmedOrders.reduce((sum, order) => sum + revenueForOrder(order), 0)
+  const totalPlatformCommission = confirmedOrders.reduce((sum, order) => sum + serviceFeeForOrder(order), 0)
+  const totalAgentCommission = confirmedOrders.reduce((sum, order) => sum + agentCommissionForOrder(order), 0)
+  const netRevenueByOrder = Object.fromEntries(confirmedOrders.map(order => [order.id, revenueForOrder(order)]))
   const totalTicketsSold = Math.max(0, confirmedOrders.reduce((total, order) => total + (order.order_items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0), 0) - processedRefundTicketIds.size)
   const publishedEvents = events.filter(e => e.status === 'published').length
   const avgOrderValue = confirmedOrders.length ? Math.round(totalRevenue / confirmedOrders.length) : 0
@@ -1100,7 +1124,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                   </div>
                   {verificationStatus !== 'verified' && <div className="flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
                     <div><p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Organizer verification</p><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>{verificationStatus === 'verified' ? 'Your organizer profile is verified.' : verificationStatus === 'pending' ? 'Your verification request is awaiting review.' : 'Verify your profile to show a trusted badge on organizer cards and profiles.'}</p></div>
-                    <button onClick={requestVerification} disabled={verificationStatus !== 'unverified'} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: verificationStatus === 'unverified' ? 'var(--primary)' : 'var(--muted)', color: verificationStatus === 'unverified' ? '#000' : 'var(--muted-foreground)' }}>{verificationStatus === 'verified' ? 'Verified' : verificationStatus === 'pending' ? 'Pending review' : 'Request verification'}</button>
+                    <button onClick={requestVerification} disabled={!isOwner || verificationStatus !== 'unverified' || verificationSubmitting} className="rounded-xl px-4 py-2.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-60" style={{ background: verificationStatus === 'unverified' && isOwner ? 'var(--primary)' : 'var(--muted)', color: verificationStatus === 'unverified' && isOwner ? '#000' : 'var(--muted-foreground)' }}>{verificationStatus === 'verified' ? 'Verified' : verificationStatus === 'pending' ? 'Pending review' : verificationSubmitting ? 'Submitting…' : isOwner ? 'Request verification' : 'Owner only'}</button>
                   </div>}
                   {/* KPI grid */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

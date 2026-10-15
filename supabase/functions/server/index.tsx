@@ -110,7 +110,7 @@ async function pdfAttachment(ticket: {
   pdf.text('PRICE', 103, 99);
   pdf.setTextColor(25, 25, 25);
   pdf.setFontSize(7);
-  pdf.text(`${ticketPrice.toLocaleString()} BIF`, 103, 105);
+  pdf.text(ticketPrice <= 0 ? 'Free' : `${ticketPrice.toLocaleString()} BIF`, 103, 105);
   pdf.setTextColor(100, 100, 100);
   pdf.text('PURCHASED', 145, 99);
   pdf.setTextColor(25, 25, 25);

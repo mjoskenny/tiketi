@@ -95,7 +95,7 @@ export default function NotificationsPage({ navigate }: Props) {
     if (notification.ticketId) {
       const { data: ticket, error: ticketError } = await supabase.from('tickets').select('*, events(*), ticket_tiers(*)').eq('id', notification.ticketId).maybeSingle()
       if (ticketError) { setLoadError(ticketError.message); return }
-      if (ticket?.events) navigate('ticket', { event: ticket.events, info: { name: ticket.holder_name ?? 'Guest', phone: ticket.holder_phone ?? '', email: ticket.holder_email ?? '' }, ticket: ticket.qr_code, ticketStatus: ticket.status, ticketType: ticket.ticket_tiers?.name, ticketKind: ticket.ticket_tiers?.ticket_type, ticketPrice: ticket.ticket_tiers?.price, purchasedAt: ticket.created_at, ticketExtraInfo: ticket.ticket_tiers?.extra_info, ticketExpiry: ticket.ticket_tiers?.expires_at, ticketGroupSize: ticket.ticket_tiers?.group_size })
+      if (ticket?.events) navigate('ticket', { ticketId: ticket.id, event: ticket.events, info: { name: ticket.holder_name ?? 'Guest', phone: ticket.holder_phone ?? '', email: ticket.holder_email ?? '' }, ticket: ticket.qr_code, ticketStatus: ticket.status, ticketType: ticket.ticket_tiers?.name, ticketKind: ticket.ticket_tiers?.ticket_type, ticketPrice: ticket.ticket_tiers?.price, purchasedAt: ticket.created_at, ticketExtraInfo: ticket.ticket_tiers?.extra_info, ticketExpiry: ticket.ticket_tiers?.expires_at, ticketGroupSize: ticket.ticket_tiers?.group_size })
     } else if (notification.eventId && notification.recipientScope === 'attendee') {
       const { data: event, error: eventError } = await supabase
         .from('events')

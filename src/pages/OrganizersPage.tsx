@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { ArrowRightIcon, BarChartIcon, CheckIcon, ChevronDownIcon, ClipboardIcon, DollarSignIcon, LinkIcon, QrCodeIcon, TicketIcon, UsersIcon, ZapIcon } from '../components/Icon'
 import { events } from '../data/events'
+import { supabase } from '../lib/supabase'
 
 type Props = { navigate: (page: string) => void }
 
 const heroEvent = events[0]
 const logos = Array.from(new Set(events.map(event => event.organizer))).slice(0, 8)
 const formatBif = (value: number) => `BIF ${value.toLocaleString()}`
+const DEFAULT_FEE_RATES = { nonConsumable: 5, consumable: 4, table: 5, free: 0 }
 const faqs = [
   ['How can I create an event?', 'Create an organizer account, enter your event details, add ticket types and pricing, review the listing, and publish when it is ready.'],
   ['Do I need a computer?', 'QPassa Studio should work comfortably on mobile for important event tasks. Confirm feature parity across mobile and desktop before launch.'],
@@ -48,6 +50,24 @@ function ProductSection({ number, label, title, copy, points, image, secondaryIm
 
 export default function OrganizersPage({ navigate }: Props) {
   const [openFaq, setOpenFaq] = useState<number | null>(null)
+  const [feeRates, setFeeRates] = useState(DEFAULT_FEE_RATES)
+
+  useEffect(() => {
+    let active = true
+    const loadFeeRates = async () => {
+      const { data } = await supabase.rpc('get_public_ticket_fee_settings')
+      const settings = Array.isArray(data) ? data[0] : data
+      if (!active || !settings) return
+      setFeeRates({
+        nonConsumable: Number(settings.service_fee_non_consumable_percent ?? DEFAULT_FEE_RATES.nonConsumable),
+        consumable: Number(settings.service_fee_consumable_percent ?? DEFAULT_FEE_RATES.consumable),
+        table: Number(settings.service_fee_table_percent ?? DEFAULT_FEE_RATES.table),
+        free: Number(settings.service_fee_free_percent ?? DEFAULT_FEE_RATES.free),
+      })
+    }
+    void loadFeeRates()
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     const observer = new IntersectionObserver(entries => entries.forEach(entry => { if (entry.isIntersecting) entry.target.classList.add('is-visible') }), { threshold: .14 })
@@ -67,7 +87,12 @@ export default function OrganizersPage({ navigate }: Props) {
 
     <section className="organizer-reference-reviews organizer-reference-shell"><Reveal><p className="organizer-reference-kicker"><UsersIcon size={15} /> The QPassa point of view</p><h2>Build the kind of event<br /><em>you would attend.</em></h2><p className="organizer-reference-lede">Clear information, a smoother arrival, and fewer loose ends make space for the part people actually remember.</p></Reveal><div className="organizer-reference-review-grid">{[['One clear listing', '01 · DETAILS', 'Give guests the venue, time, ticket choice, and context they need before they say yes.'], ['A calmer door', '02 · CHECK-IN', 'Keep the guest list close to the team welcoming people into the room.'], ['A better read', '03 · INSIGHTS', 'Leave the event with useful signals about what sold, who arrived, and what to build next.'], ['A growing audience', '04 · FOLLOW', 'Make it easy for people who enjoyed this event to discover the next one.']].map(([title, user, copy], index) => <Reveal className={`organizer-reference-review review-${index}`} key={user}><b>{title}</b><small>{user}</small><blockquote>{copy}</blockquote><span>● ● ●</span></Reveal>)}</div></section>
 
-    <section id="pricing" className="organizer-reference-pricing"><div className="organizer-reference-shell"><Reveal><p className="organizer-reference-kicker"><TicketIcon size={15} /> Pricing</p><h2>Simple pricing.<br /><em>Every feature.</em></h2><p className="organizer-reference-lede">Clear commission rates for ticketed events, with the core organizer tools included.</p></Reveal><div className="organizer-reference-price-grid"><Reveal><article><span>Starter</span><small>ALWAYS FREE</small><p>Community and free-entry events</p><b>0% <i>commission</i></b></article></Reveal><Reveal><article className="is-popular"><span>General</span><small>MOST POPULAR</small><p>Conferences, concerts, and ticketed experiences</p><b>6% <i>commission</i></b></article></Reveal><Reveal><article><span>Consumable</span><small>VENUE CREDIT</small><p>Tickets redeemed for food or drinks at the venue</p><b>4% <i>commission</i></b></article></Reveal></div><Reveal className="organizer-reference-includes"><div><h3>Every plan includes</h3><p>Ticket scanning, shareable event link, sales and settlement tracking, team roles, analytics, and attendee management.</p></div><button onClick={() => navigate('auth-organizer')}>Get started <ArrowRightIcon size={15} /></button><ul>{['Ticket scanning', 'Shareable event link', 'Sales and settlement tracking', 'Team roles and access control', 'Sales analytics', 'Attendee and check-in management', 'Supported local payment methods'].map(item => <li key={item}><CheckIcon size={14} />{item}</li>)}</ul></Reveal></div></section>
+    <section id="pricing" className="organizer-reference-pricing"><div className="organizer-reference-shell"><Reveal><p className="organizer-reference-kicker"><TicketIcon size={15} /> Pricing</p><h2>Simple pricing.<br /><em>Every feature.</em></h2><p className="organizer-reference-lede">Commission rates are set by QPassa and deducted from organizer proceeds. They are not added to the customer’s ticket checkout total.</p></Reveal><div className="organizer-reference-price-grid">{[
+      { title: 'Non-consumable', label: 'STANDARD TICKETS', description: 'General admission, VIP, and other non-consumable tiers', rate: feeRates.nonConsumable },
+      { title: 'Table / group', label: 'MULTI-TICKET', description: 'Table tiers and tickets that issue multiple admissions per purchase', rate: feeRates.table },
+      { title: 'Consumable', label: 'VENUE CREDIT', description: 'Tickets redeemed for food, drinks, or other venue credit', rate: feeRates.consumable },
+      { title: 'Free tickets', label: 'FREE ENTRY', description: 'Free tiers have no ticket value; percentage commission amount is zero', rate: feeRates.free },
+    ].map((item, index) => <Reveal key={item.title}><article className={index === 0 ? 'is-popular' : ''}><span>{item.title}</span><small>{item.label}</small><p>{item.description}</p><b>{item.rate}% <i>commission</i></b></article></Reveal>)}</div><Reveal className="organizer-reference-includes"><div><h3>Every plan includes</h3><p>Ticket scanning, shareable event link, sales and settlement tracking, team roles, analytics, and attendee management.</p></div><button onClick={() => navigate('auth-organizer')}>Get started <ArrowRightIcon size={15} /></button><ul>{['Ticket scanning', 'Shareable event link', 'Sales and settlement tracking', 'Team roles and access control', 'Sales analytics', 'Attendee and check-in management', 'Supported local payment methods'].map(item => <li key={item}><CheckIcon size={14} />{item}</li>)}</ul></Reveal></div></section>
 
     <section className="organizer-reference-faq organizer-reference-shell"><div><p className="organizer-reference-kicker"><ClipboardIcon size={15} /> FAQ</p><h2>Your guide to<br /><em>running events.</em></h2></div><div>{faqs.map(([question, answer], index) => <Reveal key={question} className="organizer-reference-faq-item"><button onClick={() => setOpenFaq(openFaq === index ? null : index)}><span><small>Q{index + 1}</small>{question}</span><ChevronDownIcon size={17} /></button>{openFaq === index && <p>{answer}</p>}</Reveal>)}</div></section>
 
