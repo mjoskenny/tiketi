@@ -28,7 +28,7 @@ export default function BottomNav({ current, navigate }: Props) {
     if (!user) { setUnreadNotifications(0); return }
     let active = true
     const loadUnread = async () => {
-      const { count } = await supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', user.id).is('read_at', null)
+      const { count } = await supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('recipient_scope', 'attendee').is('read_at', null)
       if (active) setUnreadNotifications(count ?? 0)
     }
     void loadUnread()
