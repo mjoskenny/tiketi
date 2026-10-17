@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { categories } from '../data/events'
 import { SearchIcon, XIcon, FilterIcon, TagIcon, SparkleIcon, ArrowRightIcon } from '../components/Icon'
@@ -67,6 +67,10 @@ function EmptySection({ message = 'No events available' }: { message?: string })
 }
 
 export default function HomePage({ navigate }: Props) {
+  const trendingScrollerRef = useRef<HTMLDivElement>(null)
+  const trendingTrackRef = useRef<HTMLDivElement>(null)
+  const [trendingCopyCount, setTrendingCopyCount] = useState(5)
+  const [trendingCycleWidth, setTrendingCycleWidth] = useState(0)
   const [events, setEvents] = useState<Event[]>([])
   const [trendingEvents, setTrendingEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
@@ -76,6 +80,57 @@ export default function HomePage({ navigate }: Props) {
   const [priceFilter, setPriceFilter] = useState<'all' | 'free' | 'paid'>('all')
   const [showFilters, setShowFilters] = useState(false)
   const [currentTime, setCurrentTime] = useState(() => Date.now())
+
+  useEffect(() => {
+    const scroller = trendingScrollerRef.current
+    const track = trendingTrackRef.current
+    if (!scroller || !track) return
+
+    const groups = track.querySelectorAll<HTMLElement>('.trending-events-group')
+    if (groups.length < 2) return
+
+    const updateCopies = () => {
+      const cycleWidth = groups[1].offsetLeft - groups[0].offsetLeft
+      if (!cycleWidth) return
+      setTrendingCycleWidth(current => current === cycleWidth ? current : cycleWidth)
+      const copies = Math.max(5, Math.ceil(scroller.clientWidth / cycleWidth) * 2 + 3)
+      setTrendingCopyCount(current => current === copies ? current : copies)
+    }
+
+    updateCopies()
+    const measurementFrame = window.requestAnimationFrame(updateCopies)
+    const observer = new ResizeObserver(updateCopies)
+    observer.observe(scroller)
+    observer.observe(track)
+    return () => {
+      window.cancelAnimationFrame(measurementFrame)
+      observer.disconnect()
+    }
+  }, [trendingEvents.length])
+
+  useEffect(() => {
+    const scroller = trendingScrollerRef.current
+    const track = trendingTrackRef.current
+    if (!scroller || !track || !trendingEvents.length) return
+
+    const groups = track.querySelectorAll<HTMLElement>('.trending-events-group')
+    const middleGroup = groups[Math.floor(groups.length / 2)]
+    if (middleGroup) scroller.scrollLeft = middleGroup.offsetLeft
+  }, [trendingEvents.length, trendingCopyCount])
+
+  const handleTrendingScroll = () => {
+    const scroller = trendingScrollerRef.current
+    const track = trendingTrackRef.current
+    if (!scroller || !track) return
+
+    const groups = track.querySelectorAll<HTMLElement>('.trending-events-group')
+    if (groups.length < 3) return
+    const cycleWidth = groups[1].offsetLeft - groups[0].offsetLeft
+    if (!cycleWidth) return
+
+    if (scroller.scrollLeft < cycleWidth) scroller.scrollLeft += cycleWidth
+    else if (scroller.scrollLeft > track.scrollWidth - scroller.clientWidth - cycleWidth) scroller.scrollLeft -= cycleWidth
+  }
 
   useEffect(() => {
     const timer = window.setInterval(() => setCurrentTime(Date.now()), 15000)
@@ -236,7 +291,7 @@ export default function HomePage({ navigate }: Props) {
               <span aria-hidden className="h-1.5 w-1.5 animate-pulse rounded-full bg-orange-400 shadow-[0_0_10px_#fb923c]" />Live
             </span>
           </div>
-          <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+          <div className="flex gap-4 overflow-x-auto pb-2 pt-2" style={{ scrollbarWidth: 'none' }}>
             {liveNowEvents.map(ev => {
               const image = ev.cover_image || ev.organizers?.profiles?.profile_image || ev.organizers?.profiles?.avatar_url || ev.organizers?.logo_url || ORGANIZER_COVER_PLACEHOLDER
               return <button key={ev.id} type="button" onClick={() => navigate('event-detail', ev)} aria-label={`Live now: ${ev.title}`} className="group flex w-[84px] shrink-0 flex-col items-center gap-2 text-center">
@@ -249,7 +304,7 @@ export default function HomePage({ navigate }: Props) {
             })}
           </div>
         </section>}
-        {loading ? <section><SectionHeading title="Trending events" /><div className="flex gap-4 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{[1, 2, 3].map(i => <div key={i} className="aspect-[4/5] rounded-[2rem] animate-pulse flex-shrink-0" style={{ width: 220, background: 'var(--muted)' }} />)}</div></section> : trendingEvents.length > 0 ? <section><SectionHeading title="Trending events" /><div className="trending-events-marquee overflow-x-auto overscroll-x-contain pb-3" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' }}><div className="trending-events-track flex min-w-max gap-4 py-1" style={{ width: 'max-content' }}>{[...trendingEvents, ...trendingEvents].map((ev, index) => <div key={`${ev.id}-${index}`} className="shrink-0"><EventCard event={ev} poster listing timerBadge trending onClick={() => navigate('event-detail', ev)} /></div>)}</div></div></section> : null}
+        {loading ? <section><SectionHeading title="Trending events" /><div className="flex gap-4 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{[1, 2, 3].map(i => <div key={i} className="aspect-[4/5] rounded-[2rem] animate-pulse flex-shrink-0" style={{ width: 220, background: 'var(--muted)' }} />)}</div></section> : trendingEvents.length > 0 ? <section><SectionHeading title="Trending events" /><div ref={trendingScrollerRef} onScroll={handleTrendingScroll} className="trending-events-marquee overflow-x-auto overscroll-x-contain pb-3" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' }}><div ref={trendingTrackRef} className="trending-events-track flex min-w-max py-1" style={{ width: 'max-content', '--trending-cycle-width': `${trendingCycleWidth}px` } as React.CSSProperties}>{Array.from({ length: trendingCopyCount }, (_, copy) => <div key={`trending-group-${copy}`} className="trending-events-group flex shrink-0 gap-4" aria-hidden={copy !== Math.floor(trendingCopyCount / 2)}>{trendingEvents.map(ev => <div key={`${copy}-${ev.id}`} className="shrink-0"><EventCard event={ev} poster listing timerBadge trending onClick={() => navigate('event-detail', ev)} /></div>)}</div>)}</div></div></section> : null}
         {loading ? <section><SectionHeading title="Active events" /><div className="flex gap-4 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{[1, 2, 3].map(i => <div key={i} className="aspect-[4/5] rounded-[2rem] animate-pulse flex-shrink-0" style={{ width: 327, background: 'var(--muted)' }} />)}</div></section> : <section><SectionHeading title="Active events" />{activeEvents.length > 0 ? <div className="flex min-w-0 gap-4 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{activeEvents.map(ev => <EventCard key={ev.id} event={ev} poster onClick={() => navigate('event-detail', ev)} />)}</div> : <EmptySection />}</section>}
         {freeEvents.length > 0 && <section><SectionHeading title="Free to attend" /><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">{freeEvents.map(ev => <EventCard key={ev.id} event={ev} onClick={() => navigate('event-detail', ev)} />)}</div></section>}
       </>}

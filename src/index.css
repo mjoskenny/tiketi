@@ -576,28 +576,27 @@ button[style*="124,58,237"],
 .tixian-event-card-listing .event-card-price { color: var(--primary-light); }
 .trending-events-marquee {
   position: relative;
-  mask-image: linear-gradient(to right, transparent 0, rgba(0,0,0,1) 8%, rgba(0,0,0,1) 92%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, transparent 0, rgba(0,0,0,1) 8%, rgba(0,0,0,1) 92%, transparent 100%);
+  padding-inline: .5rem;
 }
 .trending-events-track {
+  position: relative;
   display: flex;
   min-width: max-content;
   gap: 1rem;
-  animation: trending-scroll 28s linear infinite;
   will-change: transform;
+  animation: trending-events-marquee-scroll 36s linear infinite;
 }
-.trending-events-track:hover {
+.trending-events-marquee:hover .trending-events-track,
+.trending-events-marquee:focus-within .trending-events-track {
   animation-play-state: paused;
 }
-.trending-events-marquee:active .trending-events-track {
-  animation-play-state: paused;
+.trending-events-group { backface-visibility: hidden; }
+@keyframes trending-events-marquee-scroll {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(calc(0px - var(--trending-cycle-width, 0px)), 0, 0); }
 }
 .trending-events-marquee::-webkit-scrollbar {
   display: none;
-}
-@keyframes trending-scroll {
-  from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(-50%, 0, 0); }
 }
 .tixian-event-card-trending {
   width: clamp(210px, 22vw, 280px);
