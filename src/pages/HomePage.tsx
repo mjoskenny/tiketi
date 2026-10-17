@@ -193,7 +193,7 @@ export default function HomePage({ navigate }: Props) {
             <h1 className="hero-title">Find <span className="hero-gradient-text">events nearby</span></h1>
             <p className="hero-copy">Discover live experiences, artists, and unforgettable moments all in one place.</p>
           </div>
-          <div className="events-filter-row home-search-filter-row mx-auto mb-3 flex w-full min-w-0 justify-center gap-3">
+          <div className="events-filter-row home-search-filter-row mx-auto mb-4 flex w-full min-w-0 justify-center gap-3">
             <div className="relative min-w-0 flex-1 max-w-xl">
               <div className="attendee-control-icon absolute left-4 top-1/2 -translate-y-1/2"><SearchIcon size={16} /></div>
               <input type="text" placeholder="Search events, artists, venues…" aria-label="Search events" value={search} onChange={e => setSearch(e.target.value)} className="attendee-search-input w-full pl-11 pr-10 py-3.5 rounded-xl text-sm outline-none" />
@@ -228,7 +228,7 @@ export default function HomePage({ navigate }: Props) {
         </div>
       </div>
     </div>
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 pb-8 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6  pb-8 space-y-6">
       {!anyActive && <>
         {!loading && liveNowEvents.length > 0 && <section aria-label="Live events">
           <div className="mb-5">

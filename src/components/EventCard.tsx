@@ -122,7 +122,7 @@ export default function EventCard({ event, onClick, size = 'md', compact = false
           <span data-locale-ignore className="truncate">{event.venue}</span>
         </div>
         <div className="flex min-w-0 items-center justify-between gap-2">
-          <h3 data-locale-ignore className={`min-w-0 truncate text-[12px] font-medium leading-snug text-white transition-colors ${ended ? 'group-hover:text-white' : 'group-hover:text-[var(--primary-light)]'}`}>{event.title}</h3>
+          <h4 data-locale-ignore className={`min-w-0 flex-1 line-clamp-2 break-words text-sm font-medium leading-snug text-white transition-colors ${ended ? 'group-hover:text-white' : 'group-hover:text-[var(--primary-light)]'}`}>{event.title}</h4>
           {ended && <span className="shrink-0 rounded-full bg-rose-600 px-2 py-1 text-[9px] font-black uppercase tracking-wider text-white">Ended</span>}
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-white/55">
@@ -159,7 +159,7 @@ export default function EventCard({ event, onClick, size = 'md', compact = false
         <span className="trending-date-month mt-0.5 text-[6px] font-semibold uppercase tracking-[0.18em] text-white/55">{dateMonthName}</span>
       </div>
       <div className="relative isolate max-w-[calc(100%-78px)]">
-        <h3 data-locale-ignore className="trending-card-title-inline line-clamp-2 text-[0.58rem] font-black uppercase leading-[1.02] tracking-[-0.05em] text-white">{event.title}</h3>
+        <h4 data-locale-ignore className="trending-card-title-inline line-clamp-2 text-sm font-medium uppercase leading-[1.02] tracking-[-0.05em] text-white">{event.title}</h4>
       </div>
     </div>}
 
@@ -192,7 +192,7 @@ export default function EventCard({ event, onClick, size = 'md', compact = false
     </div> : <div className={`event-card-details absolute inset-x-3 bottom-3 z-10 rounded-[2rem] border p-4 shadow-2xl backdrop-blur-xl transition-all duration-500 sm:inset-x-3.5 sm:bottom-3.5 sm:p-4 ${ended ? 'border-white/15 bg-black/75 group-hover:-translate-y-0 group-hover:border-white/20' : `border-white/5 group-hover:-translate-y-1 ${listing ? 'bg-black/35 group-hover:border-white/20 group-hover:bg-black/45' : 'bg-[#111]/85 group-hover:border-white/20 group-hover:bg-[#111]/95'}`}`} style={listing ? { paddingBottom: '1.5rem' } : undefined}>
       <div className={listing ? 'space-y-2.5' : 'space-y-3'}>
         <div className={listing ? 'space-y-2' : 'space-y-1'}>
-          <h3 data-locale-ignore className={`event-card-title line-clamp-1 text-base font-black uppercase italic leading-none tracking-tighter text-white transition-colors md:text-lg ${ended ? 'group-hover:text-white' : listing ? 'group-hover:text-[var(--primary-light)]' : 'group-hover:text-[#ffdbb6]'}`}>{event.title}</h3>
+          <h4 data-locale-ignore className={`event-card-title line-clamp-2 text-sm font-medium uppercase italic leading-snug tracking-tighter text-white transition-colors ${ended ? 'group-hover:text-white' : listing ? 'group-hover:text-[var(--primary-light)]' : 'group-hover:text-[#ffdbb6]'}`}>{event.title}</h4>
           {listing ? <div className="event-card-meta flex min-w-0 items-center gap-3 whitespace-nowrap text-[9px] font-black uppercase tracking-[0.04em] text-white/65 sm:gap-3 sm:text-[10px]">
             <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap"><CalendarIcon size={13} className="shrink-0 text-white/55" /><span>{formattedDateTime}</span></span>
             <span className="flex min-w-0 items-center gap-1.5"><MapPinIcon size={14} className={`shrink-0 ${ended ? 'text-white/60' : 'text-[var(--primary-light)]'}`} /><span className="truncate">{event.venue}</span></span>

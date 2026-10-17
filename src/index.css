@@ -230,7 +230,7 @@ html:has(.attendee-auth-theme), body:has(.attendee-auth-theme), #root:has(.atten
   border-radius: 9999px;
   background: #080808 !important;
 }
-.attendee-theme .home-search-filter-row { box-sizing: border-box; width: min(100%, 760px); margin-inline: auto; align-items: stretch; gap: .5rem; padding: .55rem; }
+.attendee-theme .home-search-filter-row { box-sizing: border-box; width: min(100%, 760px); margin-inline: auto; align-items: stretch; gap: .75rem; padding: 0; }
 .attendee-theme .home-search-filter-row > .search-shell { border: 0 !important; border-radius: 0; background: transparent !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 .attendee-theme .attendee-bottom-nav-surface { background: rgba(9,9,9,.38) !important; border-color: rgba(255,255,255,.16) !important; -webkit-backdrop-filter: blur(24px) saturate(135%) !important; backdrop-filter: blur(24px) saturate(135%) !important; }
 .attendee-theme .home-search-filter-select { width: clamp(5.8rem, 12vw, 9rem); flex: 0 0 auto; }
@@ -273,8 +273,7 @@ html:has(.attendee-auth-theme), body:has(.attendee-auth-theme), #root:has(.atten
 .attendee-theme .attendee-filter-panel .attendee-control-icon { color: #858585 !important; }
 .attendee-auth-theme { --background: #000; --muted: #090909; --card: #080808; --border: #242424; }
 @media (max-width: 640px) {
-  .attendee-theme .home-search-filter-row { width: 100%; gap: .4rem; }
-  .attendee-theme .attendee-search-input { padding-top: .7rem !important; padding-bottom: .7rem !important; font-size: .78rem !important; }
+  .attendee-theme .home-search-filter-row { width: 100%; gap: .5rem; }
   .attendee-theme .home-search-filter-select,
   .attendee-theme .home-search-filter-select:last-child { width: 2.6rem; height: 2.6rem; }
   .attendee-theme .home-search-filter-select select {
@@ -290,9 +289,7 @@ html:has(.attendee-auth-theme), body:has(.attendee-auth-theme), #root:has(.atten
   }
   .attendee-theme .home-search-filter-select select option { color: #f5f5f5; font-size: 1rem; text-indent: 0; }
   .attendee-theme .attendee-filter-select-icon { left: 50% !important; transform: translate(-50%, -50%); }
-  .attendee-theme .home-filter-row { justify-content: center !important; gap: .35rem; overflow-x: auto; }
-  .attendee-theme .home-time-filter { padding: .45rem .65rem; font-size: .68rem !important; }
-  .attendee-theme .home-filter-row button { font-size: .68rem !important; }
+  .attendee-theme .home-filter-row { justify-content: flex-start !important; gap: .5rem; overflow-x: auto; padding-left: 0; padding-right: .25rem; }
 }
 @media (hover: none), (max-width: 640px) {
   .attendee-theme .tixian-event-card:hover { transform: none !important; box-shadow: none !important; }
@@ -1068,7 +1065,7 @@ h3 {
 }
 
 h4 {
-  font-size: 1.25rem !important;
+  font-size: 1rem !important;
   line-height: 1.25 !important;
   letter-spacing: -0.01em !important;
   font-weight: 600;
