@@ -106,7 +106,7 @@ export default function HomePage({ navigate }: Props) {
       window.cancelAnimationFrame(measurementFrame)
       observer.disconnect()
     }
-  }, [trendingEvents.length])
+  }, [trendingEvents.length, loading])
 
   useEffect(() => {
     const scroller = trendingScrollerRef.current
@@ -116,7 +116,7 @@ export default function HomePage({ navigate }: Props) {
     const groups = track.querySelectorAll<HTMLElement>('.trending-events-group')
     const middleGroup = groups[Math.floor(groups.length / 2)]
     if (middleGroup) scroller.scrollLeft = middleGroup.offsetLeft
-  }, [trendingEvents.length, trendingCopyCount])
+  }, [trendingEvents.length, trendingCopyCount, loading])
 
   const handleTrendingScroll = () => {
     const scroller = trendingScrollerRef.current
