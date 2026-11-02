@@ -82,7 +82,7 @@ function sectionFromPath(pathname: string): Section {
   if (exactMatch) return exactMatch[0] as Section
   const pathParts = normalizedPath.split('/').filter(Boolean)
   const slug = pathParts[pathParts.length - 1]
-  const legacyFinanceRoutes: Record<string, Section> = { transactions: 'transactions', payouts: 'payouts' }
+  const legacyFinanceRoutes: Record<string, Section> = { transactions: 'transactions', payouts: 'payouts', roles: 'settings' }
   if (slug && legacyFinanceRoutes[slug]) return legacyFinanceRoutes[slug]
   const match = Object.entries(SECTION_PATHS).find(([, path]) => path.split('/').pop() === slug)
   return (match?.[0] as Section | undefined) ?? 'overview'

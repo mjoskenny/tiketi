@@ -104,13 +104,12 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
 
   const navLink = (label: string, page: string) => {
     const active = current === page || (page === 'discover' && current === 'home')
-    const inactiveColor = theme === 'dark' ? '#ffffff' : '#102a56'
     return (
     <button key={page} onClick={() => navigate(page)}
       className={`nav-link text-sm font-bold transition-colors ${active ? 'is-active' : ''}`}
-      style={{ color: active ? 'var(--brand-blue)' : inactiveColor, textShadow: 'none' }}
-      onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--brand-blue)' }}
-      onMouseLeave={e => (e.currentTarget.style.color = active ? 'var(--brand-blue)' : inactiveColor)}>
+      style={{ color: active ? 'var(--foreground)' : 'var(--muted-foreground)' }}
+      onMouseEnter={e => (e.currentTarget.style.color = 'var(--foreground)')}
+      onMouseLeave={e => (e.currentTarget.style.color = active ? 'var(--foreground)' : 'var(--muted-foreground)')}>
       {label}
     </button>
     )
@@ -151,8 +150,7 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
                 )}
                 {!isOrganizer && (
                   <button onClick={() => navigate('my-tickets')}
-                    data-active={current === 'my-tickets'}
-                    className="nav-account-action flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl transition-all"
+                    className="flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl transition-all"
                     style={{ color: '#fff', background: current === 'my-tickets' ? 'var(--muted)' : 'transparent', border: '1px solid transparent' }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'var(--muted)'; e.currentTarget.style.color = '#fff' }}
                     onMouseLeave={e => { e.currentTarget.style.background = current === 'my-tickets' ? 'var(--muted)' : 'transparent'; e.currentTarget.style.color = '#fff' }}>
@@ -161,8 +159,7 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
                 )}
                 {shouldShowOrganizerDashboard && (
                   <button onClick={() => navigate('dashboard')}
-                    data-active={current === 'dashboard'}
-                    className="nav-account-action flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl transition-all"
+                    className="flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl transition-all"
                     style={{ color: '#fff', background: current === 'dashboard' ? 'var(--muted)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.16)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'; e.currentTarget.style.color = '#fff' }}
                     onMouseLeave={e => { e.currentTarget.style.background = current === 'dashboard' ? 'var(--muted)' : 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; e.currentTarget.style.color = '#fff' }}>
@@ -238,15 +235,15 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
             ) : (
               <>
                 <button onClick={() => navigate('auth-customer')}
-                  className="nav-sign-in-button text-sm font-medium px-4 py-2 rounded-xl transition-all"
-                  style={{ color: 'var(--brand-blue)', background: 'transparent', border: '1px solid var(--brand-blue)', boxShadow: 'none' }}
-                  onMouseEnter={e => { e.currentTarget.style.color = 'var(--brand-blue-hover)'; e.currentTarget.style.borderColor = 'var(--brand-blue-hover)' }}
-                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--brand-blue)'; e.currentTarget.style.borderColor = 'var(--brand-blue)' }}>
+                  className="text-sm font-medium px-4 py-2 rounded-xl transition-all"
+                  style={{ color: 'var(--muted-foreground)' }}
+                  onMouseEnter={e => { e.currentTarget.style.color = 'var(--foreground)'; e.currentTarget.style.background = 'var(--muted)' }}
+                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted-foreground)'; e.currentTarget.style.background = 'transparent' }}>
                   Sign in
                 </button>
                 <button onClick={() => navigate('auth-organizer')}
-                  className="nav-create-event-button text-sm font-semibold px-5 py-2.5 rounded-xl transition-all"
-                  style={{ background: 'var(--brand-blue)', border: '1px solid var(--brand-blue)', color: '#ffffff', boxShadow: 'none' }}
+                  className="gradient-action text-sm font-semibold px-5 py-2.5 rounded-xl transition-all"
+                  style={{ boxShadow: '0 4px 20px rgba(249,112,21,0.2)' }}
                   onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
                   onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
                   Create Event
@@ -296,8 +293,8 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
                 </button>
               ))}
               <button onClick={() => { navigate('auth-organizer'); setMenuOpen(false) }}
-                className="nav-create-event-button mt-2 rounded-xl px-4 py-3 text-sm font-bold text-center transition-all active:scale-[0.98]"
-                style={{ background: 'var(--brand-blue)', border: '1px solid var(--brand-blue)', color: '#ffffff', boxShadow: 'none' }}>
+                className="gradient-action mt-2 rounded-xl px-4 py-3 text-sm font-bold text-center transition-all active:scale-[0.98]"
+                style={{ boxShadow: '0 4px 18px rgba(249,112,21,0.2)' }}>
                 Create Event
               </button>
               {hasPendingInvitation && (
@@ -330,8 +327,8 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
                   </>
                 ) : (
                   <button onClick={() => { navigate('auth-customer'); setMenuOpen(false) }}
-                    className="nav-sign-in-button py-3 rounded-xl text-sm font-medium text-center"
-                    style={{ background: 'transparent', color: 'var(--brand-blue)', border: '1px solid var(--brand-blue)', boxShadow: 'none' }}>
+                    className="py-3 rounded-xl text-sm font-medium text-center"
+                    style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>
                     Sign in
                   </button>
                 )}

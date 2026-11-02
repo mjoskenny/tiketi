@@ -29,6 +29,7 @@ type Props = {
   timerBadge?: boolean
   rowLayout?: boolean
   trending?: boolean
+  agenda?: boolean
 }
 
 function fmtPrice(n: number, listing: boolean) {
@@ -52,7 +53,7 @@ function formatTimeUntil(timestamp: number, now: number) {
   return `${String(days).padStart(2, '0')}d ${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`
 }
 
-export default function EventCard({ event, onClick, size = 'md', compact = false, poster = false, fullWidthMobile = false, listing = true, timerBadge = false, rowLayout = false, trending = false }: Props) {
+export default function EventCard({ event, onClick, size = 'md', compact = false, poster = false, fullWidthMobile = false, listing = true, timerBadge = false, rowLayout = false, trending = false, agenda = false }: Props) {
   const { user } = useAuth()
   const [liked, setLiked] = useState(() => isFavoriteEvent(event.id))
   const [shared, setShared] = useState(false)
@@ -130,6 +131,28 @@ export default function EventCard({ event, onClick, size = 'md', compact = false
           <span className="inline-flex items-center gap-1.5 whitespace-nowrap"><CalendarIcon size={12} className="shrink-0 text-white/45" />{formattedDateTime}</span>
         </div>
       </div>
+    </article>
+  }
+
+  if (agenda) {
+    return <article className={`qpassa-agenda-card group${ended ? ' is-ended' : ''}`}>
+      <button type="button" className="qpassa-agenda-card-main" onClick={onClick} aria-label={`View ${event.title}`}>
+        <span className="qpassa-agenda-media" aria-hidden="true">
+          <span className="qpassa-agenda-date"><span>{dateMonthName}</span><strong>{dateDayNumber}</strong><span>{dateDayName}</span></span>
+          <span className="qpassa-agenda-image"><img src={img} alt="" loading="lazy" /></span>
+        </span>
+        <span className="qpassa-agenda-copy">
+          <span className="qpassa-agenda-time">{formatLocaleTime(dateTime, { hour: 'numeric', minute: '2-digit' })}</span>
+          <strong data-locale-ignore>{event.title}</strong>
+          <span className="qpassa-agenda-venue"><MapPinIcon size={13} />{event.venue}{event.city ? ` · ${event.city}` : ''}</span>
+        </span>
+      </button>
+      <span className="qpassa-agenda-actions">
+        <span className="qpassa-agenda-price">{fmtPrice(minPrice, false)}</span>
+        <button type="button" className="qpassa-agenda-cta" onClick={onClick} disabled={ended} aria-label={ended ? `${event.title} has ended` : `Get tickets for ${event.title}`}>
+          {ended ? 'Ended' : 'Get tickets'}
+        </button>
+      </span>
     </article>
   }
 

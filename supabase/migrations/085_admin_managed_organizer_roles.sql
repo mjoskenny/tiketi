@@ -51,6 +51,29 @@ UPDATE public.organizer_roles
 SET permissions = '{"all": true}'::jsonb
 WHERE lower(name) = 'admin';
 
+CREATE OR REPLACE FUNCTION public.protect_organizer_admin_role()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  IF lower(OLD.name) = 'admin' THEN
+    IF TG_OP = 'DELETE' THEN
+      RAISE EXCEPTION 'The built-in Admin role cannot be deleted';
+    END IF;
+    IF lower(NEW.name) <> 'admin' OR COALESCE((NEW.permissions ->> 'all')::BOOLEAN, FALSE) IS NOT TRUE THEN
+      RAISE EXCEPTION 'The built-in Admin role must retain its name and full access';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS protect_organizer_admin_role_mutation ON public.organizer_roles;
+CREATE TRIGGER protect_organizer_admin_role_mutation
+BEFORE UPDATE OR DELETE ON public.organizer_roles
+FOR EACH ROW EXECUTE FUNCTION public.protect_organizer_admin_role();
+
 DROP TRIGGER IF EXISTS seed_default_organizer_roles_on_create ON public.organizers;
 CREATE TRIGGER seed_default_organizer_roles_on_create
 AFTER INSERT ON public.organizers

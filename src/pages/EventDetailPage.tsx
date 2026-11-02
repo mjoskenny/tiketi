@@ -38,13 +38,13 @@ function formatEventTime(value?: string | null) {
 function formatPrice(value: number) { return value === 0 ? 'Free' : `BIF ${value.toLocaleString()}` }
 
 function eventHasEnded(event: Event) {
-  return hasEventEnded(event.date, event.time, event.end_time, Date.now(), event.end_date)
+  return hasEventEnded(event.date, event.time, event.end_time)
 }
 
 function sortUpcomingFirst(events: Event[]) {
   return [...events].sort((a, b) => {
-    const aTime = getEventEndTimestamp(a.date, a.time, a.end_time, a.end_date)
-    const bTime = getEventEndTimestamp(b.date, b.time, b.end_time, b.end_date)
+    const aTime = getEventEndTimestamp(a.date, a.time, a.end_time)
+    const bTime = getEventEndTimestamp(b.date, b.time, b.end_time)
     const aUpcoming = aTime >= Date.now()
     const bUpcoming = bTime >= Date.now()
 
@@ -79,7 +79,6 @@ export default function EventDetailPage({ event, navigate, onRequireAuth }: Prop
   const [followBusy, setFollowBusy] = useState(false)
   const [followError, setFollowError] = useState('')
   const [checkoutSettings, setCheckoutSettings] = useState<CheckoutSettings>(DEFAULT_CHECKOUT_SETTINGS)
-  const [descriptionExpanded, setDescriptionExpanded] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -233,13 +232,7 @@ export default function EventDetailPage({ event, navigate, onRequireAuth }: Prop
       </section>
 
       <section className="sinc-event-body">
-        <div className={`sinc-event-description ${descriptionExpanded ? 'is-expanded' : ''}`}>
-          <h2>About this event</h2>
-          <p>{event.description || 'Join us for an unforgettable experience.'}</p>
-          {(event.description || '').trim().length > 220 && <button type="button" className="sinc-description-toggle" onClick={() => setDescriptionExpanded(expanded => !expanded)} aria-expanded={descriptionExpanded}>
-            {descriptionExpanded ? 'Show less' : 'See more'}
-          </button>}
-        </div>
+        <div className="sinc-event-description"><h2>About this event</h2><p>{event.description || 'Join us for an unforgettable experience.'}</p></div>
         <section className="sinc-ticket-section"><div className="sinc-ticket-heading"><h2>Get tickets</h2></div><div className="sinc-ticket-content"><p>Choose your ticket type to continue</p><div className="sinc-ticket-list">{tiers.length === 0 && <div className="sinc-empty-tickets">Tickets will be available soon.</div>}{tiers.map(tier => { const remaining = Math.max(0, tier.quantity - tier.sold); const soldOut = remaining === 0; const tierType = i18n.t(tier.ticket_type === 'non_consumable' ? 'Non-consumable' : 'Consumable'); const expiry = tier.expires_at ? `${i18n.t('Expires')} ${formatLocaleDate(`${tier.expires_at}T00:00:00`, { day: 'numeric', month: 'short', year: 'numeric' })}` : null; return <div className={`sinc-ticket-row ${soldOut || ended ? 'is-sold-out' : ''}`} key={tier.id}><div className="sinc-ticket-copy"><strong>{tier.name}</strong><span>{tier.price === 0 ? 'Free' : formatPrice(tier.price)}</span><small>{[tier.description ? i18n.t(tier.description) : null, tier.extra_info ? i18n.t(tier.extra_info) : null, tierType, (tier.group_size ?? 1) > 1 ? `${tier.group_size} ${i18n.t('tickets per purchase')}` : null, expiry].filter(Boolean).join(' · ')}</small></div>{ended ? <span className="sinc-ended-row-label">EVENT ENDED</span> : soldOut ? <span className="sinc-sold-stamp">SOLD OUT</span> : <div className="sinc-ticket-quantity"><button onClick={() => changeQuantity(tier, -1)} aria-label={`Remove ${tier.name}`}><MinusIcon size={14} /></button><b>{quantities[tier.id] || 0}</b><button onClick={() => changeQuantity(tier, 1)} aria-label={`Add ${tier.name}`}><PlusIcon size={14} /></button></div>}</div> })}</div><p className="sinc-contact-note">{ended ? 'This event has ended and tickets are no longer available.' : <>Questions about tickets? <span>Contact the organizer.</span></>}</p>{subtotal > 0 && <div className="sinc-total-row"><span>Total <small>{totalTickets} ticket{totalTickets === 1 ? '' : 's'} · no customer service fee</small></span><strong>{formatPrice(total)}</strong></div>}<button className="sinc-continue-button" onClick={checkout} disabled={ended || !totalTickets}>{ended ? 'Event ended' : 'Continue'}</button></div></section>
 
         <section className="sinc-location-section"><div className="sinc-section-title"><h2>Location</h2><a href={venueMapUrl} target="_blank" rel="noreferrer">View on map</a></div><p>{event.venue}</p><div className="sinc-map"><iframe title={`${event.venue} map`} src={`https://www.google.com/maps?q=${encodeURIComponent(venueMapQuery)}&output=embed`} loading="lazy" referrerPolicy="no-referrer-when-downgrade" /></div></section>

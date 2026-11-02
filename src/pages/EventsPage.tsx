@@ -10,8 +10,8 @@ type Props = { navigate: (p: string, extra?: unknown) => void }
 
 function sortUpcomingFirst(events: Event[]) {
   return [...events].sort((a, b) => {
-    const aDate = getEventEndTimestamp(a.date, a.time, a.end_time, a.end_date)
-    const bDate = getEventEndTimestamp(b.date, b.time, b.end_time, b.end_date)
+    const aDate = getEventEndTimestamp(a.date, a.time, a.end_time)
+    const bDate = getEventEndTimestamp(b.date, b.time, b.end_time)
     const aIsUpcoming = aDate >= Date.now()
     const bIsUpcoming = bDate >= Date.now()
 
@@ -146,8 +146,8 @@ export default function EventsPage({ navigate }: Props) {
       return matchCat && matchSearch && matchPrice && matchDate && matchMonth && matchPreset
     })
   ).sort((a, b) => {
-      const aIsUpcoming = getEventEndTimestamp(a.date, a.time, a.end_time, a.end_date) >= Date.now()
-      const bIsUpcoming = getEventEndTimestamp(b.date, b.time, b.end_time, b.end_date) >= Date.now()
+      const aIsUpcoming = getEventEndTimestamp(a.date, a.time, a.end_time) >= Date.now()
+      const bIsUpcoming = getEventEndTimestamp(b.date, b.time, b.end_time) >= Date.now()
       if (aIsUpcoming !== bIsUpcoming) return aIsUpcoming ? -1 : 1
 
       if (sort === 'price-asc') {

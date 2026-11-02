@@ -52,7 +52,10 @@ function Field({ Icon, type, placeholder, value, onChange, right }: {
         <Icon size={14} />
       </div>
       <input type={type} placeholder={placeholder} value={value} onChange={onChange}
-        className="auth-input w-full pl-10 pr-10 py-3.5 rounded-xl text-sm outline-none" />
+        className="w-full pl-10 pr-10 py-3.5 rounded-xl text-sm outline-none"
+        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.09)', color: 'var(--foreground)', transition: 'border-color 0.2s, box-shadow 0.2s, background 0.2s' }}
+        onFocus={e => { e.currentTarget.style.borderColor = 'rgba(249,112,21,0.7)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(249,112,21,0.12)'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
+        onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }} />
       {right && <div className="absolute right-3.5 top-1/2 -translate-y-1/2">{right}</div>}
     </div>
   )
@@ -147,7 +150,12 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
       </button>
       {/* ── Left brand panel ── */}
       <div className="qpassa-auth-brand-panel hidden lg:flex flex-col w-[46%] relative overflow-hidden">
-        <div className="qpassa-auth-brand-overlay absolute inset-0" />
+        <img src="https://images.unsplash.com/photo-1524368535928-5b5e00ddc76b?w=900&h=1200&fit=crop&auto=format"
+          alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.28 }} />
+        <div className="qpassa-auth-brand-overlay absolute inset-0"
+          style={{ background: 'linear-gradient(145deg, rgba(8,8,8,0.98) 0%, rgba(122,45,10,0.62) 55%, rgba(8,8,8,0.94) 100%)' }} />
+        <div className="absolute inset-0"
+          style={{ backgroundImage: 'radial-gradient(circle, rgba(249,112,21,0.13) 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
 
         <div className="relative flex flex-col justify-between h-full p-12">
           <button onClick={() => navigate?.('home')} className="text-2xl font-black w-fit"
@@ -156,16 +164,16 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
           </button>
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold mb-5"
-              style={{ background: 'rgba(72,130,232,0.18)', border: '1px solid rgba(144,185,255,0.34)', color: '#a9cbff' }}>
+              style={{ background: 'rgba(249,112,21,0.15)', border: '1px solid rgba(249,112,21,0.34)', color: 'var(--primary-light)' }}>
               {mode === 'organizer' ? 'For Organizers' : 'Event Discovery'}
             </div>
             <h2 className="text-4xl font-bold leading-tight mb-4"
               style={{ fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.03em' }}>
               {mode === 'organizer'
-                ? <><span>Sell out your</span><br /><span className="auth-banner-accent">next event.</span></>
-                : <><span>Discover events</span><br /><span className="auth-banner-accent">near you.</span></>}
+                ? <><span>Sell out your</span><br /><span style={{ color: 'var(--accent)' }}>next event.</span></>
+                : <><span>Discover events</span><br /><span style={{ color: 'var(--accent)' }}>near you.</span></>}
             </h2>
-            <p className="auth-banner-description text-sm leading-relaxed mb-8" style={{ maxWidth: 340 }}>
+            <p className="text-sm leading-relaxed mb-8" style={{ color: 'rgba(255,255,255,0.45)', maxWidth: 300 }}>
               {mode === 'organizer'
                 ? 'Create, sell, promote and manage events from one platform built for Burundi.'
                 : 'Find concerts, parties, sports, comedy and more happening in Bujumbura.'}
@@ -175,10 +183,10 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
                 {PERKS.map(({ icon: Icon, label }) => (
                   <div key={label} className="flex items-center gap-3">
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ background: 'rgba(72,130,232,0.18)', border: '1px solid rgba(144,185,255,0.3)' }}>
-                      <Icon size={13} style={{ color: '#a9cbff' }} />
+                      style={{ background: 'rgba(249,112,21,0.16)', border: '1px solid rgba(249,112,21,0.3)' }}>
+                      <Icon size={13} style={{ color: 'var(--accent)' }} />
                     </div>
-                    <span className="auth-banner-perk text-sm">{label}</span>
+                    <span className="text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>{label}</span>
                   </div>
                 ))}
               </div>

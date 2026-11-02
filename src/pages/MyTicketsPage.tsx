@@ -101,7 +101,7 @@ export default function MyTicketsPage({ navigate }: Props) {
 
         const { data, error: ticketsError } = await supabase
           .from('tickets')
-          .select('*, events(title, date, end_date, time, end_time, venue, cover_image, category, tags, status), ticket_tiers(name, price, description, ticket_type, extra_info, expires_at, group_size)')
+          .select('*, events(title, date, time, end_time, venue, cover_image, category, tags, status), ticket_tiers(name, price, description, ticket_type, extra_info, expires_at, group_size)')
           .in('order_id', orderIds)
         if (ticketsError) throw ticketsError
 
@@ -153,11 +153,11 @@ export default function MyTicketsPage({ navigate }: Props) {
   const now = Date.now()
   const eventHasEnded = (event: any) => {
     if (!event?.date) return false
-    return hasEventEnded(event.date, event.time, event.end_time, now, event.end_date)
+    return hasEventEnded(event.date, event.time, event.end_time, now)
   }
   const eventTime = (event: any) => {
     if (!event?.date) return 0
-    return getEventEndTimestamp(event.date, event.time, event.end_time, event.end_date)
+    return getEventEndTimestamp(event.date, event.time, event.end_time)
   }
   const sortTicketsByEventDate = (a: Ticket, b: Ticket) => {
     const aEvent = (a as any).events
