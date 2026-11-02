@@ -7,6 +7,18 @@ import { useAuth } from '../context/AuthContext'
 import type { Profile } from '../lib/types'
 import { LanguageSwitcher } from './LocaleContent'
 
+function ThemeIcon({ theme, size = 19 }: { theme: 'dark' | 'light'; size?: number }) {
+  return theme === 'dark' ? (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>
+    </svg>
+  ) : (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/>
+    </svg>
+  )
+}
+
 type NavProps = {
   current: string
   navigate: (p: string) => void
@@ -18,6 +30,7 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => document.documentElement.dataset.theme === 'light' ? 'light' : 'dark')
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const { isOrganizer, teamMembership, agentAssignments } = useAuth()
   const hasPendingInvitation = teamMembership?.status === 'pending'
@@ -62,6 +75,19 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
 
   const isLoggedIn = !!user
 
+  const isAuthPage = current === 'auth-customer' || current === 'auth-organizer'
+
+  const notificationButton = isLoggedIn ? (
+    <button type="button" onClick={() => navigate('notifications')}
+      aria-label={unreadNotifications > 0 ? `Notifications, ${unreadNotifications} unread` : 'Notifications'}
+      title="Notifications" aria-current={current === 'notifications' ? 'page' : undefined}
+      className="relative flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-[var(--hover)]"
+      style={{ color: 'var(--muted-foreground)', background: 'transparent', border: 0, boxShadow: 'none' }}>
+      <BellIcon size={21} />
+      {unreadNotifications > 0 && <span className="absolute right-1 top-1 min-w-[1.1rem] rounded-full px-1 text-center text-[10px] font-black leading-[1.1rem]" style={{ background: '#f97316', color: '#fff' }}>{unreadNotifications > 99 ? '99+' : unreadNotifications}</span>}
+    </button>
+  ) : null
+
   const handleSignOut = async () => {
     setProfileOpen(false)
     setMenuOpen(false)
@@ -69,14 +95,22 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
     navigate('home')
   }
 
+  const toggleTheme = () => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark'
+    document.documentElement.dataset.theme = nextTheme
+    window.localStorage.setItem('qpassa-theme', nextTheme)
+    setTheme(nextTheme)
+  }
+
   const navLink = (label: string, page: string) => {
     const active = current === page || (page === 'discover' && current === 'home')
+    const inactiveColor = theme === 'dark' ? '#ffffff' : '#102a56'
     return (
     <button key={page} onClick={() => navigate(page)}
       className={`nav-link text-sm font-bold transition-colors ${active ? 'is-active' : ''}`}
-      style={{ color: active ? '#fff' : 'rgba(255,255,255,0.78)' }}
-      onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
-      onMouseLeave={e => (e.currentTarget.style.color = active ? '#fff' : 'rgba(255,255,255,0.78)')}>
+      style={{ color: active ? 'var(--brand-blue)' : inactiveColor, textShadow: 'none' }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.color = 'var(--brand-blue)' }}
+      onMouseLeave={e => (e.currentTarget.style.color = active ? 'var(--brand-blue)' : inactiveColor)}>
       {label}
     </button>
     )
@@ -85,7 +119,7 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-50 transition-colors duration-300"
-        style={{ background: scrolled ? 'rgba(10,10,10,0.78)' : 'transparent', backdropFilter: scrolled ? 'blur(24px)' : 'none', WebkitBackdropFilter: scrolled ? 'blur(24px)' : 'none' }}>
+        style={{ background: scrolled ? 'var(--navigation-surface)' : 'transparent', backdropFilter: scrolled ? 'blur(14px)' : 'none', WebkitBackdropFilter: scrolled ? 'blur(14px)' : 'none' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-[4.5rem]">
 
           <button onClick={() => navigate('home')} className="flex items-center gap-2 text-xl font-bold tracking-tight"
@@ -100,8 +134,12 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
             {navLink('For Organizers', 'organizers')}
           </div>
 
-          <div className="hidden md:flex items-center gap-2.5">
+          <div className={`${isAuthPage ? '' : 'hidden md:flex'} items-center gap-2.5`}>
+            {notificationButton}
             <LanguageSwitcher bare />
+            <button type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} className="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-[var(--hover)]" style={{ color: 'var(--foreground)', background: 'transparent', border: 0, boxShadow: 'none' }}>
+              <ThemeIcon theme={theme} />
+            </button>
             {isLoggedIn ? (
               <>
                 {hasPendingInvitation && (
@@ -113,7 +151,8 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
                 )}
                 {!isOrganizer && (
                   <button onClick={() => navigate('my-tickets')}
-                    className="flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl transition-all"
+                    data-active={current === 'my-tickets'}
+                    className="nav-account-action flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl transition-all"
                     style={{ color: '#fff', background: current === 'my-tickets' ? 'var(--muted)' : 'transparent', border: '1px solid transparent' }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'var(--muted)'; e.currentTarget.style.color = '#fff' }}
                     onMouseLeave={e => { e.currentTarget.style.background = current === 'my-tickets' ? 'var(--muted)' : 'transparent'; e.currentTarget.style.color = '#fff' }}>
@@ -122,7 +161,8 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
                 )}
                 {shouldShowOrganizerDashboard && (
                   <button onClick={() => navigate('dashboard')}
-                    className="flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl transition-all"
+                    data-active={current === 'dashboard'}
+                    className="nav-account-action flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl transition-all"
                     style={{ color: '#fff', background: current === 'dashboard' ? 'var(--muted)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.16)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'; e.currentTarget.style.color = '#fff' }}
                     onMouseLeave={e => { e.currentTarget.style.background = current === 'dashboard' ? 'var(--muted)' : 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; e.currentTarget.style.color = '#fff' }}>
@@ -157,7 +197,7 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setProfileOpen(false)} />
                       <div className="absolute right-0 top-12 w-56 rounded-2xl overflow-hidden shadow-2xl z-20"
-                        style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                        style={{ background: 'var(--card)', border: '0', boxShadow: '0 18px 48px rgba(0,0,0,.22)', color: 'var(--foreground)' }}>
                         <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
                           <p className="font-semibold text-sm truncate">{displayName}</p>
                           <p className="text-xs truncate" style={{ color: 'var(--muted-foreground)' }}>{displayEmail}</p>
@@ -176,10 +216,10 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
                           ].map(({ Icon, label, page }) => (
                           <button key={page} onClick={() => { navigate(page); setProfileOpen(false) }}
                             className="profile-menu-item w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold transition-colors"
-                            style={{ color: '#fff' }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = 'var(--foreground)' }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--muted-foreground)' }}>
-                            <Icon size={15} /> <span className="flex-1 text-left">{label}</span>{page === 'notifications' && unreadNotifications > 0 && <span className="min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] font-black" style={{ background: 'var(--primary)', color: '#000' }}>{unreadNotifications > 99 ? '99+' : unreadNotifications}</span>}
+                            style={{ color: 'var(--foreground)', background: 'transparent' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--hover)'; e.currentTarget.style.color = 'var(--foreground)' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--foreground)' }}>
+                            <Icon size={15} /> <span className="flex-1 text-left">{label}</span>{page === 'notifications' && unreadNotifications > 0 && <span className="min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] font-black" style={{ background: '#f97316', color: '#fff' }}>{unreadNotifications > 99 ? '99+' : unreadNotifications}</span>}
                           </button>
                         ))}
                         <div className="border-t my-1" style={{ borderColor: 'var(--border)' }} />
@@ -198,15 +238,15 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
             ) : (
               <>
                 <button onClick={() => navigate('auth-customer')}
-                  className="text-sm font-medium px-4 py-2 rounded-xl transition-all"
-                  style={{ color: 'var(--muted-foreground)' }}
-                  onMouseEnter={e => { e.currentTarget.style.color = 'var(--foreground)'; e.currentTarget.style.background = 'var(--muted)' }}
-                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted-foreground)'; e.currentTarget.style.background = 'transparent' }}>
+                  className="nav-sign-in-button text-sm font-medium px-4 py-2 rounded-xl transition-all"
+                  style={{ color: 'var(--brand-blue)', background: 'transparent', border: '1px solid var(--brand-blue)', boxShadow: 'none' }}
+                  onMouseEnter={e => { e.currentTarget.style.color = 'var(--brand-blue-hover)'; e.currentTarget.style.borderColor = 'var(--brand-blue-hover)' }}
+                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--brand-blue)'; e.currentTarget.style.borderColor = 'var(--brand-blue)' }}>
                   Sign in
                 </button>
                 <button onClick={() => navigate('auth-organizer')}
-                  className="gradient-action text-sm font-semibold px-5 py-2.5 rounded-xl transition-all"
-                  style={{ boxShadow: '0 4px 20px rgba(249,112,21,0.2)' }}
+                  className="nav-create-event-button text-sm font-semibold px-5 py-2.5 rounded-xl transition-all"
+                  style={{ background: 'var(--brand-blue)', border: '1px solid var(--brand-blue)', color: '#ffffff', boxShadow: 'none' }}
                   onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
                   onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
                   Create Event
@@ -215,8 +255,12 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
             )}
           </div>
 
-          <div className="md:hidden flex items-center gap-2">
+          <div className={`${isAuthPage ? 'hidden' : 'md:hidden flex'} items-center gap-2`}>
+            {notificationButton}
             <LanguageSwitcher bare />
+            <button type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} className="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-[var(--hover)]" style={{ color: 'var(--foreground)', background: 'transparent', border: 0, boxShadow: 'none' }}>
+              <ThemeIcon theme={theme} />
+            </button>
             <button type="button" aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'} aria-expanded={menuOpen}
               className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-white shadow-lg backdrop-blur-xl transition-all duration-300 hover:border-white/20 hover:bg-white/10 active:scale-90"
               style={{ boxShadow: menuOpen ? '0 0 22px rgba(249,112,21,0.2)' : '0 6px 18px rgba(0,0,0,0.18)' }}
@@ -234,8 +278,8 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
         <>
           <div className="fixed inset-0 z-30 md:hidden" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
             onClick={() => setMenuOpen(false)} />
-          <div className="fixed top-16 left-0 right-0 z-40 md:hidden border-b"
-            style={{ background: 'rgba(8,8,15,0.98)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255,255,255,0.06)' }}>
+          <div className="nav-mobile-drawer fixed top-16 left-0 right-0 z-40 md:hidden"
+            style={{ background: 'var(--card)', color: 'var(--foreground)', boxShadow: '0 18px 48px rgba(0,0,0,.22)' }}>
             <div className="px-4 py-5 flex flex-col gap-1">
               {[
                 { label: 'Discover events', page: 'discover' },
@@ -246,14 +290,14 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
                 ...(agentAssignments.length > 0 ? [{ label: 'Agent Dashboard', page: 'agent-dashboard' }] : []),
               ].map(({ label, page }) => (
                 <button key={page} onClick={() => { navigate(page); setMenuOpen(false) }}
-                  className="text-left py-3 px-3 rounded-xl text-sm font-medium"
+                  className="nav-mobile-link text-left py-3 px-3 rounded-xl text-sm font-medium"
                   style={{ color: current === page ? 'var(--foreground)' : 'var(--muted-foreground)', background: current === page ? 'var(--muted)' : 'transparent' }}>
                   {label}
                 </button>
               ))}
               <button onClick={() => { navigate('auth-organizer'); setMenuOpen(false) }}
-                className="gradient-action mt-2 rounded-xl px-4 py-3 text-sm font-bold text-center transition-all active:scale-[0.98]"
-                style={{ boxShadow: '0 4px 18px rgba(249,112,21,0.2)' }}>
+                className="nav-create-event-button mt-2 rounded-xl px-4 py-3 text-sm font-bold text-center transition-all active:scale-[0.98]"
+                style={{ background: 'var(--brand-blue)', border: '1px solid var(--brand-blue)', color: '#ffffff', boxShadow: 'none' }}>
                 Create Event
               </button>
               {hasPendingInvitation && (
@@ -264,7 +308,7 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
                 </button>
               )}
 
-              <div className="mt-3 pt-3 border-t flex flex-col gap-2" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+              <div className="mt-3 pt-3 border-t flex flex-col gap-2" style={{ borderColor: 'var(--border)' }}>
                 {isLoggedIn ? (
                   <>
                     <div className="flex items-center gap-3 px-3 py-2">
@@ -286,8 +330,8 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
                   </>
                 ) : (
                   <button onClick={() => { navigate('auth-customer'); setMenuOpen(false) }}
-                    className="py-3 rounded-xl text-sm font-medium text-center"
-                    style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>
+                    className="nav-sign-in-button py-3 rounded-xl text-sm font-medium text-center"
+                    style={{ background: 'transparent', color: 'var(--brand-blue)', border: '1px solid var(--brand-blue)', boxShadow: 'none' }}>
                     Sign in
                   </button>
                 )}

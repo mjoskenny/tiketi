@@ -172,7 +172,7 @@ function price(value: number) {
 
 function eventHasEnded(event?: Event | null) {
   if (!event?.date) return false
-  return hasEventEnded(event.date, event.time, event.end_time)
+  return hasEventEnded(event.date, event.time, event.end_time, Date.now(), event.end_date)
 }
 
 function Badge({ label, color }: { label: string; color: string }) {
@@ -709,7 +709,7 @@ export default function AgentDashboardPage({ navigate }: { navigate: (page: stri
             <div className="relative z-20">
               <button onClick={() => setUtilityPopup(current => current === 'notifications' ? null : 'notifications')} aria-label="Notifications" title="Notifications" className="relative flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: utilityPopup === 'notifications' ? 'rgba(200,169,110,0.14)' : 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}>
                 <BellIcon size={18} />
-                {notifications.filter(notification => !notification.read_at).length > 0 && <span className="absolute -right-2 -top-2 min-w-5 rounded-full px-1 text-center text-[10px] font-black" style={{ background: 'var(--primary)', color: '#000' }}>{notifications.filter(notification => !notification.read_at).length > 99 ? '99+' : notifications.filter(notification => !notification.read_at).length}</span>}
+                {notifications.filter(notification => !notification.read_at).length > 0 && <span className="absolute -right-2 -top-2 min-w-5 rounded-full px-1 text-center text-[10px] font-black" style={{ background: '#f97316', color: '#fff' }}>{notifications.filter(notification => !notification.read_at).length > 99 ? '99+' : notifications.filter(notification => !notification.read_at).length}</span>}
               </button>
               {utilityPopup === 'notifications' && (
                 <div className="absolute right-0 top-11 flex max-h-96 w-72 flex-col rounded-2xl border p-4 shadow-2xl" style={{ background: '#171918', borderColor: 'rgba(255,255,255,0.12)' }}>

@@ -52,10 +52,7 @@ function Field({ Icon, type, placeholder, value, onChange, right }: {
         <Icon size={14} />
       </div>
       <input type={type} placeholder={placeholder} value={value} onChange={onChange}
-        className="w-full pl-10 pr-10 py-3.5 rounded-xl text-sm outline-none"
-        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.09)', color: 'var(--foreground)', transition: 'border-color 0.2s, box-shadow 0.2s, background 0.2s' }}
-        onFocus={e => { e.currentTarget.style.borderColor = 'rgba(249,112,21,0.7)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(249,112,21,0.12)'; e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
-        onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }} />
+        className="auth-input w-full pl-10 pr-10 py-3.5 rounded-xl text-sm outline-none" />
       {right && <div className="absolute right-3.5 top-1/2 -translate-y-1/2">{right}</div>}
     </div>
   )
@@ -63,6 +60,7 @@ function Field({ Icon, type, placeholder, value, onChange, right }: {
 
 export default function AuthPage({ defaultMode = 'customer', navigate }: Props) {
   const [mode, setMode] = useState<Mode>(defaultMode)
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => document.documentElement.dataset.theme === 'light' ? 'light' : 'dark')
   const [view, setView] = useState<AuthView>('signin')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -74,6 +72,12 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
     setForm(f => ({ ...f, [k]: e.target.value }))
   const clear = () => { setError(null); setSuccess(null) }
   const switchView = (v: AuthView) => { setView(v); clear(); setForm({ name: '', email: '', password: '', confirm: '' }) }
+  const toggleTheme = () => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark'
+    document.documentElement.dataset.theme = nextTheme
+    window.localStorage.setItem('qpassa-theme', nextTheme)
+    setTheme(nextTheme)
+  }
 
   function friendlyError(e: unknown, context?: 'google' | 'email'): string {
     const msg = e instanceof Error ? e.message : String(e)
@@ -133,16 +137,17 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
   }
 
   return (
-    <div className={`min-h-screen flex ${mode === 'customer' ? 'attendee-auth-theme' : ''}`} style={{ background: 'radial-gradient(circle at 76% 12%, rgba(249,112,21,0.11), transparent 28%), var(--background)', color: 'var(--foreground)' }}>
-
+    <div className={`qpassa-auth-page min-h-screen flex ${mode === 'customer' ? 'attendee-auth-theme' : ''}`} style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+      <button type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} className="qpassa-auth-theme-toggle fixed right-16 top-4 z-[101] flex h-10 w-10 items-center justify-center rounded-full" style={{ color: 'var(--foreground)', background: 'var(--card)', border: 0 }}>
+        {theme === 'dark' ? (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+        ) : (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/></svg>
+        )}
+      </button>
       {/* ── Left brand panel ── */}
-      <div className="hidden lg:flex flex-col w-[46%] relative overflow-hidden">
-        <img src="https://images.unsplash.com/photo-1524368535928-5b5e00ddc76b?w=900&h=1200&fit=crop&auto=format"
-          alt="" className="absolute inset-0 w-full h-full object-cover" style={{ opacity: 0.28 }} />
-        <div className="absolute inset-0"
-          style={{ background: 'linear-gradient(145deg, rgba(8,8,8,0.98) 0%, rgba(122,45,10,0.62) 55%, rgba(8,8,8,0.94) 100%)' }} />
-        <div className="absolute inset-0"
-          style={{ backgroundImage: 'radial-gradient(circle, rgba(249,112,21,0.13) 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
+      <div className="qpassa-auth-brand-panel hidden lg:flex flex-col w-[46%] relative overflow-hidden">
+        <div className="qpassa-auth-brand-overlay absolute inset-0" />
 
         <div className="relative flex flex-col justify-between h-full p-12">
           <button onClick={() => navigate?.('home')} className="text-2xl font-black w-fit"
@@ -151,16 +156,16 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
           </button>
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold mb-5"
-              style={{ background: 'rgba(249,112,21,0.15)', border: '1px solid rgba(249,112,21,0.34)', color: 'var(--primary-light)' }}>
+              style={{ background: 'rgba(72,130,232,0.18)', border: '1px solid rgba(144,185,255,0.34)', color: '#a9cbff' }}>
               {mode === 'organizer' ? 'For Organizers' : 'Event Discovery'}
             </div>
             <h2 className="text-4xl font-bold leading-tight mb-4"
               style={{ fontFamily: 'Outfit, sans-serif', letterSpacing: '-0.03em' }}>
               {mode === 'organizer'
-                ? <><span>Sell out your</span><br /><span style={{ color: 'var(--accent)' }}>next event.</span></>
-                : <><span>Discover events</span><br /><span style={{ color: 'var(--accent)' }}>near you.</span></>}
+                ? <><span>Sell out your</span><br /><span className="auth-banner-accent">next event.</span></>
+                : <><span>Discover events</span><br /><span className="auth-banner-accent">near you.</span></>}
             </h2>
-            <p className="text-sm leading-relaxed mb-8" style={{ color: 'rgba(255,255,255,0.45)', maxWidth: 300 }}>
+            <p className="auth-banner-description text-sm leading-relaxed mb-8" style={{ maxWidth: 340 }}>
               {mode === 'organizer'
                 ? 'Create, sell, promote and manage events from one platform built for Burundi.'
                 : 'Find concerts, parties, sports, comedy and more happening in Bujumbura.'}
@@ -170,10 +175,10 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
                 {PERKS.map(({ icon: Icon, label }) => (
                   <div key={label} className="flex items-center gap-3">
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ background: 'rgba(249,112,21,0.16)', border: '1px solid rgba(249,112,21,0.3)' }}>
-                      <Icon size={13} style={{ color: 'var(--accent)' }} />
+                      style={{ background: 'rgba(72,130,232,0.18)', border: '1px solid rgba(144,185,255,0.3)' }}>
+                      <Icon size={13} style={{ color: '#a9cbff' }} />
                     </div>
-                    <span className="text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>{label}</span>
+                    <span className="auth-banner-perk text-sm">{label}</span>
                   </div>
                 ))}
               </div>
@@ -185,7 +190,7 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
 
       {/* ── Right form panel ── */}
       <div className="flex-1 flex items-center justify-center px-6 py-16">
-        <div className="w-full max-w-md rounded-[28px] p-6 sm:p-8"
+        <div className="qpassa-auth-card w-full max-w-md rounded-[28px] p-6 sm:p-8"
           style={{ background: 'rgba(18,18,18,0.82)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 80px rgba(0,0,0,0.35)' }}>
 
           {/* Mobile logo */}
@@ -197,16 +202,11 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
             <div className="mb-2 flex items-center justify-between">
               <span className="text-[10px] font-medium uppercase tracking-[0.18em]" style={{ color: 'rgba(255,255,255,0.42)' }}>I am a</span>
             </div>
-            <div className="inline-flex items-center rounded-full border p-1"
-              style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.08)' }}>
+            <div className="qpassa-auth-role-switch inline-flex items-center rounded-full border p-1">
               {(['customer', 'organizer'] as Mode[]).map(m => (
                 <button key={m} onClick={() => { setMode(m); clear() }}
-                  className="rounded-full px-4 py-2 text-sm font-medium transition-all"
-                  style={{
-                    background: mode === m ? 'linear-gradient(135deg, rgba(249,112,21,0.18), rgba(249,112,21,0.08))' : 'transparent',
-                    color: mode === m ? '#fff' : 'var(--muted-foreground)',
-                    boxShadow: mode === m ? 'inset 0 1px 0 rgba(255,255,255,0.12)' : 'none',
-                  }}>
+                  className="qpassa-auth-role-option rounded-full px-4 py-2 text-sm font-medium transition-all"
+                  aria-pressed={mode === m}>
                   {m === 'customer' ? 'Attendee' : 'Organizer'}
                 </button>
               ))}
@@ -215,17 +215,12 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
 
           {/* View tabs (sign in / create account) */}
           {view !== 'reset' && (
-            <div className="mb-6 p-1 rounded-2xl"
-              style={{ background: 'rgba(12,12,12,0.66)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="qpassa-auth-view-tabs mb-6 p-1 rounded-2xl">
               <div className="flex gap-1">
                 {(['signin', 'signup'] as AuthView[]).map(v => (
                   <button key={v} onClick={() => switchView(v)}
-                    className="flex-1 py-2.5 text-sm font-semibold rounded-xl transition-all"
-                    style={{
-                      background: view === v ? 'linear-gradient(135deg, #ff7a18 0%, #ff9e45 45%, #ffd36b 100%)' : 'transparent',
-                      color: view === v ? '#17100a' : 'var(--muted-foreground)',
-                      boxShadow: view === v ? '0 10px 24px rgba(249,112,21,0.22)' : 'none',
-                    }}>
+                    className="qpassa-auth-view-tab flex-1 py-2.5 text-sm font-semibold rounded-xl transition-all"
+                    aria-pressed={view === v}>
                     {v === 'signin' ? 'Sign in' : 'Create account'}
                   </button>
                 ))}
@@ -300,8 +295,8 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
                 </button>
               </div>
               <button type="submit" disabled={loading}
-                className="w-full py-3.5 rounded-xl font-semibold text-sm transition-transform hover:-translate-y-0.5"
-                style={{ background: 'linear-gradient(110deg, #ff7a18 0%, #ff9e45 45%, #ffd36b 100%)', color: '#17100a', opacity: loading ? 0.7 : 1, boxShadow: '0 10px 22px rgba(249,112,21,0.24)' }}>
+                className="qpassa-auth-primary-button w-full py-3.5 rounded-xl font-semibold text-sm transition-transform hover:-translate-y-0.5"
+                style={{ opacity: loading ? 0.7 : 1 }}>
                 {loading ? 'Signing in…' : 'Sign in'}
               </button>
             </form>
@@ -319,8 +314,8 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
                 } />
               <Field Icon={LockIcon} type={showPw ? 'text' : 'password'} placeholder="Confirm password" value={form.confirm} onChange={set('confirm')} />
               <button type="submit" disabled={loading}
-                className="w-full py-3.5 rounded-xl font-semibold text-sm transition-transform hover:-translate-y-0.5"
-                style={{ background: 'linear-gradient(110deg, #ff7a18 0%, #ff9e45 45%, #ffd36b 100%)', color: '#17100a', opacity: loading ? 0.7 : 1, boxShadow: '0 10px 22px rgba(249,112,21,0.24)' }}>
+                className="qpassa-auth-primary-button w-full py-3.5 rounded-xl font-semibold text-sm transition-transform hover:-translate-y-0.5"
+                style={{ opacity: loading ? 0.7 : 1 }}>
                 {loading ? 'Creating account…' : 'Create account'}
               </button>
               <p className="text-xs text-center" style={{ color: 'var(--muted-foreground)' }}>
@@ -336,22 +331,15 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
           {view !== 'reset' && (
             <>
               <div className="flex items-center gap-3 my-5">
-                <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
+                <div className="qpassa-auth-separator flex-1 h-px" />
                 <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>or</span>
-                <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.06)' }} />
+                <div className="qpassa-auth-separator flex-1 h-px" />
               </div>
               <button onClick={handleGoogle} disabled={loading}
-                className="w-full flex items-center justify-center gap-3 py-3.5 rounded-xl font-semibold text-sm transition-all"
-                style={{
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  color: 'rgba(255,255,255,0.65)',
-                  opacity: loading ? 0.5 : 1,
-                }}
-                onMouseEnter={e => !loading && (e.currentTarget.style.background = 'rgba(255,255,255,0.07)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}>
-                <GoogleIcon size={17} />
-                Continue with Google
+                className="qpassa-auth-google-button w-full flex items-center justify-center gap-3 py-3.5 rounded-xl font-semibold text-sm transition-all"
+                style={{ opacity: loading ? 0.55 : 1 }}>
+                <span className="qpassa-google-icon"><GoogleIcon size={18} /></span>
+                <span>{loading ? 'Connecting to Google…' : 'Continue with Google'}</span>
               </button>
             </>
           )}
@@ -361,8 +349,8 @@ export default function AuthPage({ defaultMode = 'customer', navigate }: Props) 
             <form onSubmit={handleReset} className="space-y-3">
               <Field Icon={MailIcon} type="email" placeholder="Your email address" value={form.email} onChange={set('email')} />
               <button type="submit" disabled={loading}
-                className="w-full py-3.5 rounded-xl font-semibold text-sm transition-transform hover:-translate-y-0.5"
-                style={{ background: 'linear-gradient(110deg, #ff7a18 0%, #ff9e45 45%, #ffd36b 100%)', color: '#17100a', opacity: loading ? 0.7 : 1, boxShadow: '0 10px 22px rgba(249,112,21,0.24)' }}>
+                className="qpassa-auth-primary-button w-full py-3.5 rounded-xl font-semibold text-sm transition-transform hover:-translate-y-0.5"
+                style={{ opacity: loading ? 0.7 : 1 }}>
                 {loading ? 'Sending…' : 'Send reset link'}
               </button>
             </form>

@@ -1,51 +1,49 @@
 import { useEffect, useState } from 'react'
-import { ArrowRightIcon, BarChartIcon, CheckIcon, ChevronDownIcon, ClipboardIcon, DollarSignIcon, LinkIcon, QrCodeIcon, TicketIcon, UsersIcon, ZapIcon } from '../components/Icon'
+import { ArrowRightIcon, BarChartIcon, CheckIcon, ChevronDownIcon, ClipboardIcon, DollarSignIcon, LinkIcon, QrCodeIcon, TicketIcon, UsersIcon } from '../components/Icon'
 import { events } from '../data/events'
 import { supabase } from '../lib/supabase'
 
 type Props = { navigate: (page: string) => void }
 
 const heroEvent = events[0]
-const logos = Array.from(new Set(events.map(event => event.organizer))).slice(0, 8)
 const formatBif = (value: number) => `BIF ${value.toLocaleString()}`
 const DEFAULT_FEE_RATES = { nonConsumable: 5, consumable: 4, table: 5, free: 0 }
-const faqs = [
-  ['How can I create an event?', 'Create an organizer account, enter your event details, add ticket types and pricing, review the listing, and publish when it is ready.'],
-  ['Do I need a computer?', 'QPassa Studio should work comfortably on mobile for important event tasks. Confirm feature parity across mobile and desktop before launch.'],
-  ['What payment methods are supported?', 'Publish the exact mobile-money, card, bank, and other methods once they are confirmed.'],
-  ['How do I cash out?', 'Withdrawals depend on settlement status, available balance, payment method, and QPassa\'s terms. Publish exact timing once finalized.'],
-  ['What events can I host?', 'Music, nightlife, sports, conferences, culture, comedy, student events, community gatherings, workshops, and other legitimate experiences that meet QPassa\'s policies.'],
+
+const workflow = [
+  { number: '01', icon: ClipboardIcon, label: 'Set it up', title: 'Put every important detail in one clear place.', copy: 'Create an event page that answers the questions guests ask before they buy: where, when, what to expect, and which ticket is right for them.', items: ['Your event page and shareable link', 'Ticket tiers, capacity, and event details'], tone: 'sky' },
+  { number: '02', icon: DollarSignIcon, label: 'Keep track', title: 'See every sale without chasing spreadsheets.', copy: 'Keep ticket sales, service fees, available balance, and withdrawals understandable from the first sale to the final settlement.', items: ['Sales and balances shown in BIF', 'A simple record of every movement'], tone: 'lilac' },
+  { number: '03', icon: QrCodeIcon, label: 'Welcome people', title: 'Give the door team a calmer way to work.', copy: 'Scan tickets, check names, and see attendance build as guests arrive. The guest list stays where your team needs it.', items: ['Fast scan and check-in status', 'Live capacity and guest list visibility'], tone: 'mint' },
 ]
 
-function Reveal({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <div className={`organizer-reference-reveal ${className}`}>{children}</div>
-}
+const faqs = [
+  ['How do I create an event?', 'Create an organizer account, add your event details and ticket types, then publish when the page is ready to share.'],
+  ['How does QPassa charge organizers?', 'QPassa commission is deducted from organizer proceeds. The rate depends on the ticket type and is shown clearly below.'],
+  ['What can I host?', 'Music, nightlife, sports, conferences, culture, comedy, student events, community gatherings, workshops, and other legitimate experiences that meet QPassa policies.'],
+  ['Can my team help at the door?', 'Yes. Give your event team access to the tools they need to welcome guests and keep entry moving.'],
+]
 
-function Phone({ variant, label }: { variant: 'dashboard' | 'create' | 'payout' | 'withdraw' | 'analytics' | 'guests'; label: string }) {
-  const sold = heroEvent.ticketsSold.toLocaleString()
+function StudioPreview() {
   const revenue = formatBif(heroEvent.ticketsSold * heroEvent.price)
-  return <div className={`organizer-reference-phone organizer-tiketi-phone-${variant}`} role="img" aria-label={label}>
-    <div className="organizer-reference-notch" />
-    <div className="organizer-tiketi-status"><span>9:41</span><span>● ● ▰</span></div>
-    <div className="organizer-tiketi-appbar"><b>{variant === 'create' ? 'New event' : variant === 'payout' || variant === 'withdraw' ? 'Wallet' : variant === 'analytics' ? 'Insights' : variant === 'guests' ? 'Guest list' : 'QPassa Studio'}</b><span>•••</span></div>
-    {variant === 'dashboard' && <><div className="organizer-tiketi-greeting">Good evening, BJ Events</div><div className="organizer-tiketi-event-banner"><span>LIVE EVENT</span><b>{heroEvent.name}</b><small>{heroEvent.venue} · {heroEvent.date}</small></div><div className="organizer-tiketi-mini-grid"><span><b>{sold}</b><small>Tickets sold</small></span><span><b>{revenue}</b><small>Sales value</small></span></div><div className="organizer-tiketi-progress"><span><i style={{ width: `${Math.round((heroEvent.ticketsSold / heroEvent.capacity) * 100)}%` }} /></span><small>{Math.round((heroEvent.ticketsSold / heroEvent.capacity) * 100)}% of capacity</small></div></>}
-    {variant === 'create' && <><div className="organizer-tiketi-form-image"><TicketIcon size={24} /><span>Add event cover</span></div><b className="organizer-tiketi-form-title">{heroEvent.name}</b><div className="organizer-tiketi-form-row"><span>Category</span><b>{heroEvent.category}</b></div><div className="organizer-tiketi-form-row"><span>City</span><b>{heroEvent.city}</b></div><div className="organizer-tiketi-form-row"><span>Capacity</span><b>{heroEvent.capacity.toLocaleString()}</b></div><button className="organizer-tiketi-screen-button">Publish event</button></>}
-    {variant === 'payout' && <><div className="organizer-tiketi-balance-label">Available balance</div><strong className="organizer-tiketi-balance">BIF 2,480,000</strong><div className="organizer-tiketi-payout-card"><span>From ticket sales</span><b>{revenue}</b><small>Updated just now</small></div><button className="organizer-tiketi-screen-button">Withdraw earnings</button></>}
-    {variant === 'withdraw' && <><div className="organizer-tiketi-balance-label">Withdraw to</div><div className="organizer-tiketi-momo"><b>Mobile Money</b><span>+257 79 000 000</span></div><div className="organizer-tiketi-form-row"><span>Amount</span><b>BIF 350,000</b></div><button className="organizer-tiketi-screen-button">Confirm withdrawal</button></>}
-    {variant === 'analytics' && <><div className="organizer-tiketi-chart-label">Sales this week <b>+24.8%</b></div><div className="organizer-tiketi-chart"><i /><i /><i /><i /><i /><i /><i /></div><div className="organizer-tiketi-mini-grid"><span><b>{sold}</b><small>Scanned</small></span><span><b>{heroEvent.capacity.toLocaleString()}</b><small>Capacity</small></span></div></>}
-    {variant === 'guests' && <><div className="organizer-tiketi-scan-card"><QrCodeIcon size={32} /><b>Scan to check in</b><small>Fast entry at Stade Intwari</small></div>{['Aline N.', 'Kevin M.', 'Diane K.'].map((guest, index) => <div className="organizer-tiketi-guest" key={guest}><span>{guest}</span><b>{index === 0 ? 'Checked in' : 'Ready'}</b></div>)}</>}
+  const capacity = Math.round((heroEvent.ticketsSold / heroEvent.capacity) * 100)
+
+  return <div className="organizer-studio-preview" role="img" aria-label="QPassa Studio event dashboard preview">
+    <div className="organizer-studio-preview-topbar"><span className="organizer-studio-preview-brand"><TicketIcon size={15} /> QPassa Studio</span><span className="organizer-studio-preview-live"><i /> Event live</span></div>
+    <div className="organizer-studio-preview-body">
+      <aside className="organizer-studio-preview-nav"><span className="is-current">Overview</span><span>Event details</span><span>Tickets</span><span>Guest list</span><span>Balance</span></aside>
+      <div className="organizer-studio-preview-workspace">
+        <div className="organizer-studio-preview-heading"><div><p>YOUR EVENT</p><strong>{heroEvent.name}</strong><span>{heroEvent.city} · {heroEvent.date}</span></div><button>Manage event <ArrowRightIcon size={13} /></button></div>
+        <div className="organizer-studio-preview-stats"><div><span>Tickets sold</span><b>{heroEvent.ticketsSold.toLocaleString()}</b><small>{`of ${heroEvent.capacity.toLocaleString()} capacity`}</small></div><div><span>Sales value</span><b>{revenue}</b><small>Updated just now</small></div></div>
+        <div className="organizer-studio-preview-progress"><div><span>Capacity</span><b>{capacity}%</b></div><i><em style={{ width: `${capacity}%` }} /></i><small>{heroEvent.capacity - heroEvent.ticketsSold} more guests can join</small></div>
+      </div>
+    </div>
+    <div className="organizer-studio-preview-checkin"><QrCodeIcon size={18} /><div><b>Ready at the door</b><span>Guest check-in is switched on</span></div><strong>{heroEvent.ticketsSold.toLocaleString()}</strong></div>
   </div>
 }
 
-function ProductTitle({ number, title }: { number: string; title: string }) {
-  const accents: Record<string, string> = { '01': 'proper place.', '02': 'every sale.', '03': 'inside.' }
-  const accent = accents[number] ?? ''
-  const base = accent ? title.replace(accent, '').trimEnd() : title
-  return <h2>{base}{accent && <> <em>{accent}</em></>}</h2>
-}
-
-function ProductSection({ number, label, title, copy, points, image, secondaryImage, reverse = false, navigate }: { number: string; label: string; title: string; copy: string; points: string[]; image: 'dashboard' | 'create' | 'payout' | 'withdraw' | 'analytics' | 'guests'; secondaryImage: 'dashboard' | 'create' | 'payout' | 'withdraw' | 'analytics' | 'guests'; reverse?: boolean; navigate: (page: string) => void }) {
-  return <Reveal className={`organizer-reference-product ${reverse ? 'is-reversed' : ''}`}><div className="organizer-reference-product-copy"><p className="organizer-reference-kicker"><span>{number}</span> · {label}</p><ProductTitle number={number} title={title} /><p>{copy}</p><ul>{points.map(point => <li key={point}><CheckIcon size={15} />{point}</li>)}</ul><button onClick={() => navigate('auth-organizer')} className="organizer-reference-text-button organizer-reference-product-cta">Build your event <ArrowRightIcon size={15} /></button></div><div className="organizer-reference-phone-pair"><Phone variant={image} label={title} /><Phone variant={secondaryImage} label={`${title} detail`} /></div></Reveal>
+function FeaturePreview({ type }: { type: 'publish' | 'sales' | 'entry' }) {
+  if (type === 'publish') return <div className="organizer-feature-preview organizer-feature-preview-publish"><div className="organizer-feature-preview-top"><span><TicketIcon size={14} /> New event</span><i>Draft</i></div><strong>{heroEvent.name}</strong><small>{heroEvent.venue} · {heroEvent.city}</small><div className="organizer-feature-preview-ticket"><span>Regular</span><b>{formatBif(heroEvent.price)}</b></div><button>Publish event <ArrowRightIcon size={13} /></button></div>
+  if (type === 'sales') return <div className="organizer-feature-preview organizer-feature-preview-sales"><span className="organizer-feature-preview-label">AVAILABLE BALANCE</span><strong>BIF 2,480,000</strong><small>From ticket sales</small><div className="organizer-feature-preview-bars"><i /><i /><i /><i /><i /><i /><i /></div><div className="organizer-feature-preview-sales-row"><span>Sales this week</span><b>+24.8%</b></div></div>
+  return <div className="organizer-feature-preview organizer-feature-preview-entry"><div className="organizer-feature-preview-entry-head"><QrCodeIcon size={23} /><div><strong>Guest list</strong><small>Check-in open</small></div><b>128 / 420</b></div>{['Aline N.', 'Kevin M.', 'Diane K.'].map((guest, index) => <div className="organizer-feature-preview-guest" key={guest}><span>{guest}</span><b>{index === 0 ? 'Checked in' : 'Ready'}</b></div>)}</div>
 }
 
 export default function OrganizersPage({ navigate }: Props) {
@@ -69,33 +67,54 @@ export default function OrganizersPage({ navigate }: Props) {
     return () => { active = false }
   }, [])
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(entries => entries.forEach(entry => { if (entry.isIntersecting) entry.target.classList.add('is-visible') }), { threshold: .14 })
-    const elements = document.querySelectorAll('.organizer-reference-reveal')
-    elements.forEach(element => observer.observe(element))
-    return () => observer.disconnect()
-  }, [])
+  return <main className="organizer-launch-page">
+    <section className="organizer-launch-hero">
+      <div className="organizer-launch-shell organizer-launch-hero-inner">
+        <div className="organizer-launch-hero-copy">
+          <h1>The simpler way to<br /><em>run your next event.</em></h1>
+          <p className="organizer-launch-lede">Event pages, ticket sales, guests, check-in, and settlement in one place. Your team works from the same clear view, from the first announcement to the final scan.</p>
+          <div className="organizer-launch-actions"><button onClick={() => navigate('auth-organizer')}>Create an event <ArrowRightIcon size={16} /></button><a href="#event-day">See how it works</a></div>
+        </div>
+        <StudioPreview />
+      </div>
+    </section>
 
-  return <main className="organizer-reference-page">
-    <section className="organizer-reference-hero"><div className="organizer-reference-grid" /><div className="organizer-reference-shell organizer-reference-hero-inner"><div className="organizer-reference-hero-copy"><p className="organizer-reference-kicker"><ZapIcon size={15} /> QPassa Studio for organizers</p><h1>Turn your next idea into a <em>full room.</em></h1><p>Plan the details, sell tickets in Burundian francs, manage your event team, and welcome every guest from one connected workspace.</p><div className="organizer-reference-actions"><button onClick={() => navigate('auth-organizer')}>Create an event <ArrowRightIcon size={16} /></button><a href="#pricing">View pricing</a></div><div className="organizer-reference-proof"><div><b>{heroEvent.capacity.toLocaleString()}</b><span>Capacity on a sample event</span></div><div><b>{heroEvent.ticketsSold.toLocaleString()}</b><span>Tickets sold</span></div><div><b>{heroEvent.city}</b><span>Built for Burundi organizers</span></div></div><div className="organizer-reference-hero-points"><span><ClipboardIcon size={18} /><b>Shape the listing</b><small>Publish the cover, details, tickets, and policies.</small></span><span><QrCodeIcon size={18} /><b>Keep entry moving</b><small>Scan guests and see who has arrived.</small></span><span><DollarSignIcon size={18} /><b>Know your money</b><small>Track sales and balance in BIF.</small></span></div></div><div className="organizer-reference-hero-visual"><div className="organizer-reference-hero-glow" /><Phone variant="dashboard" label="QPassa Studio dashboard for Bujumbura Summer Fest" /></div></div></section>
+    <section className="organizer-launch-intro">
+      <div className="organizer-launch-shell organizer-launch-intro-inner"><div className="organizer-launch-intro-copy"><p className="organizer-launch-section-label">A single home for your event</p><h2>Make the admin feel <em>lighter.</em></h2></div><div className="organizer-launch-intro-side"><p>QPassa brings the moving pieces into one clear rhythm, so your energy can stay with the people and the experience you are creating.</p><div className="organizer-launch-intro-points"><span><b>One workspace</b><small>Details, tickets, guests, and sales together.</small></span><span><b>One clear view</b><small>Useful information for each moment of the event.</small></span></div></div></div>
+    </section>
 
-    <section className="organizer-reference-trust"><div className="organizer-reference-shell"><p>Organizers building what&apos;s next with QPassa</p><div className="organizer-reference-marquee"><div className="organizer-reference-marquee-track">{[...logos, ...logos].map((logo, index) => <span key={`${logo}-${index}`}><i>{logo.slice(0, 1)}</i>{logo}</span>)}</div></div></div></section>
+    <section className="organizer-launch-workflow organizer-launch-shell">
+      {workflow.map((item, index) => {
+        const Icon = item.icon
+        const preview = index === 0 ? 'publish' : index === 1 ? 'sales' : 'entry'
+        const previewOnLeft = index === 0 || index === 2
+        return <article className={`organizer-launch-workflow-card is-${item.tone} ${previewOnLeft ? 'is-preview-left' : ''}`} key={item.number}>
+          {previewOnLeft && <div className="organizer-launch-workflow-preview"><FeaturePreview type={preview} /></div>}
+          <div className="organizer-launch-workflow-copy"><div className="organizer-launch-workflow-top"><span>{item.number}</span><Icon size={20} /></div><p>{item.label}</p><h3>{item.title}</h3><div className="organizer-launch-workflow-preview-mobile"><FeaturePreview type={preview} /></div><p className="organizer-launch-workflow-description">{item.copy}</p><ul>{item.items.map(feature => <li key={feature}><CheckIcon size={15} />{feature}</li>)}</ul></div>
+          {!previewOnLeft && <div className="organizer-launch-workflow-preview"><FeaturePreview type={preview} /></div>}
+        </article>
+      })}
+    </section>
 
-    <section className="organizer-reference-shell organizer-reference-products"><div className="organizer-reference-section-intro"><p className="organizer-reference-kicker"><ZapIcon size={15} /> One toolkit, many moving parts</p><h2>Make the work feel<br /><em>lighter.</em></h2><p>QPassa keeps the operational details close, so your attention can stay on the experience and the people you're bringing together.</p></div><ProductSection navigate={navigate} number="01" label="PUBLISH" title="Give the idea a proper place." copy="Build a clear event page with the cover, venue, category, capacity, ticket tiers, and the details guests need before they commit." points={['Use your own event image and voice', 'Set regular, VIP, VVIP, or custom ticket tiers', 'Update the page when plans change', 'Share one link across Instagram, WhatsApp, and other channels']} image="create" secondaryImage="dashboard" /><ProductSection navigate={navigate} reverse number="02" label="SETTLE" title="See the value of every sale." copy="Keep ticket revenue understandable from the first BIF sale through your available balance and eventual withdrawal." points={['Revenue shown in BIF', 'Separate ticket income from withdrawals', 'See the balance available to move', 'Keep a record of transactions']} image="payout" secondaryImage="withdraw" /><ProductSection navigate={navigate} number="03" label="WELCOME" title="Know who made it inside." copy="When the doors open, your team can focus on people rather than paper lists. Check in guests and watch attendance build." points={['Live scan count at the door', 'Guest names and status in one view', 'Capacity awareness while the event runs', 'Useful attendance numbers after the night ends']} image="analytics" secondaryImage="guests" /></section>
+    <section className="organizer-launch-connection">
+      <div className="organizer-launch-shell"><div className="organizer-launch-connection-heading"><div><p className="organizer-launch-section-label">The work after a good night</p><h2>Make the next <em>yes</em> easier.</h2></div><p>A great event should not vanish the moment the last guest leaves. Keep your work easy to find, your details clear, and the next idea ready to share.</p></div><div className="organizer-launch-connection-grid"><article className="organizer-launch-connection-feature"><span className="organizer-launch-connection-number">01</span><LinkIcon size={22} /><h3>Give your events a familiar home.</h3><p>Use a clear event link every time you share a plan on WhatsApp, Instagram, or with partners. Guests know where to find the details they need.</p><div className="organizer-launch-link-sample"><i /> qpassa.events/your-event <ArrowRightIcon size={13} /></div></article><article className="organizer-launch-connection-feature is-featured"><span className="organizer-launch-connection-number">02</span><UsersIcon size={22} /><h3>Build trust before the first guest arrives.</h3><p>Strong event pages make it easy to understand the essential details before people commit: the experience, place, time, ticket, and host.</p><div className="organizer-launch-detail-tags"><span>Venue</span><span>Time</span><span>Tickets</span><span>Policies</span></div></article><article className="organizer-launch-connection-feature"><span className="organizer-launch-connection-number">03</span><BarChartIcon size={22} /><h3>Take useful learning into the next plan.</h3><p>Use your sales and attendance view to understand what worked, then take that clarity into the next event you bring to life.</p><div className="organizer-launch-signal"><b>Sales</b><i><em /></i><span>Clearer signals, better planning.</span></div></article></div></div>
+    </section>
 
-    <section className="organizer-reference-beyond"><div className="organizer-reference-shell"><Reveal><p className="organizer-reference-kicker"><ZapIcon size={15} /> Make the link do more</p><h2>Keep your audience<br /><em>close to the next thing.</em></h2><p className="organizer-reference-lede">A good event should not disappear when the lights go down. Give guests an easy way back to what you are building.</p></Reveal><div className="organizer-reference-beyond-grid"><Reveal><QrCodeIcon size={26} /><h3>Entry that respects the queue</h3><p>Give your door team a clean scan view. SCAN / VERIFY / WELCOME.</p><strong>SCAN / VERIFY / WELCOME</strong><small>Give your door team a clean scan view.</small><ul><li><CheckIcon size={14} />Fast checks for a busy entrance</li><li><CheckIcon size={14} />The guest list stays close to the team</li></ul></Reveal><Reveal><LinkIcon size={26} /><h3>A home for the programme</h3><p>Put your events behind one memorable organizer identity and let people see what is happening next.</p><strong>qpassa.events/your-name</strong><small>One place for the people who follow your work.</small><ul><li><CheckIcon size={14} />Keep upcoming events easy to find</li><li><CheckIcon size={14} />Your audience knows where to return</li></ul></Reveal><Reveal><TicketIcon size={26} /><h3>Ticket choices that make sense</h3><p>Shape a simple path from interest to checkout with REGULAR / VIP / VVIP options.</p><strong>REGULAR / VIP / VVIP</strong><small>Simple choices, clear prices, fewer questions.</small><ul><li><CheckIcon size={14} />Prices shown in BIF</li><li><CheckIcon size={14} />Built for local event rhythms</li></ul></Reveal></div></div></section>
+    <section id="event-day" className="organizer-launch-event-day">
+      <div className="organizer-launch-shell"><div className="organizer-launch-event-day-heading"><p className="organizer-launch-section-label">When the date is close</p><h2>A calmer way to run <em>event day.</em></h2><p>Keep the people, details, and decisions your team needs in view — from the last check before doors open to the final guest scan.</p></div><div className="organizer-launch-event-day-grid"><article><span>Before doors open</span><h3>Make the page ready to share.</h3><p>Check the event details, ticket choices, venue, and door plan before your audience starts arriving.</p><ul><li><CheckIcon size={14} />Review event details</li><li><CheckIcon size={14} />Confirm ticket types</li></ul></article><article><span>When the room fills</span><h3>Keep entry moving.</h3><p>Give the welcome team a simple scan flow and a guest list that stays close at the door.</p><ul><li><CheckIcon size={14} />Scan tickets quickly</li><li><CheckIcon size={14} />See guest status live</li></ul></article><article><span>When it is over</span><h3>Leave with a better read.</h3><p>Sales and attendance are kept in one place, ready to inform the next call you make.</p><ul><li><CheckIcon size={14} />Review ticket sales</li><li><CheckIcon size={14} />Track event attendance</li></ul></article></div></div>
+    </section>
 
-    <section className="organizer-reference-reviews organizer-reference-shell"><Reveal><p className="organizer-reference-kicker"><UsersIcon size={15} /> The QPassa point of view</p><h2>Build the kind of event<br /><em>you would attend.</em></h2><p className="organizer-reference-lede">Clear information, a smoother arrival, and fewer loose ends make space for the part people actually remember.</p></Reveal><div className="organizer-reference-review-grid">{[['One clear listing', '01 · DETAILS', 'Give guests the venue, time, ticket choice, and context they need before they say yes.'], ['A calmer door', '02 · CHECK-IN', 'Keep the guest list close to the team welcoming people into the room.'], ['A better read', '03 · INSIGHTS', 'Leave the event with useful signals about what sold, who arrived, and what to build next.'], ['A growing audience', '04 · FOLLOW', 'Make it easy for people who enjoyed this event to discover the next one.']].map(([title, user, copy], index) => <Reveal className={`organizer-reference-review review-${index}`} key={user}><b>{title}</b><small>{user}</small><blockquote>{copy}</blockquote><span>● ● ●</span></Reveal>)}</div></section>
+    <section id="pricing" className="organizer-launch-pricing">
+      <div className="organizer-launch-shell"><div className="organizer-launch-pricing-heading"><div><p className="organizer-launch-section-label">Simple pricing</p><h2>Clear from <em>the first sale.</em></h2></div><p>Commission is deducted from organizer proceeds, not added to a guest&apos;s ticket checkout total.</p></div><div className="organizer-launch-price-grid">{[
+        { title: 'Standard tickets', description: 'Regular admission, VIP, and other non-consumable tiers', rate: feeRates.nonConsumable, icon: TicketIcon },
+        { title: 'Tables & groups', description: 'Tickets that issue multiple admissions per purchase', rate: feeRates.table, icon: UsersIcon },
+        { title: 'Venue credit', description: 'Tickets redeemed for food, drinks, or other credit', rate: feeRates.consumable, icon: DollarSignIcon },
+        { title: 'Free entry', description: 'Free tiers have no ticket value, so commission is zero', rate: feeRates.free, icon: CheckIcon },
+      ].map((item, index) => { const Icon = item.icon; return <article className={index === 0 ? 'is-featured' : ''} key={item.title}><Icon size={19} /><span>{item.title}</span><p>{item.description}</p><strong>{item.rate}% <small>commission</small></strong></article> })}</div><div className="organizer-launch-includes"><p>Every organizer account includes</p><span>Event pages</span><i /> <span>Ticket scanning</span><i /> <span>Sales tracking</span><i /> <span>Guest management</span></div></div>
+    </section>
 
-    <section id="pricing" className="organizer-reference-pricing"><div className="organizer-reference-shell"><Reveal><p className="organizer-reference-kicker"><TicketIcon size={15} /> Pricing</p><h2>Simple pricing.<br /><em>Every feature.</em></h2><p className="organizer-reference-lede">Commission rates are set by QPassa and deducted from organizer proceeds. They are not added to the customer’s ticket checkout total.</p></Reveal><div className="organizer-reference-price-grid">{[
-      { title: 'Non-consumable', label: 'STANDARD TICKETS', description: 'General admission, VIP, and other non-consumable tiers', rate: feeRates.nonConsumable },
-      { title: 'Table / group', label: 'MULTI-TICKET', description: 'Table tiers and tickets that issue multiple admissions per purchase', rate: feeRates.table },
-      { title: 'Consumable', label: 'VENUE CREDIT', description: 'Tickets redeemed for food, drinks, or other venue credit', rate: feeRates.consumable },
-      { title: 'Free tickets', label: 'FREE ENTRY', description: 'Free tiers have no ticket value; percentage commission amount is zero', rate: feeRates.free },
-    ].map((item, index) => <Reveal key={item.title}><article className={index === 0 ? 'is-popular' : ''}><span>{item.title}</span><small>{item.label}</small><p>{item.description}</p><b>{item.rate}% <i>commission</i></b></article></Reveal>)}</div><Reveal className="organizer-reference-includes"><div><h3>Every plan includes</h3><p>Ticket scanning, shareable event link, sales and settlement tracking, team roles, analytics, and attendee management.</p></div><button onClick={() => navigate('auth-organizer')}>Get started <ArrowRightIcon size={15} /></button><ul>{['Ticket scanning', 'Shareable event link', 'Sales and settlement tracking', 'Team roles and access control', 'Sales analytics', 'Attendee and check-in management', 'Supported local payment methods'].map(item => <li key={item}><CheckIcon size={14} />{item}</li>)}</ul></Reveal></div></section>
+    <section className="organizer-launch-faq organizer-launch-shell"><div><p className="organizer-launch-section-label">Questions</p><h2>Everything you need <em>to know.</em></h2></div><div className="organizer-launch-faq-list">{faqs.map(([question, answer], index) => <article className={openFaq === index ? 'is-open' : ''} key={question}><button onClick={() => setOpenFaq(openFaq === index ? null : index)}><span><small>0{index + 1}</small>{question}</span><ChevronDownIcon size={18} /></button>{openFaq === index && <p>{answer}</p>}</article>)}</div></section>
 
-    <section className="organizer-reference-faq organizer-reference-shell"><div><p className="organizer-reference-kicker"><ClipboardIcon size={15} /> FAQ</p><h2>Your guide to<br /><em>running events.</em></h2></div><div>{faqs.map(([question, answer], index) => <Reveal key={question} className="organizer-reference-faq-item"><button onClick={() => setOpenFaq(openFaq === index ? null : index)}><span><small>Q{index + 1}</small>{question}</span><ChevronDownIcon size={17} /></button>{openFaq === index && <p>{answer}</p>}</Reveal>)}</div></section>
-
-    <section className="organizer-reference-final"><div className="organizer-reference-shell"><Reveal><p className="organizer-reference-kicker"><ZapIcon size={15} /> Your next event</p><h2>Start with the idea.<br /><em>We&apos;ll help with the rest.</em></h2><p>Open QPassa, publish your event, share it with your audience, and start building the next experience.</p><button onClick={() => navigate('auth-organizer')}>Get started <ArrowRightIcon size={16} /></button><small>Free to get started · Built for Burundi&apos;s event organizers</small></Reveal></div></section>
+    <section className="organizer-launch-final"><div className="organizer-launch-shell organizer-launch-final-inner"><div className="organizer-launch-final-copy"><p className="organizer-launch-section-label">Ready when the idea is</p><h2>Turn a good plan into <em>a date people save.</em></h2><p>Create the page, shape the ticket journey, invite your crowd, and give your team a calmer way to run the room.</p><button onClick={() => navigate('auth-organizer')}>Create your event <ArrowRightIcon size={16} /></button></div><div className="organizer-launch-final-plan"><p>Your QPassa launch pad</p><div><span>01</span><b>Create your organizer space</b><small>Start with the people behind the event.</small></div><div><span>02</span><b>Shape the experience</b><small>Add the details and ticket choices guests need.</small></div><div><span>03</span><b>Share, sell, and welcome</b><small>Bring the right people all the way to the door.</small></div></div></div></section>
   </main>
 }

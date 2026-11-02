@@ -1,40 +1,25 @@
 import { useAuth } from '../context/AuthContext'
-import { SearchIcon, TicketIcon, BellIcon, UserIcon, BarChartIcon } from './Icon'
+import { SearchIcon, TicketIcon, UserIcon } from './Icon'
 import { useEffect, useRef, useState } from 'react'
-import { supabase } from '../lib/supabase'
 
 type Props = {
   current: string
   navigate: (p: string) => void
 }
 
-function HomeIcon2({ size = 20 }: { size?: number }) {
+function HomeIcon({ size = 20 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-      <polyline points="9,22 9,12 15,12 15,22"/>
+      <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+      <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
     </svg>
   )
 }
 
 export default function BottomNav({ current, navigate }: Props) {
-  const { user, isOrganizer, teamMembership } = useAuth()
-  const hasPendingInvitation = teamMembership?.status === 'pending'
+  const { user } = useAuth()
   const [visible, setVisible] = useState(true)
-  const [unreadNotifications, setUnreadNotifications] = useState(0)
   const lastScrollY = useRef(0)
-
-  useEffect(() => {
-    if (!user) { setUnreadNotifications(0); return }
-    let active = true
-    const loadUnread = async () => {
-      const { count } = await supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('recipient_scope', 'attendee').is('read_at', null)
-      if (active) setUnreadNotifications(count ?? 0)
-    }
-    void loadUnread()
-    const channel = supabase.channel(`bottom-notifications:${user.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => { void loadUnread() }).subscribe()
-    return () => { active = false; void supabase.removeChannel(channel) }
-  }, [user?.id])
 
   useEffect(() => {
     const handleScroll = () => {
@@ -53,70 +38,41 @@ export default function BottomNav({ current, navigate }: Props) {
   }, [])
 
   const items = [
-    { key: 'discover', label: 'Discover', Icon: HomeIcon2 },
-    { key: 'events', label: 'Events', Icon: SearchIcon },
-    ...(user
-      ? hasPendingInvitation
-        ? [{ key: 'dashboard', label: 'Accept invite', Icon: BarChartIcon }]
-        : isOrganizer
-        ? [{ key: 'dashboard', label: 'Dashboard', Icon: BarChartIcon }]
-        : [{ key: 'my-tickets', label: 'Tickets', Icon: TicketIcon }]
-      : [{ key: 'my-tickets', label: 'Tickets', Icon: TicketIcon }]
-    ),
-    ...(user ? [{ key: 'notifications', label: 'Alerts', Icon: BellIcon }] : []),
+    { key: 'discover', label: 'Home', Icon: HomeIcon },
+    { key: 'events', label: 'Discover', Icon: SearchIcon },
+    { key: 'my-tickets', label: 'Tickets', Icon: TicketIcon },
     { key: 'profile', label: user ? 'Profile' : 'Sign in', Icon: UserIcon },
   ]
 
   const HIDDEN_PAGES = new Set(['auth-customer', 'auth-organizer', 'checkin', 'dashboard', 'agent-dashboard', 'agent-ticket'])
   if (HIDDEN_PAGES.has(current)) return null
-  const hasFloatingCenter = items.length % 2 === 1 && items.length >= 5
-
   return (
     <nav className="fixed bottom-3 left-[50vw] z-50 md:hidden safe-area-bottom transition-transform duration-300"
       style={{
-        width: 'min(420px, calc(100vw - 32px))',
+        width: 'min(940px, calc(100vw - 24px))',
         boxSizing: 'border-box',
         transform: `translateX(-50%) ${visible ? 'translateY(0)' : 'translateY(140%)'}`,
         pointerEvents: visible ? 'auto' : 'none',
       }}>
-      <div className="relative">
-        <div aria-hidden="true" className="attendee-bottom-nav-surface absolute inset-0 rounded-[26px] border shadow-2xl"
-        style={{
-          background: 'rgba(16,16,16,0.86)',
-          borderColor: 'rgba(255,255,255,0.08)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.38)',
-          ...(hasFloatingCenter ? {
-            maskImage: 'radial-gradient(circle 48px at 50% 18px, transparent 0 42px, #000 43px)',
-            WebkitMaskImage: 'radial-gradient(circle 48px at 50% 18px, transparent 0 42px, #000 43px)',
-          } : {}),
-        }} />
-        <div className={`relative items-center rounded-[26px] px-2 py-2 ${hasFloatingCenter ? 'grid grid-cols-5' : 'flex justify-around'}`}>
-        {items.map(({ key, label, Icon }, index) => {
+      <div className="attendee-bottom-nav-frame relative">
+        <div aria-hidden="true" className="attendee-bottom-nav-surface absolute inset-0" />
+        <div className="attendee-bottom-nav-items relative flex items-center">
+        {items.map(({ key, label, Icon }) => {
           const active = current === key
-          const isCenter = hasFloatingCenter && index === Math.floor(items.length / 2)
           return (
             <button
               key={key}
               onClick={() => user || key === 'discover' || key === 'events' ? navigate(key) : navigate('auth-customer')}
-              className={`attendee-bottom-nav-item relative flex flex-col items-center gap-1 rounded-2xl px-3 py-2 transition-all ${isCenter ? 'attendee-bottom-nav-center z-10 -translate-y-7 justify-self-center' : ''}`}
-              style={{
-                color: isCenter || active ? '#fff' : 'rgba(255,255,255,0.6)',
-                background: isCenter ? 'linear-gradient(145deg, #ff9a3d 0%, var(--primary) 72%)' : active ? 'linear-gradient(135deg, rgba(249,112,21,0.2), rgba(249,112,21,0.08))' : 'transparent',
-                minWidth: isCenter ? 72 : 52,
-                width: isCenter ? 72 : undefined,
-                height: isCenter ? 72 : undefined,
-                justifyContent: isCenter ? 'center' : undefined,
-                border: isCenter ? '0 solid transparent' : active ? '1px solid rgba(249,112,21,0.38)' : '1px solid transparent',
-                borderRadius: isCenter ? '999px' : undefined,
-                boxShadow: isCenter ? 'none' : undefined,
-              }}>
-              <div className="relative">
-                <Icon size={20} />
-                {key === 'notifications' && unreadNotifications > 0 && <span className="absolute -right-2 -top-2 min-w-5 rounded-full px-1 text-center text-[10px] font-black" style={{ background: 'var(--primary)', color: '#000' }}>{unreadNotifications > 99 ? '99+' : unreadNotifications}</span>}
+              aria-current={active ? 'page' : undefined}
+              aria-label={label}
+              title={label}
+              className={`attendee-bottom-nav-item relative flex min-w-0 items-center justify-center transition-all ${active ? 'is-active' : ''}`}
+              style={active ? { flex: '0 0 auto', minWidth: 'max-content' } : undefined}
+              >
+              <div className="attendee-bottom-nav-content relative flex items-center justify-center">
+                <Icon size={24} />
+                {active && <span className="attendee-bottom-nav-label truncate">{label}</span>}
               </div>
-              <span className={`text-[10px] font-medium ${isCenter ? 'absolute -bottom-7 whitespace-nowrap' : ''}`}>{label}</span>
             </button>
           )
         })}

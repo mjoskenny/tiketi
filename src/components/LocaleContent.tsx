@@ -198,12 +198,15 @@ export function LanguageSwitcher({ floating = false, bare = false }: { floating?
   }, [])
   const language = i18n.resolvedLanguage?.startsWith('fr') ? 'fr' : 'en'
   const nextLanguage = language === 'fr' ? 'en' : 'fr'
+  const languageName = language === 'fr' ? 'Français' : 'English'
+  const nextLanguageName = nextLanguage === 'fr' ? 'Français' : 'English'
+  const languageSwitchLabel = `Choose language: ${languageName}. Switch to ${nextLanguageName}`
   return (
     <button
       type="button"
       className={`${floating ? 'fixed right-4 top-4 z-[100]' : ''} inline-flex h-9 w-9 items-center justify-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${bare ? 'rounded-md bg-transparent p-0 shadow-none hover:bg-transparent' : 'rounded-xl border border-white/15 bg-black/60 shadow-lg hover:bg-white/10'}`}
-      aria-label={`${i18n.t('Choose language')}: ${language === 'fr' ? 'Français' : 'English'}. Switch to ${nextLanguage === 'fr' ? 'Français' : 'English'}`}
-      title={`Switch to ${nextLanguage === 'fr' ? 'Français' : 'English'}`}
+      aria-label={i18n.t(languageSwitchLabel)}
+      title={i18n.t(`Switch to ${nextLanguageName}`)}
       onClick={() => {
         window.localStorage.setItem('tiketi-language', nextLanguage)
         void i18n.changeLanguage(nextLanguage)

@@ -71,7 +71,7 @@ export default function DigitalTicketPage({ data, navigate }: Props) {
   const ticketExtraInfo = data.ticketExtraInfo?.trim() || ''
   const ticketExpiry = data.ticketExpiry ? formatLocaleDate(`${data.ticketExpiry}T00:00:00`, { day: 'numeric', month: 'short', year: 'numeric' }) : ''
   const ticketGroupSize = data.ticketGroupSize && data.ticketGroupSize > 1 ? data.ticketGroupSize : null
-  const status = event.status === 'cancelled' || data.ticketStatus === 'cancelled' ? 'CANCELLED' : data.ticketStatus === 'used' ? 'USED' : hasEventEnded(date, rawTime, event.end_time) ? 'EXPIRED' : 'VALID'
+  const status = event.status === 'cancelled' || data.ticketStatus === 'cancelled' ? 'CANCELLED' : data.ticketStatus === 'used' ? 'USED' : hasEventEnded(date, rawTime, event.end_time, Date.now(), event.end_date) ? 'EXPIRED' : 'VALID'
   const statusColor = status === 'VALID' ? '#15803d' : '#b91c1c'
 
   const createPdf = async (ticketOverride?: { qr_code: string; holder_name?: string | null; holder_email?: string | null; created_at?: string }) => {
@@ -303,11 +303,11 @@ export default function DigitalTicketPage({ data, navigate }: Props) {
       {/* Action buttons */}
       {shareMessage && <p className="mb-3 text-center text-xs" style={{ color: 'var(--muted-foreground)' }}>{shareMessage}</p>}
       <div className="flex gap-3 mt-8 w-full max-w-sm">
-        <button onClick={() => void sharePdf()} disabled={exporting} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold"
+        <button onClick={() => void sharePdf()} disabled={exporting} className="digital-ticket-secondary-action flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold"
           style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: 'var(--muted-foreground)' }}>
           <ShareNodesIcon size={14} /> Share
         </button>
-        <button onClick={() => void downloadPdf()} disabled={exporting} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold"
+        <button onClick={() => void downloadPdf()} disabled={exporting} className="digital-ticket-primary-action flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold"
           style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}>
           <DownloadIcon size={14} /> {exporting ? 'Preparing…' : 'Download PDF'}
         </button>

@@ -12,8 +12,11 @@ import { currentLocale, formatLocaleDate } from '../lib/locale'
 import { LanguageSwitcher } from '../components/LocaleContent'
 import StatusBadge from '../components/StatusBadge'
 
-type Section = 'overview' | 'events' | 'orders' | 'customers' | 'followers' | 'members' | 'roles' | 'subscriptions' | 'transactions' | 'payouts' | 'refunds' | 'notifications'
+type Section = 'overview' | 'events' | 'orders' | 'customers' | 'followers' | 'members' | 'settings' | 'subscriptions' | 'transactions' | 'payouts' | 'refunds' | 'notifications'
 type AnalyticsRange = 'all' | 'day' | 'week' | 'month' | 'year' | 'custom'
+type StatementFilter = 'all' | 'payment' | 'fee' | 'refund' | 'payout'
+type StatementView = 'activity' | 'payouts'
+type TeamTab = 'users' | 'invitations'
 type NotificationFilter = 'all' | 'unread' | 'events' | 'sales' | 'followers' | 'team'
 type OrganizerNotification = { id: string; type: string; title: string; body: string; created_at: string; read_at: string | null; event_id?: string | null; recipient_scope?: string }
 type AgentOrderMeta = { order_id: string; agent_user_id: string; payment_mode: 'digital' | 'cash'; status: string; quantity: number; profiles?: { full_name: string | null; email: string | null } | null }
@@ -28,7 +31,7 @@ const NAV_ICONS: Record<Section, React.FC<{ size?: number }>> = {
   customers: UsersIcon,
   followers: UsersIcon,
   members: UserIcon,
-  roles: KeyIcon,
+  settings: KeyIcon,
   subscriptions: TagIcon,
   transactions: DollarSignIcon,
   payouts: DollarSignIcon,
@@ -43,11 +46,19 @@ const NAV: { key: Section; label: string }[] = [
   { key: 'customers', label: 'Customers' },
   { key: 'followers', label: 'Followers' },
   { key: 'members', label: 'Members' },
-  { key: 'roles', label: 'Roles' },
-  { key: 'transactions', label: 'Transactions' },
-  { key: 'payouts', label: 'Payouts' },
+  { key: 'settings', label: 'Settings' },
+  { key: 'transactions', label: 'Statements' },
+  { key: 'payouts', label: 'Wallet' },
   ...(FEATURES.refunds ? [{ key: 'refunds' as Section, label: 'Refund requests' }] : []),
   { key: 'notifications', label: 'Notifications' },
+]
+
+const NAV_GROUPS: { label: string; keys: Section[] }[] = [
+  { label: 'Workspace', keys: ['overview'] },
+  { label: 'Event operations', keys: ['events', 'orders', 'customers', 'followers'] },
+  { label: 'Team access', keys: ['members', 'settings'] },
+  { label: 'Finance', keys: ['transactions', 'payouts', 'refunds'] },
+  { label: 'Updates', keys: ['notifications'] },
 ]
 
 const SECTION_PATHS: Record<Section, string> = {
@@ -57,16 +68,22 @@ const SECTION_PATHS: Record<Section, string> = {
   customers: '/dashboard/customers',
   followers: '/dashboard/followers',
   members: '/dashboard/team',
-  roles: '/dashboard/roles',
+  settings: '/dashboard/settings',
   subscriptions: '/dashboard/subscriptions',
-  transactions: '/dashboard/transactions',
-  payouts: '/dashboard/payouts',
+  transactions: '/dashboard/finance/statements',
+  payouts: '/dashboard/finance/wallet',
   refunds: '/dashboard/refunds',
   notifications: '/dashboard/notifications',
 }
 
 function sectionFromPath(pathname: string): Section {
-  const slug = pathname.split('/').filter(Boolean)[1]
+  const normalizedPath = pathname.split('?')[0].replace(/\/$/, '') || '/'
+  const exactMatch = Object.entries(SECTION_PATHS).find(([, path]) => path === normalizedPath)
+  if (exactMatch) return exactMatch[0] as Section
+  const pathParts = normalizedPath.split('/').filter(Boolean)
+  const slug = pathParts[pathParts.length - 1]
+  const legacyFinanceRoutes: Record<string, Section> = { transactions: 'transactions', payouts: 'payouts' }
+  if (slug && legacyFinanceRoutes[slug]) return legacyFinanceRoutes[slug]
   const match = Object.entries(SECTION_PATHS).find(([, path]) => path.split('/').pop() === slug)
   return (match?.[0] as Section | undefined) ?? 'overview'
 }
@@ -85,6 +102,18 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 const Badge = StatusBadge
+
+function DashboardThemeIcon({ theme }: { theme: 'dark' | 'light' }) {
+  return theme === 'dark' ? (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" />
+    </svg>
+  ) : (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z" />
+    </svg>
+  )
+}
 
 function StatCard({ Icon, label, value, sub, color = 'var(--foreground)' }: { Icon: React.FC<{ size?: number }>; label: string; value: string; sub?: string; color?: string }) {
   return (
@@ -172,6 +201,14 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const [eventViewId, setEventViewId] = useState<string | null>(() => eventIdFromPath(window.location.pathname))
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [utilityPopup, setUtilityPopup] = useState<'notifications' | 'calendar' | 'profile' | null>(null)
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => document.documentElement.dataset.theme === 'light' ? 'light' : 'dark')
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark'
+    document.documentElement.dataset.theme = nextTheme
+    window.localStorage.setItem('qpassa-theme', nextTheme)
+    setTheme(nextTheme)
+  }
 
   // Data
   const [events, setEvents] = useState<Event[]>([])
@@ -197,6 +234,11 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const [analyticsDayInterval, setAnalyticsDayInterval] = useState(2)
   const [analyticsMonthInterval, setAnalyticsMonthInterval] = useState(1)
   const [notificationFilter, setNotificationFilter] = useState<NotificationFilter>('all')
+  const [statementFilter, setStatementFilter] = useState<StatementFilter>('all')
+  const [statementView, setStatementView] = useState<StatementView>('activity')
+  const [statementSearch, setStatementSearch] = useState('')
+  const [teamTab, setTeamTab] = useState<TeamTab>('users')
+  const [teamSearch, setTeamSearch] = useState('')
   const [payoutAmount, setPayoutAmount] = useState('')
   const [payoutMethod, setPayoutMethod] = useState<'mobile_money' | 'bank'>('mobile_money')
   const [payoutReference, setPayoutReference] = useState('')
@@ -206,10 +248,8 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   // Modals
   const [showNewEvent, setShowNewEvent] = useState(false)
   const [editingEvent, setEditingEvent] = useState<Event | null>(null)
-  const [editingRole, setEditingRole] = useState<OrganizerRole | null>(null)
   const [showInviteMember, setShowInviteMember] = useState(false)
   const [showInviteAgent, setShowInviteAgent] = useState(false)
-  const [showNewRole, setShowNewRole] = useState(false)
   const [actionError, setActionError] = useState('')
   const [dashboardLoadError, setDashboardLoadError] = useState(false)
   const [verificationStatus, setVerificationStatus] = useState<'unverified' | 'pending' | 'verified'>(organizer?.verification_status ?? (organizer?.verified ? 'verified' : 'unverified'))
@@ -220,7 +260,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const orgId = organizer?.id
   const isOwner = !!organizer && organizer.user_id === profile?.id
   const membershipPermissions = (teamMembership?.organizer_roles?.permissions ?? {}) as Record<string, boolean>
-  const canAccessSection = (key: Section) => key === 'payouts' ? isOwner : isOwner || membershipPermissions.all === true || membershipPermissions[key] === true || (key === 'overview' && membershipPermissions.analytics === true) || (key === 'events' && (membershipPermissions.checkin === true || membershipPermissions.orders === true))
+  const canAccessSection = (key: Section) => key === 'payouts' ? isOwner : key === 'settings' ? isOwner || membershipPermissions.all === true || membershipPermissions.roles === true : isOwner || membershipPermissions.all === true || membershipPermissions[key] === true || (key === 'overview' && membershipPermissions.analytics === true) || (key === 'events' && (membershipPermissions.checkin === true || membershipPermissions.orders === true))
   const canUseCalendar = isOwner || membershipPermissions.all === true || membershipPermissions.calendar === true
   const canViewEvents = isOwner || membershipPermissions.all === true || membershipPermissions.events === true || membershipPermissions.checkin === true || membershipPermissions.orders === true
   const canCheckIn = isOwner || membershipPermissions.all === true || membershipPermissions.checkin === true
@@ -725,15 +765,6 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     setEvents(prev => prev.filter(e => e.id !== id))
   }
 
-  const deleteRole = async (id: string) => {
-    const role = roles.find(item => item.id === id)
-    if (role?.name.trim().toLowerCase() === 'admin') { setActionError('The Admin role cannot be deleted.'); return }
-    if (!confirm('Delete this role?')) return
-    const { error } = await supabase.from('organizer_roles').delete().eq('id', id)
-    if (error) { setActionError(error.message); return }
-    setRoles(prev => prev.filter(r => r.id !== id))
-  }
-
   const removeFollower = async (id: string) => {
     if (!confirm('Remove this follower?')) return
     const { error } = await supabase.from('organizer_followers').delete().eq('id', id)
@@ -754,6 +785,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   }
 
   const updateMemberRole = async (memberId: string, roleId: string) => {
+    if (!isOwner) { setActionError('Only the organizer owner can assign team roles.'); return }
     const { error } = await supabase.from('organizer_members').update({ role_id: roleId || null }).eq('id', memberId)
     if (error) { setActionError(error.message); return }
     setMembers(prev => prev.map(member => member.id === memberId ? { ...member, role_id: roleId || null, organizer_roles: roles.find(role => role.id === roleId) } : member))
@@ -792,6 +824,46 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     if (transaction.type === 'payout' && (transaction.status === 'pending' || transaction.status === 'completed')) return balance - transaction.amount
     return balance
   }, 0) - commissions.filter(commission => ['pending', 'available', 'paid'].includes(commission.status)).reduce((sum, commission) => sum + commission.amount, 0))
+
+  const walletEventBreakdown = events.map(event => {
+    const eventOrders = orders.filter(order => order.event_id === event.id && order.status === 'confirmed')
+    const orderIds = new Set(eventOrders.map(order => order.id))
+    const gross = eventOrders.reduce((sum, order) => sum + ticketSubtotalForOrder(order), 0)
+    const fees = eventOrders.reduce((sum, order) => sum + serviceFeeForOrder(order), 0)
+    const agentFees = eventOrders.reduce((sum, order) => sum + agentCommissionForOrder(order), 0)
+    const refunds = transactions.filter(transaction => transaction.type === 'refund' && transaction.status === 'completed' && transaction.order_id && orderIds.has(transaction.order_id)).reduce((sum, transaction) => sum + transaction.amount, 0)
+    return { id: event.id, title: event.title, orders: eventOrders.length, gross, fees, agentFees, refunds, net: Math.max(0, gross - fees - agentFees - refunds) }
+  }).filter(event => event.orders > 0).sort((a, b) => b.net - a.net)
+
+  const filteredStatementTransactions = transactions.filter(transaction => {
+    const matchesType = statementFilter === 'all' || transaction.type === statementFilter
+    const order = transaction.order_id ? orders.find(item => item.id === transaction.order_id) : null
+    const searchText = `${transaction.id} ${transaction.type} ${transaction.status} ${transaction.reference ?? ''} ${transaction.currency} ${order?.events?.title ?? ''}`.toLowerCase()
+    return matchesType && (!statementSearch.trim() || searchText.includes(statementSearch.trim().toLowerCase()))
+  })
+
+  const exportStatements = () => {
+    const rows = filteredStatementTransactions.map(transaction => [
+      transaction.created_at,
+      transaction.type,
+      transaction.reference ?? transaction.id,
+      transaction.orders?.events?.title ?? orders.find(order => order.id === transaction.order_id)?.events?.title ?? '',
+      transaction.amount,
+      transaction.currency,
+      transaction.status,
+    ])
+    const csv = [['Date', 'Type', 'Reference', 'Event', 'Amount', 'Currency', 'Status'], ...rows].map(row => row.map(value => {
+      const text = String(value)
+      const safeText = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text
+      return `"${safeText.replace(/"/g, '""')}"`
+    }).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `qpassa-statements-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   const submitPayoutRequest = async () => {
     setPayoutNotice('')
@@ -899,7 +971,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
         const isAwaitingAgentCash = selectedOrder.status === 'pending' && agentSale?.payment_mode === 'cash' && agentSale.status === 'awaiting_payment'
         return (
           <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" onClick={() => setSelectedOrder(null)}>
-            <div className="w-full max-w-lg rounded-2xl border p-5 shadow-2xl" style={{ background: '#171918', borderColor: 'var(--border)' }} onClick={event => event.stopPropagation()}>
+            <div className="organizer-modal w-full max-w-lg rounded-2xl border p-5" style={{ background: 'var(--card)', borderColor: 'var(--border)' }} onClick={event => event.stopPropagation()}>
               <div className="flex items-start justify-between gap-4 border-b pb-4" style={{ borderColor: 'var(--border)' }}>
                 <div><p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--primary)' }}>Order details</p><h2 className="mt-1 text-xl font-black">{selectedOrder.id.slice(0, 8)}…</h2></div>
                 <button onClick={() => setSelectedOrder(null)} className="text-xl" style={{ color: 'var(--muted-foreground)' }}>×</button>
@@ -930,7 +1002,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
         )
       })()}
       {actionError && (
-        <div className="fixed top-4 right-4 z-[70] max-w-sm rounded-xl px-4 py-3 text-left text-xs font-semibold shadow-2xl" style={{ background: actionError.startsWith('Payout request submitted') ? '#12301e' : '#3a1717', border: `1px solid ${actionError.startsWith('Payout request submitted') ? '#22c55e' : '#ef4444'}`, color: actionError.startsWith('Payout request submitted') ? '#bbf7d0' : '#fecaca' }}>
+        <div className={`organizer-dashboard-alert fixed top-4 right-4 z-[70] max-w-sm rounded-xl px-4 py-3 text-left text-xs font-semibold shadow-2xl ${actionError.startsWith('Payout request submitted') ? 'is-success' : 'is-error'}`} role={actionError.startsWith('Payout request submitted') ? 'status' : 'alert'}>
           <p>{actionError}</p>
           <div className="mt-3 flex items-center gap-3">
             {dashboardLoadError && <button onClick={() => void load()} className="rounded-lg px-3 py-1.5 font-bold" style={{ background: 'var(--primary)', color: '#000' }}>Retry dashboard</button>}
@@ -939,63 +1011,57 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
         </div>
       )}
       {teamMembership?.status === 'pending' && (
-        <div className="fixed left-1/2 top-4 z-[70] flex w-[min(92vw,34rem)] -translate-x-1/2 items-center justify-between gap-4 rounded-xl border px-4 py-3 text-xs shadow-2xl" style={{ background: '#1a1d1d', borderColor: 'var(--primary)' }}>
+        <div className="organizer-dashboard-alert is-info fixed left-1/2 top-4 z-[70] flex w-[min(92vw,34rem)] -translate-x-1/2 items-center justify-between gap-4 rounded-xl px-4 py-3 text-xs">
           <span>You have been invited to join {organizer.name}.</span>
           <button onClick={acceptMembership} className="shrink-0 rounded-lg px-3 py-1.5 font-bold" style={{ background: 'var(--primary)', color: '#000' }}>Accept invite</button>
         </div>
       )}
 
       {/* Sidebar */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 flex flex-col border-r transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
-        style={{ background: 'rgba(12,13,13,0.96)', borderColor: 'rgba(255,255,255,0.09)', top: 0 }}
-      >
-        {/* Brand */}
-        <div className="px-5 py-5 border-b" style={{ borderColor: 'rgba(255,255,255,0.09)' }}>
-          <a href="/dashboard/analytics" onClick={event => { event.preventDefault(); selectSection('overview') }} className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-black" style={{ background: 'var(--primary)', color: '#17100a' }}>t</span>
-            <span className="text-lg font-black tracking-tight" style={{ fontFamily: 'Outfit, sans-serif' }}>organizer studio</span>
+      <aside className={`organizer-dashboard-sidebar fixed left-[18px] top-[18px] bottom-[18px] z-40 flex w-[264px] flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-[120%] lg:translate-x-0'}`}>
+        <div className="organizer-sidebar-brand">
+          <a href="/dashboard/analytics" onClick={event => { event.preventDefault(); selectSection('overview') }} className="flex items-center gap-3">
+            <span className="organizer-sidebar-logo">Q</span>
+            <span className="min-w-0"><strong>QPassa</strong><small>Organizer workspace</small></span>
           </a>
-          <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--muted-foreground)' }}>Workspace</p>
-          <p className="mt-1 truncate text-xs" style={{ color: 'rgba(255,255,255,0.72)' }}>{profile?.full_name?.trim() || organizer.name}</p>
+        </div>
+        <div className="organizer-sidebar-workspace">
+          <span className="organizer-sidebar-avatar">{(profile?.full_name?.trim() || organizer.name).slice(0, 1).toUpperCase()}</span>
+          <span className="min-w-0 flex-1"><strong className="block truncate">{organizer.name}</strong><small className="block truncate">{profile?.full_name?.trim() || organizer.name}</small></span>
+          <span className="organizer-sidebar-workspace-dot" aria-hidden="true" />
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-3">
-          {visibleNav.map(({ key, label }) => {
-            const NavIcon = NAV_ICONS[key]
-            return (
-              <a
-                key={key}
-                href={SECTION_PATHS[key]}
-                onClick={event => { event.preventDefault(); selectSection(key) }}
-                className="w-full flex items-center gap-3 px-5 py-2.5 text-sm font-medium text-left transition-colors"
-                style={{
-                  background: section === key ? 'rgba(200,169,110,0.08)' : 'transparent',
-                  color: section === key ? 'var(--foreground)' : 'rgba(255,255,255,0.45)',
-                  borderLeft: section === key ? '2px solid var(--accent)' : '2px solid transparent',
-                }}
-              >
-                <NavIcon size={15} />
-                {label}
-                <span className="ml-auto text-[10px] opacity-30">/{SECTION_PATHS[key].split('/').pop()}</span>
-              </a>
-            )
+        <nav className="organizer-sidebar-nav flex-1 overflow-y-auto" aria-label="Organizer dashboard sections">
+          {NAV_GROUPS.map(group => {
+            const groupItems = group.keys.flatMap(key => {
+              const item = visibleNav.find(navItem => navItem.key === key)
+              return item ? [item] : []
+            })
+            if (!groupItems.length) return null
+            return <div className="organizer-sidebar-group" key={group.label}>
+              <p className="organizer-sidebar-group-label">{group.label}</p>
+              {groupItems.map(({ key, label }) => {
+                const NavIcon = NAV_ICONS[key]
+                return <a key={key} href={SECTION_PATHS[key]} onClick={event => { event.preventDefault(); selectSection(key) }} aria-current={section === key ? 'page' : undefined} className="organizer-sidebar-link">
+                  <NavIcon size={17} />
+                  <span>{label}</span>
+                  {key === 'notifications' && unreadOrganizerNotifications.length > 0 && <i>{unreadOrganizerNotifications.length > 99 ? '99+' : unreadOrganizerNotifications.length}</i>}
+                </a>
+              })}
+            </div>
           })}
         </nav>
 
-        {/* Bottom */}
-        <div className="p-4 border-t space-y-2" style={{ borderColor: 'rgba(255,255,255,0.09)' }}>
-          <a href="/" onClick={event => { event.preventDefault(); navigate('home') }} aria-label="Back to site" title="Back to site" className="mx-auto flex h-10 w-10 items-center justify-center rounded-full" style={{ color: 'var(--muted-foreground)' }}>
-            <ArrowLeftIcon size={18} />
-          </a>
+        <div className="organizer-sidebar-footer">
+          <a href="/" onClick={event => { event.preventDefault(); navigate('home') }}><ArrowLeftIcon size={16} /><span>Back to site</span></a>
+          <small>QPassa · Burundi</small>
         </div>
       </aside>
 
       {/* Overlay for mobile sidebar */}
       {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/60 lg:hidden" onClick={() => setSidebarOpen(false)} />}
 
-      <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
+      <div className="organizer-dashboard-main flex min-w-0 flex-1 flex-col lg:pl-[300px]">
         {/* Main */}
         <main className="flex-1 min-w-0 flex flex-col">
           {/* Top bar */}
@@ -1010,20 +1076,23 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                 </h1><span className="hidden sm:inline rounded-md px-2 py-1 text-[10px] font-mono" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--muted-foreground)' }}>{SECTION_PATHS[section]}</span></div>
                 <p className="mt-1 text-[10px] font-mono sm:hidden" style={{ color: 'var(--muted-foreground)' }}>{SECTION_PATHS[section]}</p>
                 <p className="text-xs hidden sm:block" style={{ color: 'var(--muted-foreground)' }}>
-                  Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {profile?.full_name?.split(' ')[0] ?? 'Organizer'} · {isOwner ? organizer.name : `${organizer.name} team`} 👋
+                  Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {profile?.full_name?.split(' ')[0] ?? 'Organizer'} 👋
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               {utilityPopup && <button className="fixed inset-0 z-10 cursor-default" aria-label="Close popup" onClick={() => setUtilityPopup(null)} />}
               <LanguageSwitcher bare />
+              <button type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} className="organizer-theme-toggle flex h-9 w-9 items-center justify-center rounded-lg" style={{ color: 'var(--muted-foreground)', background: 'transparent' }}>
+                <DashboardThemeIcon theme={theme} />
+              </button>
               <div className="relative z-20">
                 <button onClick={() => setUtilityPopup(current => current === 'notifications' ? null : 'notifications')} aria-label="Notifications" title="Notifications" className="relative flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: utilityPopup === 'notifications' ? 'rgba(200,169,110,0.14)' : 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}>
                   <BellIcon size={18} />
-                  {organizerNotifications.filter(notification => !notification.read_at).length > 0 && <span className="absolute -right-2 -top-2 min-w-5 rounded-full px-1 text-center text-[10px] font-black" style={{ background: 'var(--primary)', color: '#000' }}>{organizerNotifications.filter(notification => !notification.read_at).length > 99 ? '99+' : organizerNotifications.filter(notification => !notification.read_at).length}</span>}
+                  {organizerNotifications.filter(notification => !notification.read_at).length > 0 && <span className="absolute -right-2 -top-2 min-w-5 rounded-full px-1 text-center text-[10px] font-black" style={{ background: '#f97316', color: '#fff' }}>{organizerNotifications.filter(notification => !notification.read_at).length > 99 ? '99+' : organizerNotifications.filter(notification => !notification.read_at).length}</span>}
                 </button>
                 {utilityPopup === 'notifications' && (
-                  <div className="absolute right-0 top-11 flex h-80 w-72 flex-col rounded-2xl border p-4 shadow-2xl" style={{ background: '#171918', borderColor: 'rgba(255,255,255,0.12)' }}>
+                  <div className="organizer-popover absolute right-0 top-11 flex h-80 w-72 flex-col rounded-xl p-4" style={{ background: 'var(--card)' }}>
                     <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold">Organizer notifications</p><BellIcon size={15} /></div>
                     <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto">
                       {organizerNotifications.map(notification => (
@@ -1043,7 +1112,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                   <CalendarIcon size={18} />
                 </button>
                 {utilityPopup === 'calendar' && (
-                  <div className="absolute right-0 top-11 w-80 rounded-2xl border p-4 shadow-2xl" style={{ background: '#171918', borderColor: 'rgba(255,255,255,0.12)' }}>
+                  <div className="organizer-popover absolute right-0 top-11 w-80 rounded-xl p-4" style={{ background: 'var(--card)' }}>
                     <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold">Event calendar</p><CalendarIcon size={15} /></div>
                     <div className="mt-3 space-y-2">
                       {events.slice(0, 3).map(event => (
@@ -1066,7 +1135,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                     : <UserIcon size={18} />}
                 </button>
                 {utilityPopup === 'profile' && (
-                  <div className="absolute right-0 top-11 w-56 rounded-2xl border p-2 shadow-2xl" style={{ background: '#171918', borderColor: 'rgba(255,255,255,0.12)' }}>
+                  <div className="organizer-popover absolute right-0 top-11 w-56 rounded-xl p-2" style={{ background: 'var(--card)' }}>
                     <p className="px-3 py-2 text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{profile?.full_name?.trim() || organizer.name}</p>
                     <button onClick={() => { setUtilityPopup(null); navigate('profile') }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-white/5"><UserIcon size={14} /> Account profile</button>
                     <button onClick={() => { setUtilityPopup(null); navigate('organizer-profile', organizer) }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-white/5"><LinkIcon size={14} /> Organizer profile</button>
@@ -1081,7 +1150,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-5">
-          {section === 'overview' && <div className="mb-5 rounded-2xl border p-4" style={{ background: 'rgba(20,21,20,0.9)', borderColor: 'rgba(255,255,255,0.08)' }}>
+          {section === 'overview' && <div className="organizer-compliance-alert mb-5 rounded-2xl p-4">
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(249,112,21,0.12)', color: 'var(--primary)' }}>
                 <ShieldIcon size={18} />
@@ -1108,19 +1177,19 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3" style={{ borderColor: 'var(--border)' }}>
                     <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Analytics range</p>
                     <div className="flex flex-wrap items-center gap-2">
-                      <div className="flex flex-wrap items-center gap-1 rounded-xl border p-1" style={{ background: 'rgba(255,255,255,0.035)', borderColor: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>
+                      <div className="organizer-dashboard-filter-group organizer-overview-filter-group flex flex-wrap items-center gap-1 rounded-xl border p-1" aria-label="Analytics date range">
                         {(['all', 'day', 'week', 'month', 'year', 'custom'] as AnalyticsRange[]).map(range => (
-                          <button key={range} onClick={() => setAnalyticsRange(range)} className="rounded-lg border px-3 py-2 text-xs font-bold capitalize transition-colors" style={{ background: analyticsRange === range ? 'rgba(255,255,255,0.12)' : 'transparent', borderColor: analyticsRange === range ? 'rgba(255,255,255,0.28)' : 'transparent', color: analyticsRange === range ? 'var(--foreground)' : 'var(--muted-foreground)' }}>{range === 'custom' ? 'Select dates' : range === 'all' ? 'All time' : range}</button>
+                          <button key={range} onClick={() => setAnalyticsRange(range)} className="organizer-dashboard-filter-button rounded-lg border px-3 py-2 text-xs font-bold capitalize transition-colors" aria-pressed={analyticsRange === range} style={{ background: analyticsRange === range ? 'rgba(255,255,255,0.12)' : 'transparent', borderColor: analyticsRange === range ? 'rgba(255,255,255,0.28)' : 'transparent', color: analyticsRange === range ? 'var(--foreground)' : 'var(--muted-foreground)' }}>{range === 'custom' ? 'Select dates' : range === 'all' ? 'All time' : range}</button>
                         ))}
                       </div>
                       {(analyticsRange === 'day' || analyticsRange === 'month') && (
-                        <div className="flex flex-wrap items-center gap-1 rounded-xl border p-1" style={{ background: 'rgba(255,255,255,0.035)', borderColor: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>
+                        <div className="organizer-dashboard-filter-group organizer-overview-filter-group flex flex-wrap items-center gap-1 rounded-xl border p-1" aria-label="Analytics interval">
                           {(analyticsRange === 'day' ? [1, 2, 4, 6, 12] : [1, 2, 4]).map(option => {
                             const value = analyticsRange === 'day' ? analyticsDayInterval : analyticsMonthInterval
                             const label = `${option}${analyticsRange === 'day' ? 'h' : 'w'}`
                             const active = value === option
                             return (
-                              <button key={label} onClick={() => analyticsRange === 'day' ? setAnalyticsDayInterval(option) : setAnalyticsMonthInterval(option)} className="rounded-lg border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide transition-colors" style={{ background: active ? 'rgba(255,255,255,0.12)' : 'transparent', borderColor: active ? 'rgba(255,255,255,0.28)' : 'transparent', color: active ? 'var(--foreground)' : 'var(--muted-foreground)' }}>{label}</button>
+                              <button key={label} onClick={() => analyticsRange === 'day' ? setAnalyticsDayInterval(option) : setAnalyticsMonthInterval(option)} className="organizer-dashboard-filter-button rounded-lg border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide transition-colors" aria-pressed={active} style={{ background: active ? 'rgba(255,255,255,0.12)' : 'transparent', borderColor: active ? 'rgba(255,255,255,0.28)' : 'transparent', color: active ? 'var(--foreground)' : 'var(--muted-foreground)' }}>{label}</button>
                             )
                           })}
                         </div>
@@ -1277,11 +1346,11 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                     ].map(([label, value, color]) => <div key={label} className="rounded-2xl border p-4" style={{ background: 'rgba(255,255,255,0.035)', borderColor: 'var(--border)' }}><p className="text-2xl font-black" style={{ color }}>{value}</p><p className="mt-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>{label}</p></div>)}
                   </div>
 
-                  <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-                    {([['all', 'All updates'], ['unread', 'Needs attention'], ['events', 'Events'], ['sales', 'Sales'], ['followers', 'Followers'], ['team', 'Team']] as const).map(([key, label]) => <button key={key} type="button" onClick={() => setNotificationFilter(key)} className="shrink-0 rounded-xl border px-3 py-2 text-xs font-bold" style={{ background: notificationFilter === key ? 'rgba(249,112,21,0.14)' : 'transparent', borderColor: notificationFilter === key ? 'rgba(249,112,21,0.4)' : 'var(--border)', color: notificationFilter === key ? 'var(--primary)' : 'var(--muted-foreground)' }}>{label}</button>)}
+                  <div className="organizer-dashboard-filter-row flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                    {([['all', 'All updates'], ['unread', 'Needs attention'], ['events', 'Events'], ['sales', 'Sales'], ['followers', 'Followers'], ['team', 'Team']] as const).map(([key, label]) => <button key={key} type="button" onClick={() => setNotificationFilter(key)} className="organizer-dashboard-filter-button shrink-0 rounded-xl border px-3 py-2 text-xs font-bold" aria-pressed={notificationFilter === key} style={{ background: notificationFilter === key ? 'rgba(249,112,21,0.14)' : 'transparent', borderColor: notificationFilter === key ? 'rgba(249,112,21,0.4)' : 'var(--border)', color: notificationFilter === key ? 'var(--primary)' : 'var(--muted-foreground)' }}>{label}</button>)}
                   </div>
 
-                  <div className="overflow-hidden rounded-2xl border" style={{ background: 'rgba(255,255,255,0.025)', borderColor: 'var(--border)' }}>
+                    <div className="organizer-dashboard-table-card overflow-hidden rounded-2xl border" style={{ background: 'rgba(255,255,255,0.025)', borderColor: 'var(--border)' }}>
                     <div className="border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}><p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>{filteredOrganizerNotifications.length} update{filteredOrganizerNotifications.length === 1 ? '' : 's'} in this view</p></div>
                     {filteredOrganizerNotifications.length === 0 ? <div className="px-5 py-16 text-center"><BellIcon size={24} /><p className="mt-4 font-bold">Nothing here yet</p><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>New organizer activity will appear in this inbox.</p></div> : <div>{filteredOrganizerNotifications.map(notification => {
                       const title = notification.title.toLowerCase()
@@ -1493,82 +1562,71 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
               {/* ── MEMBERS ── */}
               {section === 'members' && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-4">
-                    <div><h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Team members</h2><p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{members.length} member{members.length === 1 ? '' : 's'} in your workspace</p></div>
-                    <div className="flex shrink-0 gap-2"><button onClick={() => setShowInviteAgent(true)} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: 'var(--primary)', color: '#000' }}>+ Invite Agent</button><button onClick={() => setShowInviteMember(true)} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>+ Member</button></div>
+                <div className="mx-auto max-w-6xl space-y-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div><p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--primary)' }}>Team management</p><h2 className="mt-1 text-2xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>{organizer.name}</h2><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>Manage team members and invitations for this organization.</p></div>
+                    {isOwner && <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setShowInviteMember(true)} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>Invite user</button><button type="button" onClick={() => setShowInviteAgent(true)} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>Invite agent</button></div>}
                   </div>
-                  {members.length === 0 && (
-                    <div className="text-center py-16">
-                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: 'var(--muted)' }}><UsersIcon size={20} style={{ color: 'var(--muted-foreground)' }} /></div>
-                      <p className="font-bold mb-1">No team members yet</p>
-                      <p className="text-sm mb-4" style={{ color: 'var(--muted-foreground)' }}>Invite staff, agents, and scanners to your team.</p>
-                      <button onClick={() => setShowInviteMember(true)} className="px-5 py-2.5 rounded-xl text-sm font-bold" style={{ background: 'var(--primary)', color: '#000' }}>+ Invite Member</button>
+                  <section className="organizer-finance-panel overflow-hidden rounded-2xl">
+                    <div className="flex flex-col gap-3 border-b px-5 pt-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--border)' }}>
+                      <div className="organizer-finance-tabs" role="tablist" aria-label="Team users and invitations">
+                        <button type="button" role="tab" aria-selected={teamTab === 'users'} onClick={() => setTeamTab('users')}>Users <span>{members.filter(member => member.status !== 'pending').length}</span></button>
+                        <button type="button" role="tab" aria-selected={teamTab === 'invitations'} onClick={() => setTeamTab('invitations')}>Invitations <span>{members.filter(member => member.status === 'pending').length}</span></button>
+                      </div>
+                      <input type="search" value={teamSearch} onChange={event => setTeamSearch(event.target.value)} placeholder="Search team…" aria-label="Search team members" className="organizer-finance-search mb-3 rounded-xl px-4 py-2 text-sm sm:mb-2 sm:w-64" />
                     </div>
-                  )}
-                  {members.map(m => (
-                    <div key={m.id} className="flex items-center gap-4 p-4 rounded-2xl" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                      <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center text-sm font-bold" style={{ background: 'var(--muted)' }}>
-                        {(m as any).profiles?.profile_image || (m as any).profiles?.avatar_url
-                          ? <img src={(m as any).profiles.profile_image || (m as any).profiles.avatar_url} className="w-full h-full object-cover" />
-                          : ((m as any).profiles?.full_name?.[0] ?? '?')}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm">{(m as any).profiles?.full_name ?? 'Unknown'}</p>
-                        <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{(m as any).profiles?.email ?? '—'}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-bold px-3 py-1 rounded-full" style={{ background: 'rgba(249,112,21,0.12)', color: 'var(--primary)' }}>
-                          {(m as any).organizer_roles?.name ?? 'No role'}
-                        </span>
-                        <Badge label={m.status} color={STATUS_COLORS[m.status] ?? '#888'} />
-                        <button
-                          onClick={() => updateMemberStatus(m.id, m.status === 'active' ? 'inactive' : 'active')}
-                          className="text-xs px-3 py-1 rounded-lg"
-                          style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}
-                        >
-                          {m.status === 'active' ? 'Deactivate' : 'Activate'}
-                        </button>
-                        <select value={m.role_id ?? ''} onChange={event => updateMemberRole(m.id, event.target.value)} className="rounded-lg px-2 py-1 text-xs" style={{ background: '#252828', border: '1px solid var(--border)', color: 'var(--foreground)' }} aria-label="Member role">
-                          <option value="">No role</option>
-                          {roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}
-                        </select>
-                        {agentAssignments.filter(assignment => assignment.user_id === m.user_id).map(assignment => <button key={assignment.id} onClick={() => setEditingAgentAssignment(assignment)} className="rounded-lg px-3 py-1 text-xs font-bold" style={{ background: 'rgba(249,112,21,0.12)', color: 'var(--primary)' }}>Edit assignment</button>)}
-                        <button onClick={() => deleteMember(m.id)} className="rounded-lg px-3 py-1 text-xs font-bold" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>Remove</button>
-                      </div>
-                    </div>
-                  ))}
+                    <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm">
+                      <thead><tr>{['User', 'Role', 'Status', ...(isOwner ? ['Actions'] : [])].map(label => <th key={label} className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--muted-foreground)' }}>{label}</th>)}</tr></thead>
+                      <tbody>{members.filter(member => teamTab === 'invitations' ? member.status === 'pending' : member.status !== 'pending').filter(member => `${(member as any).profiles?.full_name ?? ''} ${(member as any).profiles?.email ?? ''}`.toLowerCase().includes(teamSearch.trim().toLowerCase())).map(member => {
+                        const fullName = (member as any).profiles?.full_name ?? 'Team member'
+                        const email = (member as any).profiles?.email ?? '—'
+                        const assignedAgent = agentAssignments.filter(assignment => assignment.user_id === member.user_id)
+                        return <tr key={member.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
+                          <td className="px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>{fullName[0]?.toUpperCase() ?? '?'}</span><span className="min-w-0"><span className="block truncate font-semibold">{email}</span><span className="mt-0.5 block truncate text-xs" style={{ color: 'var(--muted-foreground)' }}>{fullName}</span></span></div></td>
+                          <td className="px-5 py-4">{isOwner ? <select value={member.role_id ?? ''} onChange={event => void updateMemberRole(member.id, event.target.value)} className="organizer-finance-search max-w-52 rounded-lg px-3 py-2 text-xs" aria-label={`Role for ${fullName}`}><option value="">Select role</option>{roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select> : <span className="text-xs font-semibold">{(member as any).organizer_roles?.name ?? '—'}</span>}</td>
+                          <td className="px-5 py-4"><Badge label={member.status === 'active' ? 'Active' : member.status} color={STATUS_COLORS[member.status] ?? '#888'} /></td>
+                          {isOwner && <td className="px-5 py-4"><div className="flex flex-wrap gap-2">{member.status === 'pending' && <button type="button" onClick={() => void updateMemberStatus(member.id, 'active')} className="rounded-lg px-3 py-1.5 text-xs font-bold" style={{ background: 'var(--selected)', color: 'var(--primary)' }}>Activate</button>}{assignedAgent.map(assignment => <button key={assignment.id} type="button" onClick={() => setEditingAgentAssignment(assignment)} className="rounded-lg px-3 py-1.5 text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>Agent settings</button>)}<button type="button" onClick={() => member.status === 'active' ? void updateMemberStatus(member.id, 'inactive') : void deleteMember(member.id)} className="rounded-lg px-3 py-1.5 text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>{member.status === 'active' ? 'Deactivate' : 'Remove'}</button></div></td>}
+                        </tr>
+                      })}
+                      {members.filter(member => teamTab === 'invitations' ? member.status === 'pending' : member.status !== 'pending').filter(member => `${(member as any).profiles?.full_name ?? ''} ${(member as any).profiles?.email ?? ''}`.toLowerCase().includes(teamSearch.trim().toLowerCase())).length === 0 && <tr><td colSpan={isOwner ? 4 : 3} className="px-5 py-14 text-center text-sm" style={{ color: 'var(--muted-foreground)' }}>{teamTab === 'invitations' ? 'No pending invitations.' : 'No team members match your search.'}</td></tr>}</tbody>
+                    </table></div>
+                    <div className="border-t px-5 py-3 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>Showing {members.filter(member => teamTab === 'invitations' ? member.status === 'pending' : member.status !== 'pending').length} entries</div>
+                  </section>
                 </div>
               )}
 
-              {/* ── ROLES ── */}
-              {section === 'roles' && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-4">
-                    <div><h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Roles</h2><p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{roles.length} role{roles.length === 1 ? '' : 's'} configured</p></div>
-                    <button onClick={() => setShowNewRole(true)} className="shrink-0 rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: 'var(--primary)', color: '#000' }}>+ New Role</button>
+              {/* ── ORGANIZER SETTINGS / ROLE REFERENCE ── */}
+              {section === 'settings' && (
+                <div className="mx-auto max-w-5xl space-y-6">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--primary)' }}>Organization settings</p>
+                    <h2 className="mt-1 text-2xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Roles & permissions</h2>
+                    <p className="mt-1 max-w-2xl text-sm" style={{ color: 'var(--muted-foreground)' }}>Review the access profiles available to your team. Role definitions are managed by QPassa administrators; organization owners can assign a profile to a team member.</p>
                   </div>
-                  {roles.map(r => (
-                    <div key={r.id} className="flex items-center justify-between p-5 rounded-2xl" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                      <div>
-                        <p className="font-bold">{r.name}</p>
-                        <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                          Permissions: {Object.entries(r.permissions || {}).filter(([, enabled]) => enabled).map(([permission]) => permission).join(', ') || 'None granted'}
-                        </p>
-                        <p className="text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
-                          {members.filter(m => m.role_id === r.id).length} member{members.filter(m => m.role_id === r.id).length !== 1 ? 's' : ''}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>Live</span><button onClick={() => { setEditingRole(r); setShowNewRole(true) }} className="text-xs px-3 py-1.5 rounded-lg" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>Edit</button><button onClick={() => deleteRole(r.id)} className="text-xs px-3 py-1.5 rounded-lg" style={{ background: 'rgba(239,68,68,0.08)', color: '#ef4444' }}>Delete</button></div>
-                    </div>
-                  ))}
-                  {roles.length === 0 && (
-                    <div className="text-center py-16">
-                      <p className="text-4xl mb-3">🔑</p>
-                      <p className="font-bold mb-1">No roles defined</p>
-                      <button onClick={() => setShowNewRole(true)} className="mt-4 px-5 py-2.5 rounded-xl text-sm font-bold" style={{ background: 'var(--primary)', color: '#000' }}>+ New Role</button>
-                    </div>
-                  )}
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {[
+                      ['Organization scope', 'Roles apply only to this organization and its events.'],
+                      ['Role administration', 'Only QPassa platform administrators can create or edit role permissions.'],
+                    ].map(([title, description]) => <div key={title} className="organizer-finance-stat rounded-2xl p-4"><p className="font-bold">{title}</p><p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>{description}</p></div>)}
+                  </div>
+
+                  <section className="organizer-finance-panel overflow-hidden rounded-2xl">
+                    <div className="border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}><h3 className="font-bold">Role definitions</h3><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Available access profiles for {organizer.name}</p></div>
+                    <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm">
+                      <thead><tr>{['Role', 'Scope', 'Capabilities', 'Assigned members'].map(label => <th key={label} className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--muted-foreground)' }}>{label}</th>)}</tr></thead>
+                      <tbody>{roles.map(role => {
+                        const capabilities = role.permissions?.all ? ['Full organization access'] : Object.entries(role.permissions ?? {}).filter(([, enabled]) => enabled).map(([permission]) => permission.replace(/_/g, ' '))
+                        return <tr key={role.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
+                          <td className="px-5 py-4 font-semibold">{role.name}</td>
+                          <td className="px-5 py-4 text-xs" style={{ color: 'var(--muted-foreground)' }}>Organization</td>
+                          <td className="px-5 py-4"><div className="flex max-w-lg flex-wrap gap-1.5">{capabilities.length ? capabilities.map(capability => <span key={capability} className="organizer-permission-chip">{capability}</span>) : <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>No access granted</span>}</div></td>
+                          <td className="px-5 py-4 text-xs">{members.filter(member => member.role_id === role.id).length}</td>
+                        </tr>
+                      })}
+                      {roles.length === 0 && <tr><td colSpan={4} className="px-5 py-12 text-center text-sm" style={{ color: 'var(--muted-foreground)' }}>Role profiles are being configured by your platform administrator.</td></tr>}</tbody>
+                    </table></div>
+                  </section>
                 </div>
               )}
 
@@ -1648,75 +1706,122 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                 </div>
               )}
 
-              {/* ── TRANSACTIONS ── */}
+              {/* ── STATEMENTS ── */}
               {section === 'transactions' && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    {(['payment', 'payout', 'refund', 'fee'] as const).map(type => {
-                      const total = transactions.filter(t => t.type === type && t.status === 'completed').reduce((s, t) => s + t.amount, 0)
-                      return (
-                        <div key={type} className="p-4 rounded-2xl" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                          <p className="text-xs font-semibold capitalize mb-1" style={{ color: 'var(--muted-foreground)' }}>{type}s</p>
-                          <p className="font-black text-base" style={{ fontFamily: 'Outfit, sans-serif', color: STATUS_COLORS[type] ?? '#fff' }}>{formatPrice(total)}</p>
-                        </div>
-                      )
+                <div className="mx-auto max-w-6xl space-y-6">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--primary)' }}>Finance · ledger</p>
+                      <h2 className="mt-1 text-2xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Statements</h2>
+                      <p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>Review settlement activity and payout history for {organizer.name}.</p>
+                    </div>
+                    <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Updated {lastUpdated?.toLocaleTimeString() ?? 'loading'}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                    {([
+                      ['Payments', 'payment'], ['Fees', 'fee'], ['Refunds', 'refund'], ['Payouts', 'payout'],
+                    ] as const).map(([label, type]) => {
+                      const amount = transactions.filter(item => item.type === type && item.status === 'completed').reduce((sum, item) => sum + item.amount, 0)
+                      const count = transactions.filter(item => item.type === type).length
+                      return <div key={type} className="organizer-finance-stat rounded-2xl p-4"><p className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted-foreground)' }}>{label}</p><p className="mt-2 text-xl font-black" style={{ color: type === 'refund' ? 'var(--error)' : 'var(--foreground)' }}>{formatPrice(amount)}</p><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{count} record{count === 1 ? '' : 's'}</p></div>
                     })}
                   </div>
 
-                  <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                    <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
-                      <h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>{transactions.length} Transactions</h2>
+                  <section className="organizer-finance-panel overflow-hidden rounded-2xl">
+                    <div className="flex flex-col gap-4 border-b p-5 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--border)' }}>
+                      <div><h3 className="font-bold">Financial statements</h3><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Ledger transactions and withdrawal requests</p></div>
+                      <button type="button" onClick={exportStatements} disabled={!filteredStatementTransactions.length || statementView === 'payouts'} className="rounded-xl px-4 py-2.5 text-xs font-bold disabled:opacity-50" style={{ background: 'var(--primary)', color: '#fff' }}>Export CSV</button>
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr style={{ background: 'var(--muted)' }}>
-                            {['ID', 'Type', 'Amount', 'Currency', 'Status', 'Reference', 'Date'].map(h => (
-                              <th key={h} className="text-left px-4 py-3 text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {transactions.map(t => (
-                            <tr key={t.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                              <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--muted-foreground)' }}>{t.id.slice(0, 8)}…</td>
-                              <td className="px-4 py-3"><Badge label={t.type} color={STATUS_COLORS[t.type] ?? '#888'} /></td>
-                              <td className="px-4 py-3 text-xs font-bold" style={{ color: t.type === 'refund' ? '#ef4444' : 'var(--primary)' }}>
-                                {t.type === 'refund' ? '-' : '+'}{formatPrice(t.amount)}
-                              </td>
-                              <td className="px-4 py-3 text-xs">{t.currency}</td>
-                              <td className="px-4 py-3"><Badge label={t.status} color={STATUS_COLORS[t.status === 'completed' ? 'completed_t' : t.status === 'failed' ? 'failed' : 'pending_t'] ?? '#888'} /></td>
-                              <td className="px-4 py-3 text-xs font-mono" style={{ color: 'var(--muted-foreground)' }}>{t.reference ?? '—'}</td>
-                              <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted-foreground)' }}>{new Date(t.created_at).toLocaleDateString()}</td>
+                    <div className="border-b px-5 pt-4" style={{ borderColor: 'var(--border)' }}>
+                      <div className="organizer-finance-tabs" role="tablist" aria-label="Statement views">
+                        <button type="button" role="tab" aria-selected={statementView === 'activity'} onClick={() => setStatementView('activity')}>Organization statements <span>{transactions.length}</span></button>
+                        <button type="button" role="tab" aria-selected={statementView === 'payouts'} onClick={() => setStatementView('payouts')}>Payouts <span>{withdrawals.length}</span></button>
+                      </div>
+                    </div>
+
+                    {statementView === 'activity' ? <>
+                      <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--border)' }}>
+                        <input type="search" value={statementSearch} onChange={event => setStatementSearch(event.target.value)} placeholder="Search statements…" aria-label="Search statements" className="organizer-finance-search w-full rounded-xl px-4 py-2.5 text-sm sm:max-w-sm" />
+                        <div className="organizer-finance-filters" aria-label="Filter statement type">
+                          {([['all', 'All activity'], ['payment', 'Payments'], ['fee', 'Fees'], ['refund', 'Refunds'], ['payout', 'Payouts']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={statementFilter === value} onClick={() => setStatementFilter(value)}>{label}</button>)}
+                        </div>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[760px] text-left text-sm">
+                          <thead><tr>{['Date', 'Description', 'Type', 'Amount', 'Status'].map(label => <th key={label} className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--muted-foreground)' }}>{label}</th>)}</tr></thead>
+                          <tbody>{filteredStatementTransactions.map(transaction => {
+                            const order = orders.find(item => item.id === transaction.order_id)
+                            const positive = transaction.type === 'payment'
+                            return <tr key={transaction.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
+                              <td className="whitespace-nowrap px-5 py-3 text-xs" style={{ color: 'var(--muted-foreground)' }}>{new Date(transaction.created_at).toLocaleDateString()}</td>
+                              <td className="px-5 py-3"><p className="text-sm font-semibold">{order?.events?.title ?? (transaction.type === 'payout' ? 'Wallet withdrawal' : `${transaction.type[0].toUpperCase()}${transaction.type.slice(1)} settlement`)}</p><p className="mt-0.5 font-mono text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{transaction.reference ?? transaction.id.slice(0, 12)}</p></td>
+                              <td className="px-5 py-3"><Badge label={transaction.type} color={STATUS_COLORS[transaction.type] ?? '#888'} /></td>
+                              <td className="whitespace-nowrap px-5 py-3 text-sm font-bold" style={{ color: positive ? 'var(--success)' : transaction.type === 'refund' ? 'var(--error)' : 'var(--foreground)' }}>{positive ? '+' : '−'}{formatPrice(transaction.amount)}</td>
+                              <td className="px-5 py-3"><Badge label={transaction.status} color={STATUS_COLORS[transaction.status === 'completed' ? 'completed_t' : transaction.status === 'failed' ? 'failed' : 'pending_t'] ?? '#888'} /></td>
                             </tr>
-                          ))}
-                          {transactions.length === 0 && (
-                            <tr><td colSpan={7} className="px-4 py-12 text-center text-xs" style={{ color: 'var(--muted-foreground)' }}>No transactions yet</td></tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                          })}
+                          {filteredStatementTransactions.length === 0 && <tr><td colSpan={5} className="px-5 py-14 text-center"><p className="font-semibold">No statements found</p><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Adjust your search or filters, or wait for financial activity.</p></td></tr>}</tbody>
+                        </table>
+                      </div>
+                    </> : <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+                      {withdrawals.map(withdrawal => <div key={withdrawal.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div><p className="font-bold">{formatPrice(withdrawal.amount)}</p><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{withdrawal.payment_method === 'mobile_money' ? 'Mobile Money' : 'Bank transfer'} · {withdrawal.payment_reference}</p><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Requested {new Date(withdrawal.requested_at).toLocaleString()}</p></div>
+                        <Badge label={withdrawal.status} color={STATUS_COLORS[withdrawal.status] ?? '#888'} />
+                      </div>)}
+                      {withdrawals.length === 0 && <p className="px-5 py-14 text-center text-sm" style={{ color: 'var(--muted-foreground)' }}>No payout statements yet.</p>}
+                    </div>}
+                  </section>
                 </div>
               )}
 
               {section === 'payouts' && isOwner && (
                 <div className="mx-auto max-w-5xl space-y-5">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--primary)' }}>Organizer wallet</p>
-                    <h2 className="mt-1 text-2xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Payouts</h2>
-                    <p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>Request a transfer of settled earnings to your Mobile Money number or bank account.</p>
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--primary)' }}>Organizer finance</p>
+                      <h2 className="mt-1 text-2xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Wallet</h2>
+                      <p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>Track event earnings and request transfers to your Mobile Money number or bank account.</p>
+                    </div>
+                    <button type="button" onClick={() => document.getElementById('wallet-withdrawal-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} className="shrink-0 rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>Request withdrawal ↓</button>
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-2xl border p-5" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-                      <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Available to request</p>
-                      <p className="mt-2 text-3xl font-black" style={{ fontFamily: 'Outfit, sans-serif', color: 'var(--primary)' }}>{formatPrice(availablePayoutBalance)}</p>
-                      <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>Calculated from completed payment, fee, refund, and payout ledger entries, less agent commissions. Pending requests reserve funds.</p>
+                  <div className="organizer-wallet-balance rounded-2xl p-5 sm:p-6">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted-foreground)' }}>Available to withdraw</p>
+                        <p className="mt-2 text-3xl font-black sm:text-4xl" style={{ fontFamily: 'Outfit, sans-serif' }}>{formatPrice(availablePayoutBalance)}</p>
+                        <p className="mt-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>Pending transfers are reserved until processed or cancelled.</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs sm:min-w-56">
+                        <div className="rounded-xl px-3 py-2" style={{ background: 'var(--muted)' }}><span style={{ color: 'var(--muted-foreground)' }}>Pending</span><strong className="mt-1 block">{withdrawals.filter(item => ['requested', 'processing'].includes(item.status)).length}</strong></div>
+                        <div className="rounded-xl px-3 py-2" style={{ background: 'var(--muted)' }}><span style={{ color: 'var(--muted-foreground)' }}>Settled</span><strong className="mt-1 block">{withdrawals.filter(item => item.status === 'paid').length}</strong></div>
+                      </div>
                     </div>
-                    <div className="rounded-2xl border p-5" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                    {([
+                      ['Gross collection', walletEventBreakdown.reduce((sum, item) => sum + item.gross, 0)],
+                      ['Platform fees', walletEventBreakdown.reduce((sum, item) => sum + item.fees, 0)],
+                      ['Refunds', walletEventBreakdown.reduce((sum, item) => sum + item.refunds, 0)],
+                      ['Net settled', walletEventBreakdown.reduce((sum, item) => sum + item.net, 0)],
+                    ] as const).map(([label, amount]) => <div key={label} className="organizer-finance-stat rounded-2xl p-4"><p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--muted-foreground)' }}>{label}</p><p className="mt-2 text-lg font-black">{formatPrice(amount)}</p></div>)}
+                  </div>
+
+                  <section className="organizer-finance-panel overflow-hidden rounded-2xl">
+                    <div className="border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}><h3 className="font-bold">Earnings breakdown</h3><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Confirmed ticket sales by event · after fees, refunds, and agent commissions</p></div>
+                    <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm">
+                      <thead><tr>{['Event', 'Orders', 'Gross collection', 'Fees & commissions', 'Refunds', 'Net settled'].map(label => <th key={label} className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--muted-foreground)' }}>{label}</th>)}</tr></thead>
+                      <tbody>{walletEventBreakdown.map(item => <tr key={item.id} className="border-t" style={{ borderColor: 'var(--border)' }}><td className="px-5 py-3 font-semibold">{item.title}</td><td className="px-5 py-3 text-xs">{item.orders}</td><td className="px-5 py-3 text-xs">{formatPrice(item.gross)}</td><td className="px-5 py-3 text-xs">{formatPrice(item.fees + item.agentFees)}</td><td className="px-5 py-3 text-xs">{formatPrice(item.refunds)}</td><td className="px-5 py-3 text-xs font-bold" style={{ color: 'var(--primary)' }}>{formatPrice(item.net)}</td></tr>)}
+                        {walletEventBreakdown.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-sm" style={{ color: 'var(--muted-foreground)' }}>Event earnings will appear here after the first confirmed sale.</td></tr>}</tbody>
+                    </table></div>
+                  </section>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div id="wallet-withdrawal-form" className="organizer-finance-panel rounded-2xl p-5 sm:col-span-2">
                       <div className="mb-4"><h3 className="font-bold">Request a payout</h3><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>The platform team reviews requests and updates their status after processing.</p></div>
-                      {payoutNotice && <p role="status" className="mb-3 rounded-xl border px-3 py-2 text-xs" style={{ background: 'rgba(34,197,94,.1)', borderColor: 'rgba(34,197,94,.25)', color: '#86efac' }}>{payoutNotice}</p>}
+                      {payoutNotice && <p role="status" className="organizer-dashboard-alert is-success mb-3 rounded-xl border px-3 py-2 text-xs">{payoutNotice}</p>}
                       <div className="space-y-3">
                         <label className="block text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Amount (BIF)
                           <input type="number" min="1" step="1" max={availablePayoutBalance} inputMode="numeric" value={payoutAmount} onChange={event => setPayoutAmount(event.target.value)} placeholder="Enter a whole amount" className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
@@ -1763,8 +1868,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
       {/* ── CREATE EVENT MODAL ── */}
       {(showNewEvent || editingEvent) && <CreateEventModal orgId={orgId!} event={editingEvent} onClose={() => { setShowNewEvent(false); setEditingEvent(null) }} onCreated={() => { setShowNewEvent(false); setEditingEvent(null); load() }} />}
-      {showNewRole && <CreateRoleModal orgId={orgId!} role={editingRole} onClose={() => { setShowNewRole(false); setEditingRole(null) }} onCreated={() => { setShowNewRole(false); setEditingRole(null); load() }} />}
-      {showInviteMember && <InviteMemberModal orgId={orgId!} roles={roles} onClose={() => setShowInviteMember(false)} onInvited={() => { setShowInviteMember(false); load() }} />}
+      {showInviteMember && <InviteMemberModal orgId={orgId!} roles={isOwner ? roles : []} onClose={() => setShowInviteMember(false)} onInvited={() => { setShowInviteMember(false); load() }} />}
       {showInviteAgent && <InviteAgentModal orgId={orgId!} events={events} onClose={() => setShowInviteAgent(false)} onInvited={() => { setShowInviteAgent(false); load() }} />}
       {editingAgentAssignment && <EditAgentAssignmentModal assignment={editingAgentAssignment} events={events} onClose={() => setEditingAgentAssignment(null)} onSaved={() => { setEditingAgentAssignment(null); load() }} />}
     </div>
@@ -1776,7 +1880,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 type EventTierForm = { id?: string; name: string; price: string; quantity: string; description: string; ticket_type: 'consumable' | 'non_consumable'; consumable_amount: string; extra_info: string; expires_at: string; group_size: string; show_optional_details: boolean; sold: number }
 
 function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string; event?: Event | null; onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState(() => ({ title: event?.title ?? '', category: event?.category ?? 'Music', date: event?.date ?? '', time: event?.time ?? '18:00', end_time: event?.end_time ?? '', venue: event?.venue ?? '', venue_latitude: event?.venue_latitude ?? null as number | null, venue_longitude: event?.venue_longitude ?? null as number | null, city: event?.city ?? 'Bujumbura', description: event?.description ?? '', capacity: String(event?.capacity ?? 500), cover_image: event?.cover_image ?? '', tags: event?.tags?.join(', ') ?? '', status: event?.status ?? 'draft', refund_policy: event?.refund_policy ?? 'Tickets are non-refundable', entry_policy: event?.entry_policy ?? 'Valid ID required at entry' }))
+  const [form, setForm] = useState(() => ({ title: event?.title ?? '', category: event?.category ?? 'Music', date: event?.date ?? '', end_date: event?.end_date ?? '', time: event?.time ?? '18:00', end_time: event?.end_time ?? '', venue: event?.venue ?? '', venue_latitude: event?.venue_latitude ?? null as number | null, venue_longitude: event?.venue_longitude ?? null as number | null, city: event?.city ?? 'Bujumbura', description: event?.description ?? '', capacity: String(event?.capacity ?? 500), cover_image: event?.cover_image ?? '', tags: event?.tags?.join(', ') ?? '', status: event?.status ?? 'draft', refund_policy: event?.refund_policy ?? 'Tickets are non-refundable', entry_policy: event?.entry_policy ?? 'Valid ID required at entry' }))
   const [venueSearch, setVenueSearch] = useState(event?.venue ?? '')
   const [venueResults, setVenueResults] = useState<Array<{ display_name: string; lat: string; lon: string; class?: string; type?: string; address?: { city?: string; town?: string; village?: string } }>>([])
   const [venueSearching, setVenueSearching] = useState(false)
@@ -1785,7 +1889,9 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
   const [coverPreview, setCoverPreview] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const endTimeIsBeforeStart = Boolean(form.end_time && form.time && form.end_time.slice(0, 5) <= form.time.slice(0, 5))
+  const endDateIsBeforeStart = Boolean(form.end_date && form.date && form.end_date < form.date)
+  const endTimeIsBeforeStart = Boolean(form.end_time && form.time && (!form.end_date || form.end_date === form.date) && form.end_time.slice(0, 5) <= form.time.slice(0, 5))
+  const invalidEventEnd = endDateIsBeforeStart || endTimeIsBeforeStart
 
   const createCoverDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
@@ -1812,8 +1918,12 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
     const venue = form.venue.trim()
     const capacity = Number.parseInt(form.capacity, 10)
     if (!title || !form.date || !venue) { setError('Event title, date, and venue are required.'); return }
-    if (form.end_time && form.time && form.end_time.slice(0, 5) <= form.time.slice(0, 5)) {
-      setError('Event ending time must be later than the start time on the selected event date.')
+    if (endDateIsBeforeStart) {
+      setError('Event end date must be on or after the start date.')
+      return
+    }
+    if (endTimeIsBeforeStart) {
+      setError('When the event ends on its start date, the end time must be later than the start time.')
       return
     }
     if (!Number.isInteger(capacity) || capacity < 1) { setError('Event capacity must be a positive whole number.'); return }
@@ -1877,6 +1987,7 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
       title,
       category: form.category,
       date: form.date,
+      end_date: form.end_date || null,
       time: form.time,
       end_time: form.end_time || null,
       venue,
@@ -1980,7 +2091,7 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)' }}>
-      <div className="dashboard-form-modal w-full max-w-lg rounded-2xl overflow-hidden overflow-y-auto" style={{ background: '#1a1d1d', border: '1px solid var(--border)', maxHeight: '90vh' }}>
+      <div className="organizer-modal dashboard-form-modal w-full max-w-lg rounded-2xl overflow-hidden overflow-y-auto" style={{ background: 'var(--card)', border: '1px solid var(--border)', maxHeight: '90vh' }}>
         <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
           <h2 className="font-black text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>{event ? 'Edit Event' : 'New Event'}</h2>
           <button onClick={onClose} className="text-xl" style={{ color: 'var(--muted-foreground)' }}>✕</button>
@@ -2031,11 +2142,16 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
                 className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} />
             </div>
             <div>
-              <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Event ending time</label>
-              <input type="time" value={form.end_time} min={form.time || undefined} aria-invalid={endTimeIsBeforeStart} onChange={e => f('end_time', e.target.value)} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: `1px solid ${endTimeIsBeforeStart ? '#ef4444' : 'var(--border)'}`, color: '#fff' }} />
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>End date (optional)</label>
+              <input type="date" value={form.end_date} min={form.date || undefined} aria-invalid={endDateIsBeforeStart} onChange={e => f('end_date', e.target.value)} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: `1px solid ${endDateIsBeforeStart ? '#ef4444' : 'var(--border)'}`, color: '#fff' }} />
+              {endDateIsBeforeStart && <p role="alert" className="mt-1 text-[10px]" style={{ color: '#fca5a5' }}>End date cannot be before the start date.</p>}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>End time (optional)</label>
+              <input type="time" value={form.end_time} aria-invalid={endTimeIsBeforeStart} onChange={e => f('end_time', e.target.value)} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: `1px solid ${endTimeIsBeforeStart ? '#ef4444' : 'var(--border)'}`, color: '#fff' }} />
               {endTimeIsBeforeStart
-                ? <p role="alert" className="mt-1 text-[10px]" style={{ color: '#fca5a5' }}>Ending time must be later than the start time on the selected event date.</p>
-                : <p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Must be later than the start time. The event date above applies to both times.</p>}
+                ? <p role="alert" className="mt-1 text-[10px]" style={{ color: '#fca5a5' }}>End time must be later when the event ends on its start date.</p>
+                : <p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Events can span multiple days.</p>}
             </div>
           </div>
           <div>
@@ -2112,66 +2228,8 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
             ))}
           </div>
 
-          <button onClick={handleSubmit} disabled={saving || endTimeIsBeforeStart} className="w-full py-3.5 rounded-xl font-black disabled:cursor-not-allowed" style={{ background: 'var(--primary)', color: '#000', opacity: saving || endTimeIsBeforeStart ? 0.55 : 1 }}>
+          <button onClick={handleSubmit} disabled={saving || invalidEventEnd} className="w-full py-3.5 rounded-xl font-black disabled:cursor-not-allowed" style={{ background: 'var(--primary)', color: '#000', opacity: saving || invalidEventEnd ? 0.55 : 1 }}>
             {saving ? (event ? 'Saving...' : 'Creating...') : event ? 'Save event changes' : 'Create Event (Draft)'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function CreateRoleModal({ orgId, role, onClose, onCreated }: { orgId: string; role?: OrganizerRole | null; onClose: () => void; onCreated: () => void }) {
-  const [name, setName] = useState(role?.name ?? '')
-  const [perms, setPerms] = useState<Record<string, boolean>>({ events: false, orders: false, customers: false, transactions: false, followers: false, calendar: false, checkin: false, analytics: false, members: false, ...(role?.permissions ?? {}) })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-
-  const save = async () => {
-    const normalizedName = name.trim()
-    if (role?.name.trim().toLowerCase() === 'admin') { setError('The Admin role cannot be edited.'); return }
-    if (normalizedName.length < 2) { setError('Role name must be at least 2 characters.'); return }
-    if (normalizedName.length > 40) { setError('Role name must be 40 characters or fewer.'); return }
-    if (!/^[\p{L}\p{N}][\p{L}\p{N} &'._-]*$/u.test(normalizedName)) { setError('Role name contains unsupported characters.'); return }
-    setSaving(true)
-    const query = role
-      ? supabase.from('organizer_roles').update({ name: normalizedName, permissions: perms }).eq('id', role.id)
-      : supabase.from('organizer_roles').insert({ organizer_id: orgId, name: normalizedName, permissions: perms })
-    const { error: saveError } = await query
-    if (saveError) { setError(saveError.message); setSaving(false); return }
-    setSaving(false)
-    onCreated()
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)' }}>
-      <div className="dashboard-form-modal w-full max-w-sm rounded-2xl" style={{ background: '#1a1d1d', border: '1px solid var(--border)' }}>
-        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
-          <h2 className="font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>{role ? 'Edit Role' : 'New Role'}</h2>
-          <button onClick={onClose} style={{ color: 'var(--muted-foreground)' }}>✕</button>
-        </div>
-        <div className="p-6 space-y-4">
-          {error && <p className="rounded-lg px-3 py-2 text-xs" style={{ background: '#3a1717', color: '#fecaca' }}>{error}</p>}
-          <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Role name</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Scanner, Agent, Manager"
-              className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} />
-          </div>
-          <div>
-            <p className="text-xs font-semibold mb-2" style={{ color: 'var(--muted-foreground)' }}>Permissions</p>
-            {Object.keys(perms).map(p => (
-              <label key={p} className="flex items-center gap-3 py-1.5 cursor-pointer">
-                <div onClick={() => setPerms(v => ({ ...v, [p]: !v[p] }))}
-                  className="w-4 h-4 rounded flex items-center justify-center text-xs font-bold flex-shrink-0"
-                  style={{ background: perms[p] ? 'var(--primary)' : 'var(--border)', color: '#000' }}>
-                  {perms[p] ? <CheckIcon size={10} /> : null}
-                </div>
-                <span className="text-sm capitalize">{p}</span>
-              </label>
-            ))}
-          </div>
-          <button onClick={save} disabled={saving || !name.trim() || role?.name.trim().toLowerCase() === 'admin'} className="w-full py-3 rounded-xl font-bold text-sm" style={{ background: 'var(--primary)', color: '#000', opacity: saving || !name.trim() || role?.name.trim().toLowerCase() === 'admin' ? 0.5 : 1 }}>
-            {saving ? 'Saving...' : role ? 'Save Role' : 'Create Role'}
           </button>
         </div>
       </div>
@@ -2211,7 +2269,7 @@ function InviteAgentModal({ orgId, events, onClose, onInvited }: { orgId: string
     if (error) { setMessage(error.message); setSaving(false); return }
     onInvited()
   }
-  return <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,.8)' }}><div className="w-full max-w-sm rounded-2xl p-6" style={{ background: '#1a1d1d', border: '1px solid var(--border)' }}>
+  return <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,.8)' }}><div className="organizer-modal w-full max-w-sm rounded-2xl p-6" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
     <div className="flex items-center justify-between"><h2 className="font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Invite Agent</h2><button onClick={onClose}>✕</button></div>
     <p className="mt-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>The person must already have a QPassa account.</p>
     <div className="mt-4 space-y-3">
@@ -2269,7 +2327,7 @@ function EditAgentAssignmentModal({ assignment, events, onClose, onSaved }: { as
     onSaved()
   }
 
-  return <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4" style={{ background: 'rgba(0,0,0,.8)' }}><div className="w-full max-w-lg rounded-2xl p-6" style={{ background: '#1a1d1d', border: '1px solid var(--border)' }}>
+  return <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4" style={{ background: 'rgba(0,0,0,.8)' }}><div className="organizer-modal w-full max-w-lg rounded-2xl p-6" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
     <div className="flex items-center justify-between"><div><h2 className="font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Edit agent assignment</h2><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{(assignment as any).profiles?.full_name ?? 'Assigned agent'}</p></div><button onClick={onClose} style={{ color: 'var(--muted-foreground)' }}>✕</button></div>
     <div className="mt-5 space-y-3">
       {error && <p className="rounded-lg px-3 py-2 text-xs" style={{ background: '#3a1717', color: '#fecaca' }}>{error}</p>}
@@ -2316,7 +2374,7 @@ function InviteMemberModal({ orgId, onClose, roles, onInvited }: { orgId: string
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)' }}>
-      <div className="dashboard-form-modal w-full max-w-sm rounded-2xl" style={{ background: '#1a1d1d', border: '1px solid var(--border)' }}>
+      <div className="organizer-modal dashboard-form-modal w-full max-w-sm rounded-2xl" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
           <h2 className="font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Invite Member</h2>
           <button onClick={onClose} style={{ color: 'var(--muted-foreground)' }}>✕</button>

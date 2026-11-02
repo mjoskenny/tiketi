@@ -43,7 +43,7 @@ export default function OrganizerCard({ organizer, eventCount, coverImage, onCli
           {verified && <span className="verified-profile-badge organizer-card-verified" aria-label="Verified organizer"><CheckIcon size={12} /></span>}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-base font-semibold text-white">{name}</span>
+          <span className="organizer-card-name block truncate text-base font-semibold">{name}</span>
           {username && <span className="mt-0.5 block truncate text-xs" style={{ color: 'var(--muted-foreground)' }}>@{username}</span>}
           <span className="mt-2 block truncate text-xs" style={{ color: 'var(--muted-foreground)' }}>{`${eventCount} ${eventCount === 1 ? 'published event' : 'published events'}`}</span>
         </span>

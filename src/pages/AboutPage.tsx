@@ -37,53 +37,57 @@ function Metric({ value, label }: { value: string; label: string }) {
   return <div className="about-metric"><strong>{value}</strong><span>{label}</span></div>
 }
 
+function EventCardFan({ events, navigate }: { events: Event[]; navigate: Props['navigate'] }) {
+  // Keep the hero hand visually complete even while the marketplace has fewer
+  // than five published events. Repeated cards are only used as a backdrop;
+  // each remains linked to its real event.
+  const fanEvents = events.length
+    ? Array.from({ length: Math.max(5, events.length) }, (_, index) => events[index % events.length])
+    : []
+
+  return (
+    <div className="about-event-card-fan" aria-label="Featured events — hover to fan out the cards">
+      <span className="sr-only">Choose an event card to view its details.</span>
+      {fanEvents.map((event, index) => (
+        <div className="about-event-card-fan-card" data-card={index} key={`${event.id}-${index}`}>
+          <EventCard event={event} poster trending imagePriority onClick={() => navigate('event-detail', event)} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function AboutPage({ navigate }: Props) {
   const [openFaq, setOpenFaq] = useState(0)
-  const [featuredEvents, setFeaturedEvents] = useState<Event[]>([])
-  const [featuredLoading, setFeaturedLoading] = useState(true)
-
-  const hasEnded = (event: Event) => {
-    const timestamp = new Date(`${event.date}T${event.time || '00:00'}`).getTime()
-    return Number.isFinite(timestamp) && timestamp < Date.now()
-  }
+  const [heroEvents, setHeroEvents] = useState<Event[]>([])
 
   useEffect(() => {
-    const loadFeaturedEvents = async () => {
+    const loadHeroEvents = async () => {
       const { data } = await supabase
         .from('events')
         .select('*, tags, ticket_tiers(id, event_id, name, price, description, ticket_type, extra_info, expires_at, group_size, quantity, sold, created_at), organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email))')
         .eq('status', 'published')
-        .eq('is_featured', true)
-        .order('created_at', { ascending: false })
-        .limit(4)
-      setFeaturedEvents(((data as Event[]) ?? []).filter(event => !hasEnded(event)))
-      setFeaturedLoading(false)
+        .order('is_featured', { ascending: false })
+        .order('date', { ascending: true })
+        .limit(3)
+      setHeroEvents((data as Event[]) ?? [])
     }
 
-    void loadFeaturedEvents()
+    void loadHeroEvents()
   }, [])
 
   return (
     <main className="about-page">
       <section className="about-hero">
-        <div className="about-hero-glow" aria-hidden="true" />
         <div className="about-hero-inner">
-          <p className="about-eyebrow"><span /> The home for Burundi&apos;s live culture</p>
           <h1>Moments worth<br /><em>showing up for.</em></h1>
           <p className="about-hero-copy">QPassa helps people discover what is happening across Burundi and gives organizers a simple, trusted way to sell tickets, manage events, and bring people together.</p>
           <div className="about-hero-actions">
             <button onClick={() => navigate('discover')} className="about-primary-button">Discover events <ArrowRightIcon size={16} /></button>
             <button onClick={() => navigate('auth-organizer')} className="about-text-button">Host an event <ArrowRightIcon size={15} /></button>
           </div>
-          <div className="about-hero-note"><span className="about-avatar-stack"><i /><i /><i /></span><span>Built for the people, artists, organizers, venues, and communities shaping Burundi&apos;s event culture.</span></div>
         </div>
-        <div className="about-hero-art" aria-hidden="true"><div className="about-art-ring about-art-ring-one" /><div className="about-art-ring about-art-ring-two" /><div className="about-art-ticket"><TicketIcon size={38} /><b>LIVE</b><small>MAKE A MEMORY</small></div><span className="about-art-dot about-art-dot-one" /><span className="about-art-dot about-art-dot-two" /></div>
-      </section>
-
-      <section className="about-featured about-section-shell">
-        <div className="about-featured-heading"><div><div className="about-section-label">Featured events</div><h2>What is happening<br /><span>right now.</span></h2></div></div>
-        {featuredLoading ? <div className="about-featured-row">{[1, 2, 3].map(item => <div className="about-featured-skeleton" key={item} />)}</div> : featuredEvents.length > 0 ? <div className="about-featured-row">{featuredEvents.map(event => <EventCard key={event.id} event={event} poster onClick={() => navigate('event-detail', event)} />)}</div> : <div className="about-featured-empty"><TicketIcon size={20} /><span>New experiences are coming soon.</span></div>}
-        <div className="about-featured-action"><button onClick={() => navigate('discover')} className="about-glass-button">Browse all events <ArrowRightIcon size={15} /></button></div>
+        <EventCardFan events={heroEvents} navigate={navigate} />
       </section>
 
       <section className="about-story about-section-shell">
@@ -100,20 +104,20 @@ export default function AboutPage({ navigate }: Props) {
       </section>
 
       <section className="about-product about-section-shell">
-        <div className="about-section-label">02 / From discovery to the door</div>
+        <div className="about-section-label">03 / From discovery to the door</div>
         <div className="about-product-heading"><h2>Everything you need,<br /><span>in your pocket.</span></h2><p>QPassa keeps the event journey simple. Explore what is on, follow what matters, book when you are ready, and arrive with confidence.</p></div>
         <div className="about-product-steps">{productSteps.map((step, index) => <article className={`about-product-step about-product-step-${step.tone}`} key={step.number}><div className="about-product-copy"><span className="about-step-number">{step.number} · {step.label}</span><h3>{step.title}</h3><p>{step.copy}</p><button onClick={() => navigate(step.page)} className="about-product-action">{step.action} <ArrowRightIcon size={15} /></button></div><PhoneMockup variant={index} /></article>)}</div>
       </section>
 
-      <section className="about-principles about-section-shell"><div className="about-section-label">03 / What we believe</div><div className="about-principles-heading"><h2>Technology with<br /><span>a human pulse.</span></h2><p>We are not trying to make events feel more digital. We are using technology to make discovery, access, and event operations simpler, so the experience itself can take over.</p></div><div className="about-principles-grid">{principles.map(principle => <article key={principle.number}><span>{principle.number}</span><h3>{principle.title}</h3><p>{principle.copy}</p></article>)}</div></section>
+      <section className="about-principles about-section-shell"><div className="about-section-label">04 / What we believe</div><div className="about-principles-heading"><h2>Technology with<br /><span>a human pulse.</span></h2><p>We are not trying to make events feel more digital. We are using technology to make discovery, access, and event operations simpler, so the experience itself can take over.</p></div><div className="about-principles-grid">{principles.map(principle => <article key={principle.number}><span>{principle.number}</span><h3>{principle.title}</h3><p>{principle.copy}</p></article>)}</div></section>
 
-      <section className="about-organizers about-section-shell"><div className="about-organizer-card"><div><p className="about-eyebrow"><SparkleIcon size={14} /> For organizers</p><h2>Your event deserves<br /><span>a full house.</span></h2><p>Publish your event, sell tickets, manage access, understand your audience, and keep your attention where it belongs: on creating a great experience.</p><button onClick={() => navigate('auth-organizer')} className="about-primary-button">Start hosting <ArrowRightIcon size={16} /></button></div><div className="about-organizer-orbit"><div><CalendarIcon size={23} /><span>Plan</span></div><div><TicketIcon size={23} /><span>Sell</span></div><div><UsersIcon size={23} /><span>Grow</span></div></div></div></section>
+      <section className="about-organizers about-section-shell"><div className="about-organizer-card"><div><p className="about-eyebrow"><SparkleIcon size={14} /> 05 / For organizers</p><h2>Your event deserves<br /><span>a full house.</span></h2><p>Publish your event, sell tickets, manage access, understand your audience, and keep your attention where it belongs: on creating a great experience.</p><button onClick={() => navigate('auth-organizer')} className="about-primary-button">Start hosting <ArrowRightIcon size={16} /></button></div><div className="about-organizer-orbit"><div><CalendarIcon size={23} /><span>Plan</span></div><div><TicketIcon size={23} /><span>Sell</span></div><div><UsersIcon size={23} /><span>Grow</span></div></div></div></section>
 
-      <section className="about-pricing about-section-shell"><div className="about-section-label">04 / Simple pricing</div><div className="about-pricing-heading"><h2>Clear from the<br /><span>first ticket.</span></h2><p>Straightforward tools and pricing designed to make professional event management more accessible to organizers in Burundi.</p></div><div className="about-price-grid"><article><span>Discover</span><strong>Free</strong><p>Find events and keep your tickets in one place.</p><button onClick={() => navigate('discover')}>Browse events <ArrowRightIcon size={15} /></button></article><article className="about-price-featured"><span>Host</span><strong>Built to grow</strong><p>Tools for organizers to publish, sell, scan, manage, and understand their events.</p><button onClick={() => navigate('auth-organizer')}>Become an organizer <ArrowRightIcon size={15} /></button></article></div></section>
+      <section className="about-pricing about-section-shell"><div className="about-section-label">06 / Simple pricing</div><div className="about-pricing-heading"><h2>Clear from the<br /><span>first ticket.</span></h2><p>Straightforward tools and pricing designed to make professional event management more accessible to organizers in Burundi.</p></div><div className="about-price-grid"><article><span>Discover</span><strong>Free</strong><p>Find events and keep your tickets in one place.</p><button onClick={() => navigate('discover')}>Browse events <ArrowRightIcon size={15} /></button></article><article className="about-price-featured"><span>Host</span><strong>Built to grow</strong><p>Tools for organizers to publish, sell, scan, manage, and understand their events.</p><button onClick={() => navigate('auth-organizer')}>Become an organizer <ArrowRightIcon size={15} /></button></article></div></section>
 
-      <section className="about-faq about-section-shell"><div className="about-section-label">05 / Questions</div><div className="about-faq-grid"><div><h2>Good to<br /><span>know.</span></h2><p>Still curious? Here are a few answers to help you find your way around QPassa.</p></div><div className="about-faq-list">{faqs.map((faq, index) => <div className={`about-faq-item ${openFaq === index ? 'is-open' : ''}`} key={faq.question}><button onClick={() => setOpenFaq(openFaq === index ? -1 : index)}><span>{faq.question}</span><ChevronDownIcon size={18} /></button>{openFaq === index && <p>{faq.answer}</p>}</div>)}</div></div></section>
+      <section className="about-faq about-section-shell"><div className="about-section-label">07 / Questions</div><div className="about-faq-grid"><div><h2>Good to<br /><span>know.</span></h2><p>Still curious? Here are a few answers to help you find your way around QPassa.</p></div><div className="about-faq-list">{faqs.map((faq, index) => <div className={`about-faq-item ${openFaq === index ? 'is-open' : ''}`} key={faq.question}><button onClick={() => setOpenFaq(openFaq === index ? -1 : index)}><span>{faq.question}</span><ChevronDownIcon size={18} /></button>{openFaq === index && <p>{faq.answer}</p>}</div>)}</div></div></section>
 
-      <section className="about-contact about-section-shell"><div className="about-contact-inner"><div className="about-section-label">06 / Get in touch</div><h2>Have something<br /><span>in mind?</span></h2><p>Whether you are planning your first event, growing an event series, building a venue, looking for the next experience to attend, or want to work with QPassa, we would love to hear from you.</p><a href="mailto:hello@qpassa.events" className="about-email">hello@qpassa.events <ArrowRightIcon size={17} /></a></div></section>
+      <section className="about-contact about-section-shell"><div className="about-contact-inner"><div className="about-section-label">08 / Get in touch</div><h2>Have something<br /><span>in mind?</span></h2><p>Whether you are planning your first event, growing an event series, building a venue, looking for the next experience to attend, or want to work with QPassa, we would love to hear from you.</p><a href="mailto:hello@qpassa.events" className="about-email">hello@qpassa.events <ArrowRightIcon size={17} /></a></div></section>
     </main>
   )
 }

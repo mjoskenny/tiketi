@@ -302,7 +302,7 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
         <section className="rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
           <div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Event overview</p><h2 className="mt-1 text-lg font-bold">Details</h2></div><TrendingUpIcon size={18} /></div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Detail Icon={CalendarIcon} label="Date" value={formatDate(event.date)} />
+            <Detail Icon={CalendarIcon} label="Date" value={event.end_date && event.end_date !== event.date ? `${formatDate(event.date)} – ${formatDate(event.end_date)}` : formatDate(event.date)} />
             <Detail Icon={ClockIcon} label="Time" value={(() => {
               const start = event.time ? String(event.time).trim() : ''
               const end = event.end_time ? String(event.end_time).trim() : ''

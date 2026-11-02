@@ -81,7 +81,7 @@ export default function AgentTicketPage({ data, navigate }: Props) {
   const ticketExtraInfo = data.ticketExtraInfo?.trim() || ''
   const ticketExpiry = data.ticketExpiry ? formatLocaleDate(`${data.ticketExpiry}T00:00:00`, { day: 'numeric', month: 'short', year: 'numeric' }) : ''
   const ticketGroupSize = data.ticketGroupSize && data.ticketGroupSize > 1 ? data.ticketGroupSize : null
-  const status = event.status === 'cancelled' || data.ticketStatus === 'cancelled' ? 'CANCELLED' : data.ticketStatus === 'used' ? 'USED' : hasEventEnded(date, rawTime, event.end_time) ? 'EXPIRED' : 'VALID'
+  const status = event.status === 'cancelled' || data.ticketStatus === 'cancelled' ? 'CANCELLED' : data.ticketStatus === 'used' ? 'USED' : hasEventEnded(date, rawTime, event.end_time, Date.now(), event.end_date) ? 'EXPIRED' : 'VALID'
 
   const createPdf = async () => {
     const { jsPDF } = await import('jspdf')

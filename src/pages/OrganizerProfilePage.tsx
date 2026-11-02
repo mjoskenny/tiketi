@@ -27,8 +27,8 @@ function getMinPrice(event: Event) {
   return Math.min(...event.ticket_tiers.map((tier) => tier.price))
 }
 
-function getEventPhase(date: string, time: string, endTime?: string | null) {
-  return hasEventEnded(date, time, endTime) ? 'past' : 'active'
+function getEventPhase(date: string, time: string, endTime?: string | null, endDate?: string | null) {
+  return hasEventEnded(date, time, endTime, Date.now(), endDate) ? 'past' : 'active'
 }
 
 export default function OrganizerProfilePage({ organizer: initialOrganizer, navigate }: Props) {
@@ -214,8 +214,8 @@ export default function OrganizerProfilePage({ organizer: initialOrganizer, navi
   const organizerAvatar = organizer.profiles?.profile_image || organizer.profiles?.avatar_url || organizer.logo_url || null
   const initials = displayName.slice(0, 1).toUpperCase()
   const sortedEvents = [...events].sort((a, b) => {
-    const aTime = getEventEndTimestamp(a.date, a.time, a.end_time)
-    const bTime = getEventEndTimestamp(b.date, b.time, b.end_time)
+    const aTime = getEventEndTimestamp(a.date, a.time, a.end_time, a.end_date)
+    const bTime = getEventEndTimestamp(b.date, b.time, b.end_time, b.end_date)
     const aUpcoming = aTime >= Date.now()
     const bUpcoming = bTime >= Date.now()
 
@@ -223,8 +223,8 @@ export default function OrganizerProfilePage({ organizer: initialOrganizer, navi
     if (aUpcoming) return aTime - bTime
     return bTime - aTime
   })
-  const activeEvents = sortedEvents.filter((event) => getEventPhase(event.date, event.time, event.end_time) === 'active')
-  const pastEvents = sortedEvents.filter((event) => getEventPhase(event.date, event.time, event.end_time) === 'past')
+  const activeEvents = sortedEvents.filter((event) => getEventPhase(event.date, event.time, event.end_time, event.end_date) === 'active')
+  const pastEvents = sortedEvents.filter((event) => getEventPhase(event.date, event.time, event.end_time, event.end_date) === 'past')
   return (
     <main className="sinc-organizer-profile organizer-profile-refresh">
       <section className="sinc-organizer-header">

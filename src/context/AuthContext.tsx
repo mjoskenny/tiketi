@@ -154,11 +154,6 @@ async function loadOrCreateOrganizerAccount(user: User): Promise<Organizer | nul
   if (!created) return fallbackOrganizer(user)
 
   await Promise.allSettled([
-    supabase.from('organizer_roles').insert([
-      { organizer_id: created.id, name: 'Admin', permissions: { all: true } },
-      { organizer_id: created.id, name: 'Scanner', permissions: { checkin: true } },
-      { organizer_id: created.id, name: 'Agent', permissions: { sell: true } },
-    ]),
     supabase.from('subscriptions').insert({ organizer_id: created.id, tier: 'free', status: 'active', price: 0 }),
   ])
 

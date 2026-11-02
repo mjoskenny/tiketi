@@ -110,6 +110,7 @@ export type Event = {
   description: string | null
   category: string
   date: string
+  end_date?: string | null
   time: string
   end_time?: string | null
   venue: string

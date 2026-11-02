@@ -5,6 +5,8 @@ import dashboardFr from './translations-dashboard-fr'
 import publicFr from './translations-public-fr'
 import miscFr from './translations-misc-fr'
 import trackingFr from './translations-tracking-fr'
+import legalOrganizerFr from './translations-legal-organizer-fr'
+import platformFr from './translations-platform-fr'
 
 // English source strings are stable translation keys; event/organizer-supplied copy is never
 // translated unless it exactly matches a platform string in this catalog.
@@ -91,7 +93,7 @@ const fr: Record<string, string> = {
 }
 
 Object.assign(fr, frSupplement)
-Object.assign(fr, publicFr, accountFr, dashboardFr, miscFr, trackingFr)
+Object.assign(fr, publicFr, accountFr, dashboardFr, miscFr, trackingFr, legalOrganizerFr, platformFr)
 
 function getInitialLanguage(): 'en' | 'fr' {
   try {

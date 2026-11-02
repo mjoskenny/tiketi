@@ -110,7 +110,7 @@ export default function NotificationsPage({ navigate }: Props) {
   }
 
   return (
-    <div className="min-h-screen pt-24 pb-16" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+    <div className="qpassa-notifications-page min-h-screen pt-24 pb-16" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
       <div className="max-w-2xl mx-auto px-4 sm:px-6">
 
         <div className="flex items-center justify-between mb-6">
@@ -122,7 +122,7 @@ export default function NotificationsPage({ navigate }: Props) {
           </div>
           {unreadCount > 0 && (
             <button onClick={markAllRead} className="text-xs font-medium px-3 py-1.5 rounded-full"
-              style={{ color: 'var(--accent)', background: 'rgba(249,112,21,0.1)', border: '1px solid rgba(249,112,21,0.22)' }}>
+              style={{ color: 'var(--brand-blue)', background: 'var(--brand-blue-soft)', border: '0' }}>
               Mark all read
             </button>
           )}
@@ -134,9 +134,9 @@ export default function NotificationsPage({ navigate }: Props) {
             <button key={key} onClick={() => setTab(key)}
               className="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap"
               style={{
-                background: tab === key ? 'rgba(249,112,21,0.15)' : 'var(--muted)',
-                color: tab === key ? 'var(--accent)' : 'var(--muted-foreground)',
-                border: `1px solid ${tab === key ? 'rgba(249,112,21,0.35)' : 'var(--border)'}`,
+                background: tab === key ? 'var(--selected)' : 'var(--muted)',
+                color: tab === key ? 'var(--brand-blue)' : 'var(--muted-foreground)',
+                border: '0',
               }}>
               <Icon size={13} /> {label}
             </button>
@@ -166,9 +166,9 @@ export default function NotificationsPage({ navigate }: Props) {
               const Icon = n.type === 'ticket' ? TicketIcon : n.type === 'event' ? CalendarIcon : n.type === 'payment' ? DollarSignIcon : n.type === 'team' || n.type === 'follower' ? UsersIcon : TagIcon
               return (
                 <button key={n.id} type="button" onClick={() => void openNotification(n)} className="notification-card w-full flex items-start gap-4 p-4 rounded-2xl text-left transition-all"
-                  style={{ background: n.read ? 'var(--card)' : 'rgba(249,112,21,0.08)', border: `1px solid ${n.read ? 'var(--border)' : 'rgba(249,112,21,0.22)'}` }}>
+                    style={{ background: n.read ? 'var(--card)' : 'var(--selected)', border: '0', boxShadow: '0 8px 24px rgba(0,0,0,.08)' }}>
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'rgba(249,112,21,0.12)', color: 'var(--accent)' }}>
+                    style={{ background: 'var(--selected)', color: 'var(--brand-blue)' }}>
                     <Icon size={17} />
                   </div>
                   <div className="flex-1 min-w-0">

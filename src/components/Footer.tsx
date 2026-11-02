@@ -30,11 +30,11 @@ export default function Footer({ navigate, publicPlatformSettings }: FooterProps
   }
 
   return (
-    <footer className="mt-16" style={{ background: '#070709' }}>
+    <footer className="qpassa-site-footer mt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-10">
           <div className="col-span-2 md:col-span-2">
-            <div className="mb-2 text-2xl font-black" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', letterSpacing: '-0.02em' }}>{platformName}</div>
+            <div className="mb-2 text-2xl font-black" style={{ fontFamily: 'var(--font-sans)', letterSpacing: '-0.02em' }}>{platformName}</div>
             <p className="mb-5 text-sm" style={{ color: 'var(--muted-foreground)' }}>Discover. Book. Experience.</p>
             <div className="mb-3 flex items-center gap-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>
               <MapPinIcon size={13} />

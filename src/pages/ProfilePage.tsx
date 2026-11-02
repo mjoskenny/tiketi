@@ -368,7 +368,7 @@ export default function ProfilePage({ navigate }: Props) {
   ]
 
   return (
-    <div className="min-h-screen pt-24 pb-16" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+    <div className="qpassa-profile-page min-h-screen pt-24 pb-16" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
       <div className="max-w-2xl mx-auto px-4 sm:px-6">
 
         {/* Profile header */}
@@ -548,7 +548,7 @@ export default function ProfilePage({ navigate }: Props) {
                   <button type="button" onClick={() => handlePrivacyRequest('export')} className="w-full rounded-xl px-4 py-2.5 text-sm font-semibold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>
                     Request data export
                   </button>
-                  <button type="button" onClick={() => handlePrivacyRequest('delete')} className="w-full rounded-xl px-4 py-2.5 text-sm font-semibold" style={{ background: 'rgba(248,113,113,0.08)', color: '#fca5a5', border: '1px solid rgba(248,113,113,0.2)' }}>
+                  <button type="button" onClick={() => handlePrivacyRequest('delete')} className="profile-account-delete-action w-full rounded-xl px-4 py-2.5 text-sm font-semibold" style={{ background: 'rgba(248,113,113,0.08)', color: '#fca5a5', border: '1px solid rgba(248,113,113,0.2)' }}>
                     Request account deletion
                   </button>
                 </div>
@@ -563,7 +563,7 @@ export default function ProfilePage({ navigate }: Props) {
 
         {/* Sign out */}
         <button onClick={handleSignOut}
-          className="w-full mt-5 flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-semibold transition-all"
+          className="profile-sign-out-action w-full mt-5 flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-semibold transition-all"
           style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.15)', color: '#f87171' }}
           onMouseEnter={e => (e.currentTarget.style.background = 'rgba(248,113,113,0.12)')}
           onMouseLeave={e => (e.currentTarget.style.background = 'rgba(248,113,113,0.08)')}>

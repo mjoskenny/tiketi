@@ -8,12 +8,12 @@ type StatusBadgeProps = {
 type ToneStyle = { foreground: string; background: string; border: string }
 
 const TONES: Record<NonNullable<StatusBadgeProps['tone']>, ToneStyle> = {
-  success: { foreground: '#86efac', background: 'rgba(34,197,94,.12)', border: 'rgba(34,197,94,.28)' },
-  warning: { foreground: '#fcd34d', background: 'rgba(245,158,11,.12)', border: 'rgba(245,158,11,.3)' },
-  danger: { foreground: '#fca5a5', background: 'rgba(239,68,68,.12)', border: 'rgba(239,68,68,.3)' },
-  info: { foreground: '#93c5fd', background: 'rgba(96,165,250,.12)', border: 'rgba(96,165,250,.3)' },
-  neutral: { foreground: '#cbd5e1', background: 'rgba(148,163,184,.1)', border: 'rgba(148,163,184,.22)' },
-  accent: { foreground: 'var(--primary)', background: 'rgba(249,112,21,.12)', border: 'rgba(249,112,21,.28)' },
+  success: { foreground: 'var(--success)', background: 'color-mix(in srgb, var(--success) 12%, transparent)', border: 'color-mix(in srgb, var(--success) 30%, transparent)' },
+  warning: { foreground: 'var(--warning)', background: 'color-mix(in srgb, var(--warning) 12%, transparent)', border: 'color-mix(in srgb, var(--warning) 30%, transparent)' },
+  danger: { foreground: 'var(--error)', background: 'color-mix(in srgb, var(--error) 12%, transparent)', border: 'color-mix(in srgb, var(--error) 30%, transparent)' },
+  info: { foreground: 'var(--info)', background: 'color-mix(in srgb, var(--info) 12%, transparent)', border: 'color-mix(in srgb, var(--info) 30%, transparent)' },
+  neutral: { foreground: 'var(--secondary-foreground)', background: 'var(--hover)', border: 'var(--border)' },
+  accent: { foreground: 'var(--brand-orange)', background: 'var(--brand-orange-soft)', border: 'color-mix(in srgb, var(--brand-orange) 30%, transparent)' },
 }
 
 const STATUS_TONES: Record<string, NonNullable<StatusBadgeProps['tone']>> = {

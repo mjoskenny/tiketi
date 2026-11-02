@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeftIcon, SearchIcon, UsersIcon, SparkleIcon } from '../components/Icon'
+import { ArrowLeftIcon, SearchIcon, SortIcon } from '../components/Icon'
 import { supabase } from '../lib/supabase'
 import type { Organizer } from '../lib/types'
 import { ORGANIZER_COVER_PLACEHOLDER } from '../lib/profileMedia'
@@ -11,6 +11,7 @@ type OrganizerWithCover = Organizer & { cover_image: string | null; event_count:
 export default function ExploreOrganizersPage({ navigate }: Props) {
   const [organizers, setOrganizers] = useState<OrganizerWithCover[]>([])
   const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState<'active' | 'name'>('active')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -98,31 +99,38 @@ export default function ExploreOrganizersPage({ navigate }: Props) {
 
   const filteredOrganizers = useMemo(() => {
     const query = search.trim().toLowerCase()
-    if (!query) return organizers
-    return organizers.filter(organizer => (organizer.profiles?.full_name ?? organizer.name).toLowerCase().includes(query) || organizer.profiles?.username?.toLowerCase().includes(query) || organizer.description?.toLowerCase().includes(query) || organizer.city?.toLowerCase().includes(query))
-  }, [organizers, search])
+    const matches = !query
+      ? organizers
+      : organizers.filter(organizer => (organizer.profiles?.full_name ?? organizer.name).toLowerCase().includes(query) || organizer.profiles?.username?.toLowerCase().includes(query) || organizer.description?.toLowerCase().includes(query) || organizer.city?.toLowerCase().includes(query))
+    return [...matches].sort((left, right) => sortBy === 'active'
+      ? right.event_count - left.event_count || left.name.localeCompare(right.name)
+      : left.name.localeCompare(right.name))
+  }, [organizers, search, sortBy])
 
   return (
     <main className="explore-organizers-page min-h-screen" style={{ color: 'var(--foreground)' }}>
       <section className="explore-organizers-hero">
-        <div className="mx-auto max-w-7xl px-4 pb-12 pt-28 sm:px-6 md:pb-16">
-          <button type="button" onClick={() => navigate('home')} className="explore-organizers-back mb-8 flex h-10 w-10 items-center justify-center rounded-full" aria-label="Back to events" title="Back to events"><ArrowLeftIcon size={18} /></button>
-          <div className="mb-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+        <div className="mx-auto max-w-7xl px-4 pb-8 pt-24 sm:px-6 md:pb-10">
+          <button type="button" onClick={() => navigate('home')} className="explore-organizers-back mb-6 flex h-10 w-10 items-center justify-center rounded-full" aria-label="Back to events" title="Back to events"><ArrowLeftIcon size={18} /></button>
           <div>
-            <p className="organizer-eyebrow mb-3"><SparkleIcon size={14} /> The people behind the plans</p>
-            <h1 className="explore-organizers-title mb-3">Find your next <em>favourite</em> organizer.</h1>
+            <h1 className="explore-organizers-title mb-3">Find your next favourite organizer.</h1>
             <p className="max-w-xl text-base" style={{ color: 'var(--muted-foreground)' }}>Follow the teams shaping the city&apos;s best nights, gatherings and ideas.</p>
           </div>
-          <div className="explore-organizers-search relative w-full md:max-w-xs">
+          <div className="explore-organizers-search relative mt-6 w-full max-w-xl">
             <SearchIcon size={16} className="attendee-control-icon pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2" style={{ color: 'var(--muted-foreground)' }} />
             <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search organizers" aria-label="Search organizers" className="attendee-search-input w-full rounded-full py-3.5 pl-11 pr-4 text-sm outline-none" />
           </div>
         </div>
-        </div>
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 md:py-14">
-        <div className="explore-organizers-section-head"><div><p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--primary-light)' }}>Community directory</p><h2>Made for following.</h2></div><span><UsersIcon size={15} /> {filteredOrganizers.length} creators</span></div>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2" aria-label="Organizer sorting options">
+            <SortIcon size={15} style={{ color: 'var(--muted-foreground)' }} />
+            <button type="button" onClick={() => setSortBy('active')} aria-pressed={sortBy === 'active'} data-active={sortBy === 'active'} className="explore-organizers-filter-button rounded-full px-3.5 py-2 text-xs font-semibold">Most active</button>
+            <button type="button" onClick={() => setSortBy('name')} aria-pressed={sortBy === 'name'} data-active={sortBy === 'name'} className="explore-organizers-filter-button rounded-full px-3.5 py-2 text-xs font-semibold">A–Z</button>
+          </div>
+        </div>
         {loading ? (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{[1, 2, 3].map(item => <div key={item} className="h-64 animate-pulse rounded-2xl" style={{ background: 'var(--muted)' }} />)}</div>
         ) : filteredOrganizers.length > 0 ? (

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { HeartIcon } from '../components/Icon'
+import { ArrowLeftIcon, HeartIcon } from '../components/Icon'
 import EventCard from '../components/EventCard'
 import { getFavoriteEventIds } from '../lib/favorites'
 import type { Event } from '../lib/types'
@@ -37,7 +37,7 @@ export default function FavoritesPage({ navigate }: Props) {
 
   return (
     <main className="favorites-page">
-      <section className="favorites-header"><p className="favorites-kicker">YOUR COLLECTION</p><div className="favorites-title-row"><div><h1>Favorites</h1><p>Events you want to remember.</p></div><div className="favorites-heart"><HeartIcon size={24} filled /></div></div></section>
+      <section className="favorites-header"><button type="button" onClick={() => navigate('home')} className="favorites-back mb-4" aria-label="Back to home" title="Back to home"><ArrowLeftIcon size={18} /></button><p className="favorites-kicker">YOUR COLLECTION</p><div className="favorites-title-row"><div><h1>Favorites</h1><p>Events you want to remember.</p></div></div></section>
       <section className="favorites-content">
         {loading ? <p className="favorites-empty">Loading your favorites...</p> : events.length === 0 ? <div className="favorites-empty"><HeartIcon size={34} /><h2>No favorites yet</h2><p>Save an event with the heart button and it will appear here.</p><button onClick={() => navigate('events')}>Explore events</button></div> : <div className="favorites-grid">{events.map(event => <EventCard key={event.id} event={event} compact onClick={() => navigate('event-detail', event)} />)}</div>}
       </section>

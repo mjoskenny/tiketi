@@ -24,6 +24,7 @@ import { fetchAllRows } from '../lib/supabasePagination'
 import { LanguageSwitcher } from '../components/LocaleContent'
 import StatusBadge from '../components/StatusBadge'
 import i18n from '../lib/i18n'
+import type { OrganizerRole } from '../lib/types'
 
 type Section =
   | 'overview'
@@ -36,6 +37,7 @@ type Section =
   | 'payments'
   | 'payouts'
   | 'agents'
+  | 'roles'
   | 'reports'
   | 'settings'
 type AdminDateRange = '7d' | '30d' | '90d' | 'year' | 'all'
@@ -160,6 +162,18 @@ type AdminEventDraft = Omit<AdminEventRow, 'id' | 'organizer' | 'status'> & { id
 type ReportDatasetKey = 'orders' | 'payments' | 'transactions' | 'events' | 'tickets' | 'refunds' | 'payouts' | 'agents' | 'users' | 'organizers'
 type ReportDataset = { label: string; columns: string[]; rows: Array<Array<string | number>>; snapshot?: boolean }
 
+const ORGANIZER_ROLE_PERMISSIONS = [
+  { key: 'events', label: 'Event management', description: 'Create and edit events, ticket tiers, and publishing status.' },
+  { key: 'orders', label: 'Orders and sales', description: 'Review orders and record permitted ticket sales.' },
+  { key: 'customers', label: 'Customer directory', description: 'View and manage organizer customer records.' },
+  { key: 'transactions', label: 'Financial statements', description: 'View ledger entries and transaction references.' },
+  { key: 'followers', label: 'Audience followers', description: 'View the organizer audience and follower list.' },
+  { key: 'calendar', label: 'Event calendar', description: 'View and open scheduled organizer events.' },
+  { key: 'checkin', label: 'Ticket check-in', description: 'Scan and validate tickets for events.' },
+  { key: 'analytics', label: 'Analytics overview', description: 'View organizer sales and event performance.' },
+  { key: 'members', label: 'Team administration', description: 'Invite, activate, and manage team membership.' },
+] as const
+
 const organizerVerificationStatus = (organizer: { verified?: boolean | null; verification_status?: string | null }) => {
   if (organizer.verification_status === 'pending' || organizer.verification_status === 'verified' || organizer.verification_status === 'unverified') return organizer.verification_status
   return organizer.verified ? 'verified' : 'unverified'
@@ -212,6 +226,7 @@ const NAV: { key: Section; label: string }[] = [
   { key: 'payments', label: 'Payments' },
   { key: 'payouts', label: 'Payouts' },
   { key: 'agents', label: 'Ticket agents' },
+  { key: 'roles', label: 'Roles & permissions' },
   { key: 'reports', label: 'Reports' },
   { key: 'settings', label: 'Platform settings' },
 ]
@@ -227,6 +242,7 @@ const SECTION_PATHS: Record<Section, string> = {
   payments: '/admin-dashboard/payments',
   payouts: '/admin-dashboard/payouts',
   agents: '/admin-dashboard/agents',
+  roles: '/admin-dashboard/roles',
   reports: '/admin-dashboard/reports',
   settings: '/admin-dashboard/settings',
 }
@@ -242,6 +258,7 @@ const NAV_ICONS: Record<Section, React.FC<{ size?: number; className?: string; s
   payments: DollarSignIcon,
   payouts: ZapIcon,
   agents: KeyIcon,
+  roles: ShieldIcon,
   reports: TrendingUpIcon,
   settings: SettingsIcon,
 }
@@ -356,6 +373,9 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
   const [verificationNotice, setVerificationNotice] = useState('')
   const [eventRows, setEventRows] = useState<AdminEventRow[]>([])
   const [organizerOptions, setOrganizerOptions] = useState<Array<{ id: string; name: string }>>([])
+  const [managedOrganizerRoles, setManagedOrganizerRoles] = useState<Array<OrganizerRole & { organizers?: { name: string | null } | null }>>([])
+  const [roleEditor, setRoleEditor] = useState<{ id?: string; organizerId: string; name: string; permissions: Record<string, boolean> } | null>(null)
+  const [roleSaving, setRoleSaving] = useState(false)
   const [eventEditor, setEventEditor] = useState<AdminEventDraft | null>(null)
   const [eventSaving, setEventSaving] = useState(false)
   const [ticketRows, setTicketRows] = useState<Array<{ event: string; tier: string; sold: string; available: string; capacity: string; price: string; utilization: string }>>([])
@@ -1056,6 +1076,19 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
 
   useEffect(() => {
     if (!user || profile?.role !== 'admin') return
+    let active = true
+    const loadManagedRoles = async () => {
+      const { data, error } = await supabase.from('organizer_roles').select('*, organizers:organizer_id(name)').order('organizer_id').order('name')
+      if (!active) return
+      if (error) setDashboardError(error.message)
+      else setManagedOrganizerRoles((data ?? []) as Array<OrganizerRole & { organizers?: { name: string | null } | null }>)
+    }
+    void loadManagedRoles()
+    return () => { active = false }
+  }, [user?.id, profile?.role, refreshTick])
+
+  useEffect(() => {
+    if (!user || profile?.role !== 'admin') return
     let refreshTimeout: number | undefined
     const scheduleRefresh = () => {
       window.clearTimeout(refreshTimeout)
@@ -1072,6 +1105,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
       .on('postgres_changes', { event: '*', schema: 'public', table: 'commissions' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, scheduleRefresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'organizer_withdrawals' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'organizer_roles' }, scheduleRefresh)
       .subscribe()
     return () => {
       window.clearTimeout(refreshTimeout)
@@ -1100,6 +1134,38 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
     setSidebarOpen(false)
     const nextPath = SECTION_PATHS[nextSection]
     if (window.location.pathname !== nextPath) window.history.pushState({}, '', nextPath)
+  }
+
+  const startNewOrganizerRole = () => {
+    setRoleEditor({ organizerId: organizerOptions[0]?.id ?? '', name: '', permissions: {} })
+    setDashboardError('')
+  }
+
+  const saveOrganizerRole = async () => {
+    if (profile?.role !== 'admin') { setDashboardError('Platform administrator access is required.'); return }
+    if (!roleEditor?.organizerId) { setDashboardError('Choose an organization for this role.'); return }
+    const name = roleEditor.name.trim()
+    if (name.length < 2 || name.length > 50) { setDashboardError('Role name must be between 2 and 50 characters.'); return }
+    if (!/^[\p{L}\p{N}][\p{L}\p{N} &'._-]*$/u.test(name)) { setDashboardError('Role name contains unsupported characters.'); return }
+
+    setRoleSaving(true)
+    setDashboardError('')
+    const result = roleEditor.id
+      ? await supabase.from('organizer_roles').update({ name, permissions: roleEditor.permissions }).eq('id', roleEditor.id)
+      : await supabase.from('organizer_roles').insert({ organizer_id: roleEditor.organizerId, name, permissions: roleEditor.permissions })
+    setRoleSaving(false)
+    if (result.error) { setDashboardError(result.error.message); return }
+    setRoleEditor(null)
+    setRefreshTick(current => current + 1)
+  }
+
+  const deleteOrganizerRole = async (role: OrganizerRole) => {
+    if (profile?.role !== 'admin') { setDashboardError('Platform administrator access is required.'); return }
+    if (role.name.trim().toLowerCase() === 'admin') { setDashboardError('The Admin role is a protected built-in role.'); return }
+    if (!window.confirm(`Delete the ${role.name} role? Members using it will become unassigned.`)) return
+    const { error } = await supabase.from('organizer_roles').delete().eq('id', role.id)
+    if (error) { setDashboardError(error.message); return }
+    setRefreshTick(current => current + 1)
   }
 
   const updatePlatformSetting = <Key extends keyof PlatformSettings>(key: Key, value: PlatformSettings[Key]) => {
@@ -1904,6 +1970,67 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
             ], 'Leaderboard')}
           </div>
         )
+      case 'roles': {
+        const filteredRoles = managedOrganizerRoles.filter(role => {
+          const search = searchTerm.trim().toLowerCase()
+          return !search || `${role.name} ${role.organizers?.name ?? ''}`.toLowerCase().includes(search)
+        })
+        return (
+          <div className="space-y-5">
+            <section className="rounded-2xl border p-5" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--muted-foreground)' }}>Access control</p>
+                  <h3 className="mt-1 text-xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Roles & permissions</h3>
+                  <p className="mt-1 max-w-2xl text-sm" style={{ color: 'var(--muted-foreground)' }}>Define organization-scoped access profiles. Organizers can assign these roles to team members, but only platform admins can create or change role capabilities.</p>
+                </div>
+                <button type="button" onClick={startNewOrganizerRole} disabled={!organizerOptions.length} className="shrink-0 rounded-xl px-4 py-2.5 text-sm font-bold disabled:opacity-50" style={{ background: 'var(--primary)', color: '#fff' }}>Create role</button>
+              </div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                {[
+                  ['Organization scope', 'Profiles are scoped to one organizer workspace.'],
+                  ['Owner assignment', 'Owners choose a profile when managing team members.'],
+                  ['Admin controlled', 'Role permissions are edited here by platform admins.'],
+                ].map(([title, detail]) => <div key={title} className="rounded-xl p-4" style={{ background: 'var(--muted)' }}><p className="text-sm font-bold">{title}</p><p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>{detail}</p></div>)}
+              </div>
+            </section>
+
+            <section className="admin-table-card overflow-hidden rounded-2xl border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+              <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5" style={{ borderColor: 'var(--border)' }}>
+                <div><h3 className="font-bold">Organization role catalog</h3><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{filteredRoles.length} role{filteredRoles.length === 1 ? '' : 's'} across {organizerOptions.length} organizations</p></div>
+                <input type="search" value={searchTerm} onChange={event => setSearchTerm(event.target.value)} placeholder="Search roles or organizations" aria-label="Search organizer roles" className="w-full rounded-xl border px-3 py-2.5 text-sm sm:max-w-sm" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
+              </div>
+              <div className="overflow-x-auto"><table className="w-full min-w-[860px] text-left text-sm">
+                <thead><tr style={{ background: 'var(--muted)' }}>{['Role', 'Organization', 'Scope', 'Capabilities', 'Actions'].map(label => <th key={label} className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--muted-foreground)' }}>{label}</th>)}</tr></thead>
+                <tbody>{filteredRoles.map(role => {
+                  const capabilityLabels = role.permissions?.all ? ['Full organization access'] : ORGANIZER_ROLE_PERMISSIONS.filter(permission => role.permissions?.[permission.key]).map(permission => permission.label)
+                  return <tr key={role.id} className="border-t align-top" style={{ borderColor: 'var(--border)' }}>
+                    <td className="px-5 py-4 font-bold">{role.name}</td>
+                    <td className="px-5 py-4">{role.organizers?.name ?? organizerOptions.find(option => option.id === role.organizer_id)?.name ?? 'Organization'}</td>
+                    <td className="px-5 py-4 text-xs" style={{ color: 'var(--muted-foreground)' }}>Organization</td>
+                    <td className="px-5 py-4"><div className="flex max-w-lg flex-wrap gap-1.5">{capabilityLabels.length ? capabilityLabels.map(label => <span key={label} className="admin-role-capability">{label}</span>) : <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>No access granted</span>}</div></td>
+                    <td className="px-5 py-4"><div className="flex gap-2"><button type="button" onClick={() => { setRoleEditor({ id: role.id, organizerId: role.organizer_id, name: role.name, permissions: { ...role.permissions } }); setDashboardError('') }} className="rounded-lg px-3 py-1.5 text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>Edit</button><button type="button" disabled={role.name.trim().toLowerCase() === 'admin'} onClick={() => void deleteOrganizerRole(role)} className="rounded-lg px-3 py-1.5 text-xs font-bold disabled:opacity-40" style={{ background: 'rgba(239,68,68,.1)', color: '#ef4444' }}>Delete</button></div></td>
+                  </tr>
+                })}
+                {filteredRoles.length === 0 && <tr><td colSpan={5} className="px-5 py-14 text-center text-sm" style={{ color: 'var(--muted-foreground)' }}>No roles match this search.</td></tr>}</tbody>
+              </table></div>
+            </section>
+
+            {roleEditor && <div className="fixed inset-0 z-[90] flex items-center justify-center overflow-y-auto bg-black/70 p-4">
+              <section role="dialog" aria-modal="true" aria-labelledby="admin-role-editor-title" className="my-auto w-full max-w-2xl rounded-2xl p-5 sm:p-6" style={{ background: 'var(--card)', color: 'var(--foreground)' }}>
+                <div className="flex items-start justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[.18em]" style={{ color: 'var(--primary)' }}>Platform administration</p><h2 id="admin-role-editor-title" className="mt-1 text-xl font-black">{roleEditor.id ? 'Edit role permissions' : 'Create organization role'}</h2><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Organizers can assign this profile but cannot change its permissions.</p></div><button type="button" onClick={() => setRoleEditor(null)} aria-label="Close role editor" className="rounded-lg px-2 py-1 text-lg">×</button></div>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <label className="text-xs font-semibold sm:col-span-2" style={{ color: 'var(--muted-foreground)' }}>Organization<select value={roleEditor.organizerId} disabled={!!roleEditor.id} onChange={event => setRoleEditor(current => current ? { ...current, organizerId: event.target.value } : current)} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>{organizerOptions.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select></label>
+                  <label className="text-xs font-semibold sm:col-span-2" style={{ color: 'var(--muted-foreground)' }}>Role name<input value={roleEditor.name} onChange={event => setRoleEditor(current => current ? { ...current, name: event.target.value } : current)} maxLength={50} placeholder="e.g. Event manager" className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
+                  <label className="flex items-start gap-3 rounded-xl border p-4 sm:col-span-2" style={{ borderColor: 'var(--border)', background: 'var(--muted)' }}><input type="checkbox" checked={roleEditor.permissions.all === true} onChange={event => setRoleEditor(current => current ? { ...current, permissions: { ...current.permissions, all: event.target.checked } } : current)} className="mt-0.5 accent-blue-600" /><span><strong className="block text-sm">Full organization access</strong><small className="mt-1 block text-xs" style={{ color: 'var(--muted-foreground)' }}>Grants every organizer dashboard permission.</small></span></label>
+                  {ORGANIZER_ROLE_PERMISSIONS.map(permission => <label key={permission.key} className="flex cursor-pointer items-start gap-3 rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'var(--card)' }}><input type="checkbox" checked={roleEditor.permissions[permission.key] === true} disabled={roleEditor.permissions.all === true} onChange={event => setRoleEditor(current => current ? { ...current, permissions: { ...current.permissions, [permission.key]: event.target.checked } } : current)} className="mt-0.5 accent-blue-600" /><span><strong className="block text-xs">{permission.label}</strong><small className="mt-1 block text-[11px] leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>{permission.description}</small></span></label>)}
+                </div>
+                <div className="mt-5 flex flex-col-reverse justify-end gap-2 sm:flex-row"><button type="button" onClick={() => setRoleEditor(null)} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>Cancel</button><button type="button" onClick={() => void saveOrganizerRole()} disabled={roleSaving || !roleEditor.name.trim() || !roleEditor.organizerId} className="rounded-xl px-4 py-2.5 text-sm font-bold disabled:opacity-50" style={{ background: 'var(--primary)', color: '#fff' }}>{roleSaving ? 'Saving…' : roleEditor.id ? 'Save role' : 'Create role'}</button></div>
+              </section>
+            </div>}
+          </div>
+        )
+      }
       case 'reports': {
         const report = reportDatasets[reportDatasetKey]
         const normalizedReportSearch = searchTerm.trim().toLowerCase()

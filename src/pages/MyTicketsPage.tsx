@@ -101,7 +101,7 @@ export default function MyTicketsPage({ navigate }: Props) {
 
         const { data, error: ticketsError } = await supabase
           .from('tickets')
-          .select('*, events(title, date, time, end_time, venue, cover_image, category, tags, status), ticket_tiers(name, price, description, ticket_type, extra_info, expires_at, group_size)')
+          .select('*, events(title, date, end_date, time, end_time, venue, cover_image, category, tags, status), ticket_tiers(name, price, description, ticket_type, extra_info, expires_at, group_size)')
           .in('order_id', orderIds)
         if (ticketsError) throw ticketsError
 
@@ -153,11 +153,11 @@ export default function MyTicketsPage({ navigate }: Props) {
   const now = Date.now()
   const eventHasEnded = (event: any) => {
     if (!event?.date) return false
-    return hasEventEnded(event.date, event.time, event.end_time, now)
+    return hasEventEnded(event.date, event.time, event.end_time, now, event.end_date)
   }
   const eventTime = (event: any) => {
     if (!event?.date) return 0
-    return getEventEndTimestamp(event.date, event.time, event.end_time)
+    return getEventEndTimestamp(event.date, event.time, event.end_time, event.end_date)
   }
   const sortTicketsByEventDate = (a: Ticket, b: Ticket) => {
     const aEvent = (a as any).events
@@ -208,7 +208,7 @@ export default function MyTicketsPage({ navigate }: Props) {
   }
 
   return (
-    <div className="min-h-screen pt-24 pb-16" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+    <div className="qpassa-tickets-page min-h-screen pt-24 pb-16" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
       <div className="max-w-2xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -228,7 +228,7 @@ export default function MyTicketsPage({ navigate }: Props) {
               key={t}
               onClick={() => setTab(t)}
               className="flex-1 py-2.5 rounded-lg text-sm font-semibold capitalize transition-all"
-              style={{ background: tab === t ? 'var(--card)' : 'transparent', color: tab === t ? '#fff' : 'var(--muted-foreground)' }}
+              style={{ background: tab === t ? 'var(--card)' : 'transparent', color: tab === t ? 'var(--foreground)' : 'var(--muted-foreground)' }}
             >
               {t.charAt(0).toUpperCase() + t.slice(1)}
               {' '}
@@ -254,7 +254,7 @@ export default function MyTicketsPage({ navigate }: Props) {
                 <path d="M13 5v2M13 17v2M13 11v2"/>
               </svg>
             </div>
-            <p className="font-bold text-xl mb-2">No {tab} tickets</p>
+              <p className="font-bold text-xl mb-2">No {tab} tickets</p>
             <p className="text-sm mb-5" style={{ color: 'var(--muted-foreground)' }}>
               {tab === 'upcoming' ? "You don't have any upcoming events. Browse and get your first ticket!" : tab === 'past' ? "No past events yet." : "No cancelled tickets."}
             </p>
@@ -295,7 +295,11 @@ export default function MyTicketsPage({ navigate }: Props) {
                           {formatLocaleDate(`${ev.date}T12:00:00`, { day: 'numeric', month: 'short', year: 'numeric' })} · {ev.venue}
                         </p>
                       )}
-                      <p className="text-xs font-bold" style={{ color: 'var(--primary)' }}>{tier?.name ?? 'TICKET'} · {ticket.holder_name ?? 'Guest'}</p>
+                      <div className="ticket-card-tier-holder text-xs font-bold">
+                        <span className="ticket-card-tier">{tier?.name ?? 'TICKET'}</span>
+                        <span className="ticket-card-tier-divider" aria-hidden="true">•</span>
+                        <span className="ticket-card-holder">{ticket.holder_name ?? 'Guest'}</span>
+                      </div>
                     </div>
                   </div>
 
@@ -305,8 +309,7 @@ export default function MyTicketsPage({ navigate }: Props) {
                     {refund.status === 'approved' && <p className="mt-1 opacity-80">QPassa support still needs to complete the payment-provider step.</p>}
                   </div>}
 
-                  <div className="px-4 pb-4 flex items-center justify-between border-t pt-3" style={{ borderColor: 'var(--border)' }}>
-                    <p className="text-xs font-mono" style={{ color: 'var(--muted-foreground)' }}>{ticket.qr_code.slice(0, 20)}…</p>
+                  <div className="px-4 pb-4 flex items-center justify-end border-t pt-3" style={{ borderColor: 'var(--border)' }}>
                     <div className="flex flex-wrap justify-end gap-2">
                       <button onClick={() => viewTicket(ticket)} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold" style={{ background: 'var(--primary)', color: '#000' }}><TicketIcon size={13} />View ticket</button>
                       {canShowQr && <button onClick={() => setShowQR(showQR === ticket.id ? null : ticket.id)} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold" style={{ background: showQR === ticket.id ? 'var(--primary)' : 'var(--muted)', color: showQR === ticket.id ? '#000' : 'rgba(255,255,255,0.7)' }}>{showQR === ticket.id ? 'Hide QR' : 'View QR'}</button>}

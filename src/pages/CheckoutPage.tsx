@@ -373,7 +373,7 @@ export default function CheckoutPage({ data, navigate }: Props) {
   const stepDone = (n: number) => step > n
 
   return (
-    <div className="min-h-screen pt-20" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+    <div className="qpassa-checkout-page min-h-screen pt-20" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
 
         {/* Step indicators */}
@@ -422,7 +422,7 @@ export default function CheckoutPage({ data, navigate }: Props) {
                     </div>
                   ))}
                 </div>
-                <button onClick={() => setCheckoutStep(2)} className="w-full mt-6 py-4 rounded-xl font-bold text-sm"
+                <button onClick={() => setCheckoutStep(2)} className="checkout-primary-action w-full mt-6 py-4 rounded-xl font-bold text-sm"
                   style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}>
                   Continue
                 </button>
@@ -455,15 +455,15 @@ export default function CheckoutPage({ data, navigate }: Props) {
                 <div className="mt-8 space-y-4">
                   <h3 className="font-bold">Ticket holders</h3>
                   <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Add a different name for each ticket.</p>
-                  {holders.map((holder, index) => <label key={holder.id} className="block text-sm font-medium">{holder.tierName} ticket {index + 1}<input value={holder.name} onChange={event => { setHolders(current => current.map(item => item.id === holder.id ? { ...item, name: event.target.value } : item)); setError('') }} placeholder="Ticket holder name" className="mt-2 w-full px-4 py-3.5 rounded-xl text-sm outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--foreground)' }} /></label>)}
+                  {holders.map((holder, index) => <label key={holder.id} className="checkout-holder-field block text-sm font-medium"><span>{holder.tierName} ticket {index + 1}</span><input value={holder.name} onChange={event => { setHolders(current => current.map(item => item.id === holder.id ? { ...item, name: event.target.value } : item)); setError('') }} placeholder="Ticket holder name" className="checkout-holder-input w-full px-4 py-3.5 rounded-xl text-sm outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--foreground)' }} /></label>)}
                 </div>
-                <div className="mt-8 flex gap-3">
-                  <button type="button" onClick={() => setCheckoutStep(1)} aria-label="Back to tickets" title="Back to tickets" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+                <div className="checkout-action-row mt-8 flex gap-3">
+                  <button type="button" onClick={() => setCheckoutStep(1)} aria-label="Back to tickets" title="Back to tickets" className="checkout-secondary-action flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
                     style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>
                     <ArrowLeftIcon size={18} />
                   </button>
                   <button onClick={() => { const validationError = validateInfo(); if (validationError) { setError(validationError); return } setError(''); setCheckoutStep(3) }}
-                    className="flex-1 py-4 rounded-xl font-bold text-sm transition-all"
+                    className="checkout-primary-action flex-1 py-4 rounded-xl font-bold text-sm transition-all"
                     style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}>
                     Continue
                   </button>
@@ -478,14 +478,14 @@ export default function CheckoutPage({ data, navigate }: Props) {
                 <div className="rounded-2xl p-5 mb-6" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
                   <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>This event is free. No payment is required, and your tickets will be confirmed immediately.</p>
                 </div>
-                <div className="flex gap-3">
+                <div className="checkout-action-row flex gap-3">
                   <button type="button" onClick={() => setCheckoutStep(2)} aria-label="Back to your information" title="Back to your information"
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+                    className="checkout-secondary-action flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
                     style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>
                     <ArrowLeftIcon size={18} />
                   </button>
                   <button onClick={handleFreeCheckout} disabled={loading}
-                    className="flex-1 py-4 rounded-xl font-bold text-sm transition-all"
+                    className="checkout-primary-action flex-1 py-4 rounded-xl font-bold text-sm transition-all"
                     style={{ background: 'var(--primary)', color: 'var(--primary-foreground)', opacity: loading ? 0.7 : 1 }}>
                     {loading ? 'Confirming your tickets…' : 'Complete free reservation'}
                   </button>
@@ -508,10 +508,10 @@ export default function CheckoutPage({ data, navigate }: Props) {
                     <div className="mt-5 rounded-xl p-4 text-center" style={{ background: 'var(--muted)' }}>
                       <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>iHela bill code</p>
                       <p className="mt-2 break-all font-mono text-xl font-black" style={{ color: 'var(--accent)' }}>{pendingIhela.billCode}</p>
-                      <button type="button" onClick={() => void navigator.clipboard?.writeText(pendingIhela.billCode)} className="mt-3 rounded-lg px-3 py-2 text-xs font-bold" style={{ background: 'var(--card)', color: 'var(--foreground)' }}>
+                      <button type="button" onClick={() => void navigator.clipboard?.writeText(pendingIhela.billCode)} className="checkout-secondary-action mt-3 rounded-lg px-3 py-2 text-xs font-bold" style={{ background: 'var(--card)', color: 'var(--foreground)' }}>
                         Copy bill code
                       </button>
-                      {pendingIhela.confirmationUri && <a href={pendingIhela.confirmationUri} target="_blank" rel="noreferrer" className="ml-2 inline-block rounded-lg px-3 py-2 text-xs font-bold" style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}>Open iHela</a>}
+                      {pendingIhela.confirmationUri && <a href={pendingIhela.confirmationUri} target="_blank" rel="noreferrer" className="checkout-primary-action ml-2 inline-block rounded-lg px-3 py-2 text-xs font-bold" style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}>Open iHela</a>}
                     </div>
                     <p role="status" className="mt-4 text-sm" style={{ color: 'var(--muted-foreground)' }}>{paymentCheckMessage}</p>
                     <p className="mt-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>Order reference: {pendingIhela.orderId}</p>
@@ -524,7 +524,8 @@ export default function CheckoutPage({ data, navigate }: Props) {
                     { id: 'card' as const, label: 'Debit / Credit Card', sub: 'Visa · Mastercard', Icon: CreditCardIcon, enabled: checkoutSettings.card_payments_enabled },
                   ].filter(method => method.id === 'ihela' ? checkoutSettings.mobile_money_enabled : method.enabled).map(({ id, label, sub, Icon }) => (
                     <button key={id} onClick={() => setPayMethod(id)} disabled={id === 'ihela' && !ihelaConfigured}
-                      className="w-full flex items-center gap-4 p-4 rounded-xl text-left disabled:cursor-not-allowed disabled:opacity-55"
+                      className="checkout-payment-method w-full flex items-center gap-4 p-4 rounded-xl text-left disabled:cursor-not-allowed disabled:opacity-55"
+                      data-selected={payMethod === id}
                       style={{
                         background: payMethod === id ? 'rgba(200,169,110,0.06)' : 'var(--card)',
                         border: payMethod === id ? '2px solid var(--accent)' : '1px solid var(--border)',
@@ -571,14 +572,14 @@ export default function CheckoutPage({ data, navigate }: Props) {
                   ))}
                 </div>
 
-                <div className="flex gap-3">
+                <div className="checkout-action-row flex gap-3">
                   <button type="button" onClick={() => setCheckoutStep(2)} aria-label="Back to your information" title="Back to your information"
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
+                    className="checkout-secondary-action flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
                     style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>
                     <ArrowLeftIcon size={18} />
                   </button>
                   <button onClick={handlePay} disabled={loading}
-                    className="flex-1 py-4 rounded-xl font-bold text-sm transition-all"
+                    className="checkout-primary-action flex-1 py-4 rounded-xl font-bold text-sm transition-all"
                     style={{ background: 'var(--primary)', color: 'var(--primary-foreground)', opacity: loading ? 0.7 : 1 }}>
                     {loading ? 'Starting secure payment…' : `Continue to payment · ${fmtPrice(total)}`}
                   </button>

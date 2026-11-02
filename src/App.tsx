@@ -59,11 +59,23 @@ type Page =
   | 'terms'
   | 'privacy'
   | 'refunds'
+  | 'cookie'
 
 const NO_NAV: Set<Page> = new Set(['auth-customer', 'auth-organizer', 'dashboard', 'agent-dashboard', 'admin-dashboard', 'agent-ticket'])
 const EVENTS_PLATFORM_PAGES: Set<Page> = new Set(['discover', 'events', 'event-detail', 'checkout', 'ticket', 'my-tickets', 'profile', 'notifications', 'favorites', 'organizer-profile'])
 const MARKETPLACE_PAGES: Set<Page> = new Set(['home', 'discover', 'events', 'event-detail', 'organizers', 'explore-organizers', 'organizer-profile'])
-const ATTENDEE_THEME_PAGES: Set<Page> = new Set([...EVENTS_PLATFORM_PAGES, ...MARKETPLACE_PAGES])
+const ATTENDEE_THEME_PAGES: Set<Page> = new Set([
+  ...EVENTS_PLATFORM_PAGES,
+  ...MARKETPLACE_PAGES,
+  'marketing',
+  'about',
+  'help',
+  'contact',
+  'terms',
+  'privacy',
+  'refunds',
+  'cookie',
+])
 
 type SocialLinkSetting = {
   platform: 'instagram' | 'facebook' | 'x' | 'tiktok' | 'whatsapp'
@@ -127,6 +139,7 @@ const PAGE_PATHS: Record<Page, string> = {
   terms: '/terms',
   privacy: '/privacy',
   refunds: '/refunds',
+  cookie: '/cookie-policy',
 }
 
 const PATH_PAGES = Object.entries(PAGE_PATHS).reduce<Record<string, Page>>((pages, [page, path]) => {
@@ -525,23 +538,19 @@ export default function App() {
       {EVENTS_PLATFORM_PAGES.has(page) && page !== 'agent-ticket' && <BottomNav current={page} navigate={navigate} />}
 
       {authPrompt && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4" style={{ background: 'rgba(2,2,2,0.72)', backdropFilter: 'blur(16px)' }}>
-          <div className="w-full max-w-md rounded-[28px] border p-6 text-center shadow-2xl"
-            style={{ background: 'rgba(19,19,19,0.96)', borderColor: 'rgba(255,255,255,0.08)', boxShadow: '0 28px 80px rgba(0,0,0,0.5)' }}>
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-lg font-black"
-              style={{ background: 'linear-gradient(135deg, rgba(249,112,21,0.24), rgba(249,112,21,0.08))', color: '#ffbf8a' }}>
+        <div className="auth-request-overlay fixed inset-0 z-[90] flex items-center justify-center p-4">
+          <div className="auth-request-card w-full max-w-md rounded-[28px] border p-6 text-center">
+            <div className="auth-request-icon mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full text-lg font-black">
               t
             </div>
-            <p className="text-[10px] font-medium uppercase tracking-[0.24em]" style={{ color: 'rgba(255,255,255,0.5)' }}>Required</p>
+            <p className="auth-request-kicker text-[10px] font-medium uppercase tracking-[0.24em]">Required</p>
             <h3 className="mt-2 text-2xl font-bold" style={{ fontFamily: 'Inter, sans-serif', letterSpacing: '-0.04em' }}>{authPrompt.title}</h3>
             <p className="mt-3 text-sm leading-6" style={{ color: 'var(--muted-foreground)' }}>{authPrompt.message}</p>
             <div className="mt-6 flex gap-3">
-              <button onClick={() => setAuthPrompt(null)} className="flex-1 rounded-2xl border px-4 py-3 text-sm font-semibold"
-                style={{ background: 'transparent', borderColor: 'rgba(255,255,255,0.08)', color: 'var(--foreground)' }}>
+              <button onClick={() => setAuthPrompt(null)} className="auth-request-secondary flex-1 rounded-2xl border px-4 py-3 text-sm font-semibold">
                 Later
               </button>
-              <button onClick={handleAuthPromptSignIn} className="flex-1 rounded-2xl px-4 py-3 text-sm font-bold"
-                style={{ background: 'linear-gradient(135deg, #ff7a18 0%, #ff9e45 45%, #ffd36b 100%)', color: '#17100a', boxShadow: '0 10px 24px rgba(249,112,21,0.22)' }}>
+              <button onClick={handleAuthPromptSignIn} className="auth-request-primary flex-1 rounded-2xl px-4 py-3 text-sm font-bold">
                 Sign in
               </button>
             </div>
@@ -559,7 +568,7 @@ export default function App() {
             </p>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <button type="button" onClick={() => navigate('privacy')} className="flex-1 rounded-xl border px-3 py-2 text-sm font-semibold" style={{ background: 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'var(--foreground)' }}>
+              <button type="button" onClick={() => navigate('cookie')} className="flex-1 rounded-xl border px-3 py-2 text-sm font-semibold" style={{ background: 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'var(--foreground)' }}>
                 {i18n.t('View policy')}
               </button>
               <button type="button" onClick={() => applyCookiePreferences({ analytics: true, marketing: true, personalization: true })} className="flex-1 rounded-xl px-3 py-2 text-sm font-bold" style={{ background: 'var(--primary)', color: '#000' }}>
@@ -619,7 +628,7 @@ export default function App() {
       )}
       {page === 'marketing' && <AboutPage navigate={navigate} />}
       {page === 'about' && <AboutInfoPage navigate={navigate} />}
-      {(['help', 'contact', 'terms', ...(FEATURES.refunds ? ['refunds' as const] : []), 'privacy'] as const).includes(page as 'help' | 'contact' | 'terms' | 'privacy' | 'refunds') && <InfoPage kind={page as 'help' | 'contact' | 'terms' | 'privacy' | 'refunds'} navigate={navigate} onWithdrawCookieConsent={withdrawOptionalCookieConsent} />}
+      {(['help', 'contact', 'terms', ...(FEATURES.refunds ? ['refunds' as const] : []), 'privacy', 'cookie'] as const).includes(page as 'help' | 'contact' | 'terms' | 'privacy' | 'refunds' | 'cookie') && <InfoPage kind={page as 'help' | 'contact' | 'terms' | 'privacy' | 'refunds' | 'cookie'} navigate={navigate} onWithdrawCookieConsent={withdrawOptionalCookieConsent} />}
       {(page === 'dashboard' || keepOrganizerDashboardMounted) && (
         <div style={{ display: page === 'dashboard' ? 'block' : 'none', width: '100%', minHeight: '100vh' }}>
           {!user
