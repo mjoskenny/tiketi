@@ -28,12 +28,11 @@ export default function AboutInfoPage({ navigate }: Props) {
         <div className="about-studio-shell">
           <div className="about-studio-hero-grid">
             <div className="about-studio-hero-copy">
-              <p className="about-studio-eyebrow"><span /> About QPassa</p>
               <h1>Making events feel <em>closer.</em></h1>
               <p>QPassa is building the home for the moments that bring Bujumbura together, from the first discovery to the last song of the night.</p>
               <div className="about-studio-hero-actions">
                 <button type="button" onClick={() => navigate('events')}>Explore events <ArrowRightIcon size={16} /></button>
-                <button type="button" onClick={() => navigate('auth-organizer')}>Start hosting</button>
+                <button type="button" className="about-studio-hero-secondary" onClick={() => navigate('auth-organizer')}>Start hosting <ArrowRightIcon size={16} /></button>
               </div>
             </div>
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { categories } from '../data/events'
-import { SearchIcon, XIcon, FilterIcon, TagIcon, SparkleIcon, ArrowRightIcon } from '../components/Icon'
+import { SearchIcon, XIcon, FilterIcon, TagIcon, SparkleIcon, ArrowRightIcon, GridIcon, ListIcon } from '../components/Icon'
 import EventCard from '../components/EventCard'
 import OrganizerCard from '../components/OrganizerCard'
 import type { Event, Organizer } from '../lib/types'
@@ -80,6 +80,12 @@ export default function HomePage({ navigate }: Props) {
   const [priceFilter, setPriceFilter] = useState<'all' | 'free' | 'paid'>('all')
   const [showFilters, setShowFilters] = useState(false)
   const [currentTime, setCurrentTime] = useState(() => Date.now())
+  const [allEventsView, setAllEventsView] = useState<'list' | 'grid'>('list')
+  const [allEventsPage, setAllEventsPage] = useState(1)
+
+  useEffect(() => {
+    setAllEventsPage(1)
+  }, [search, timeFilter, activeCategory, priceFilter])
 
   useEffect(() => {
     const scroller = trendingScrollerRef.current
@@ -220,7 +226,12 @@ export default function HomePage({ navigate }: Props) {
   const liveEvents = filtered.filter(e => !hasEventEnded(e.date, e.time, e.end_time))
   const freeEvents = upcomingBeforePast(filtered.filter(e => !e.ticket_tiers?.length || Math.min(...e.ticket_tiers.map(t => t.price)) === 0), currentTime).slice(0, 4)
   const activeEvents = liveEvents.slice(0, 6)
-  const homeAllEvents = upcomingBeforePast(filtered, currentTime).slice(0, 8)
+  const homeAllEvents = upcomingBeforePast(filtered, currentTime)
+  const homePageCount = Math.max(1, Math.ceil(homeAllEvents.length / 8))
+  const visibleHomeEvents = homeAllEvents.slice((allEventsPage - 1) * 8, allEventsPage * 8)
+  useEffect(() => {
+    setAllEventsPage(page => Math.min(page, homePageCount))
+  }, [homePageCount])
   const organizers = Array.from(
     events.reduce((groups, event) => {
       if (!event.organizers || !(event.organizers.verified || event.organizers.verification_status === 'verified')) return groups
@@ -238,10 +249,10 @@ export default function HomePage({ navigate }: Props) {
   const activeFilters = Number(activeCategory !== 'All') + Number(priceFilter !== 'all')
 
   return <div style={{ background: 'var(--background)', color: 'var(--foreground)', minHeight: '100vh' }}>
-    <div className="relative overflow-hidden hero-shell" style={{ paddingTop: 64 }}>
+    <div className="relative overflow-hidden hero-shell" style={{ paddingTop: 48 }}>
       <div className="hero-blur hero-blur-one" aria-hidden="true" />
       <div className="hero-blur hero-blur-two" aria-hidden="true" />
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pt-12 pb-6 md:pt-20 md:pb-6">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pt-8 pb-6 md:pt-12 md:pb-6">
         <div className="home-hero-content max-w-4xl mx-auto">
           <div className="text-center mb-8 md:mb-10">
             <h1 className="hero-title">Find <span className="hero-gradient-text">events nearby</span></h1>
@@ -284,33 +295,23 @@ export default function HomePage({ navigate }: Props) {
     </div>
     <div className="home-discovery-content max-w-7xl mx-auto px-4 sm:px-6  pb-8 space-y-6">
       {!anyActive && <>
-        {!loading && liveNowEvents.length > 0 && <section className="home-live-section" aria-label="Live events">
-          <div className="mb-4">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-400/25 bg-orange-500/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-orange-400">
-              <span aria-hidden className="h-1.5 w-1.5 animate-pulse rounded-full bg-orange-400 shadow-[0_0_10px_#fb923c]" />Live
-            </span>
-          </div>
-          <div className="home-live-rail flex gap-4 overflow-x-auto pb-3 pt-1" style={{ scrollbarWidth: 'none' }}>
-            {liveNowEvents.map(ev => {
-              const image = ev.cover_image || ev.organizers?.profiles?.profile_image || ev.organizers?.profiles?.avatar_url || ev.organizers?.logo_url || ORGANIZER_COVER_PLACEHOLDER
-              return <button key={ev.id} type="button" onClick={() => navigate('event-detail', ev)} aria-label={`Live now: ${ev.title}`} className="group flex w-[84px] shrink-0 flex-col items-center gap-2 text-center">
-                <span className="relative block h-[76px] w-[76px] rounded-full p-[3px] transition-transform duration-200 group-hover:scale-105" style={{ background: 'linear-gradient(110deg, #ff7a18 0%, #ff9e45 45%, #ffd36b 100%)' }}>
-                  <span className="block h-full w-full overflow-hidden rounded-full border-2 border-[#111] bg-[#111]"><img src={image} alt="" className="h-full w-full rounded-full object-cover" loading="lazy" /></span>
-                  <span className="absolute -bottom-1 left-1/2 inline-flex -translate-x-1/2 items-center gap-1 rounded-full border border-[#111] bg-orange-500 px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-white shadow-lg"><span aria-hidden className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />Live</span>
-                </span>
-                <span className="line-clamp-2 w-full text-[11px] font-semibold leading-tight text-white/85 group-hover:text-white">{ev.title}</span>
-              </button>
-            })}
-          </div>
-        </section>}
         {loading ? <section><SectionHeading title="Trending events" /><div className="flex gap-4 overflow-x-auto px-1 pb-4 pt-2" style={{ scrollbarWidth: 'none' }}>{[1, 2, 3].map(i => <div key={i} className="aspect-[4/5] rounded-[2rem] animate-pulse flex-shrink-0" style={{ width: 220, background: 'var(--muted)' }} />)}</div></section> : trendingEvents.length > 0 ? <section className="home-trending-section"><SectionHeading title="Trending events" /><div ref={trendingScrollerRef} onScroll={handleTrendingScroll} className="trending-events-marquee overflow-x-auto overscroll-x-contain px-1 pb-4 pt-2" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' }}><div ref={trendingTrackRef} className="trending-events-track flex min-w-max py-2" style={{ width: 'max-content', '--trending-cycle-width': `${trendingCycleWidth}px` } as React.CSSProperties}>{Array.from({ length: trendingCopyCount }, (_, copy) => <div key={`trending-group-${copy}`} className="trending-events-group flex shrink-0 gap-5" aria-hidden={copy !== Math.floor(trendingCopyCount / 2)}>{trendingEvents.map(ev => <div key={`${copy}-${ev.id}`} className="shrink-0"><EventCard event={ev} poster listing timerBadge trending onClick={() => navigate('event-detail', ev)} /></div>)}</div>)}</div></div></section> : null}
-        {loading ? <section className="home-active-events-section"><SectionHeading title="Active events" /><div className="flex gap-4 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{[1, 2, 3].map(i => <div key={i} className="aspect-[4/5] rounded-[2rem] animate-pulse flex-shrink-0" style={{ width: 327, background: 'var(--muted)' }} />)}</div></section> : <section className="home-active-events-section"><SectionHeading title="Active events" />{activeEvents.length > 0 ? <div className="flex min-w-0 gap-4 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{activeEvents.map(ev => <EventCard key={ev.id} event={ev} poster onClick={() => navigate('event-detail', ev)} />)}</div> : <EmptySection />}</section>}
-        {freeEvents.length > 0 && <section><SectionHeading title="Free to attend" /><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">{freeEvents.map(ev => <EventCard key={ev.id} event={ev} onClick={() => navigate('event-detail', ev)} />)}</div></section>}
+        {loading ? <section className="home-active-events-section"><SectionHeading title="Active events" /><div className="home-active-events-rail flex gap-5 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{[1, 2, 3, 4].map(i => <div key={i} className="aspect-[4/5] w-[min(327px,84vw)] shrink-0 rounded-[2rem] animate-pulse" style={{ background: 'var(--muted)' }} />)}</div></section> : <section className="home-active-events-section"><SectionHeading title="Active events" />{activeEvents.length > 0 ? <div className="home-active-events-rail flex gap-5 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{activeEvents.map(ev => <EventCard key={ev.id} event={ev} poster onClick={() => navigate('event-detail', ev)} />)}</div> : <EmptySection />}</section>}
       </>}
       <section>
-        <div className="home-section-heading flex items-center justify-between gap-4 mb-1"><h2 className="text-base font-bold">{anyActive ? 'Search results' : 'All events'}</h2>{anyActive && !loading && <button onClick={() => { setSearch(''); setActiveCategory('All'); setTimeFilter('all'); setPriceFilter('all') }} className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full" style={{ color: 'var(--accent)', background: 'rgba(199,243,107,0.1)', border: '0' }}><XIcon size={11} />Clear all</button>}</div>
-        {loading ? <div className="grid grid-cols-1 gap-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-[124px] rounded-2xl animate-pulse" style={{ background: 'var(--muted)' }} />)}</div> : filtered.length > 0 ? <div className="home-agenda-list grid grid-cols-1 gap-3">{homeAllEvents.map(ev => <EventCard key={ev.id} event={ev} agenda listing onClick={() => navigate('event-detail', ev)} />)}</div> : <div className="flex flex-col items-center justify-center py-24 gap-4"><div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}><SearchIcon size={22} style={{ color: 'var(--muted-foreground)' }} /></div><p className="font-semibold text-lg" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>No events found</p><p className="text-sm text-center max-w-xs" style={{ color: 'var(--muted-foreground)' }}>{events.length === 0 ? 'No published events yet. Check back soon or create your own.' : 'Try different filters or search terms.'}</p>{events.length > 0 && <button onClick={() => { setSearch(''); setActiveCategory('All'); setTimeFilter('all'); setPriceFilter('all') }} className="gradient-action px-5 py-2.5 rounded-xl text-sm font-semibold transition-all">Clear filters</button>}</div>}
-        <div className="mt-6 flex justify-center"><button onClick={() => navigate('events')} className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--primary-light)' }}>{filtered.length > homeAllEvents.length ? 'View all events' : 'Explore all events'}<ArrowRightIcon size={15} /></button></div>
+        <div className="home-section-heading home-all-events-heading flex items-center justify-between gap-4 mb-1">
+          <h2 className="text-base font-bold">{anyActive ? 'Search results' : 'All events'}</h2>
+          <div className="flex items-center gap-2">
+            <div className="home-events-view-toggle flex items-center rounded-full p-1" role="group" aria-label="All events layout">
+              <button type="button" onClick={() => setAllEventsView('list')} aria-label="List view" title="List view" aria-pressed={allEventsView === 'list'} className="home-events-view-button" data-active={allEventsView === 'list'}><ListIcon size={16} /></button>
+              <button type="button" onClick={() => setAllEventsView('grid')} aria-label="Card grid view" title="Card grid view" aria-pressed={allEventsView === 'grid'} className="home-events-view-button" data-active={allEventsView === 'grid'}><GridIcon size={16} /></button>
+            </div>
+            {anyActive && !loading && <button onClick={() => { setSearch(''); setActiveCategory('All'); setTimeFilter('all'); setPriceFilter('all') }} className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full" style={{ color: 'var(--accent)', background: 'rgba(199,243,107,0.1)', border: '0' }}><XIcon size={11} />Clear all</button>}
+          </div>
+        </div>
+        {loading ? <div className="grid grid-cols-1 gap-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-[124px] rounded-2xl animate-pulse" style={{ background: 'var(--muted)' }} />)}</div> : filtered.length > 0 ? <div className={allEventsView === 'list' ? 'home-agenda-list grid grid-cols-1 gap-3' : 'home-all-events-grid grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4'}>{visibleHomeEvents.map(ev => <EventCard key={ev.id} event={ev} {...(allEventsView === 'list' ? { agenda: true, listing: true } : { poster: true })} onClick={() => navigate('event-detail', ev)} />)}</div> : <div className="flex flex-col items-center justify-center py-24 gap-4"><div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}><SearchIcon size={22} style={{ color: 'var(--muted-foreground)' }} /></div><p className="font-semibold text-lg" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>No events found</p><p className="text-sm text-center max-w-xs" style={{ color: 'var(--muted-foreground)' }}>{events.length === 0 ? 'No published events yet. Check back soon or create your own.' : 'Try different filters or search terms.'}</p>{events.length > 0 && <button onClick={() => { setSearch(''); setActiveCategory('All'); setTimeFilter('all'); setPriceFilter('all') }} className="gradient-action px-5 py-2.5 rounded-xl text-sm font-semibold transition-all">Clear filters</button>}</div>}
+        {!loading && homePageCount > 1 && <nav className="home-events-pagination" aria-label="Events pagination"><button type="button" onClick={() => setAllEventsPage(page => Math.max(1, page - 1))} disabled={allEventsPage === 1}>Previous</button><span>Page {allEventsPage} of {homePageCount}</span><button type="button" onClick={() => setAllEventsPage(page => Math.min(homePageCount, page + 1))} disabled={allEventsPage === homePageCount}>Next</button></nav>}
+        <div className="mt-6 flex justify-center"><button onClick={() => navigate('events')} className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--primary-light)' }}>{filtered.length > 8 ? 'View all events' : 'Explore all events'}<ArrowRightIcon size={15} /></button></div>
       </section>
       {!loading && organizers.length > 0 && <section><SectionHeading title="Meet the organizers" /><div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>{organizers.map(([id, item]) => <OrganizerCard key={id} organizer={item.organizer} eventCount={item.eventCount} coverImage={item.coverImage ?? null} onClick={() => navigate('organizer-profile', item.organizer)} />)}</div><div className="mt-6 flex justify-center"><button onClick={() => navigate('explore-organizers')} className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--primary-light)' }}>View all organizers<ArrowRightIcon size={15} /></button></div></section>}
       {!loading && <section className="home-organizer-banner relative overflow-hidden rounded-3xl border p-8 md:p-10"><div className="home-organizer-banner-glow absolute inset-0" aria-hidden /><div className="relative z-10 flex flex-col items-start justify-between gap-6 md:flex-row md:items-center"><div className="max-w-lg"><div className="mb-3 flex items-center gap-2"><SparkleIcon size={16} className="home-organizer-banner-kicker" /><span className="home-organizer-banner-kicker text-xs font-semibold uppercase tracking-widest">For Organizers</span></div><h2 className="mb-2 text-2xl font-bold md:text-3xl" style={{ letterSpacing: '-0.02em' }}>Have an event?</h2><p className="home-organizer-banner-copy text-sm leading-relaxed">Create, sell and manage your tickets in one place. Reach thousands of people across Burundi and beyond.</p></div><div className="flex flex-shrink-0 flex-col gap-3 sm:flex-row"><button onClick={() => navigate('auth-organizer')} className="home-organizer-banner-primary rounded-xl px-6 py-3 text-sm font-bold transition-all">Start for free</button><button onClick={() => navigate('organizers')} className="home-organizer-banner-secondary rounded-xl px-6 py-3 text-sm font-semibold transition-all">Learn more</button></div></div></section>}

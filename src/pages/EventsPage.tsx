@@ -79,6 +79,8 @@ export default function EventsPage({ navigate }: Props) {
   const [dateFilter, setDateFilter] = useState('')
   const [datePreset, setDatePreset] = useState<'all' | 'today' | 'weekend'>('all')
   const [calendarMonth, setCalendarMonth] = useState(() => todayDateKey().slice(0, 7))
+  const [selectedMonthFilter, setSelectedMonthFilter] = useState<string | null>(null)
+  const [activeDate, setActiveDate] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   const [showMonthPicker, setShowMonthPicker] = useState(false)
   const [monthPickerYear, setMonthPickerYear] = useState(() => Number(todayDateKey().slice(0, 4)))
@@ -134,8 +136,9 @@ export default function EventsPage({ navigate }: Props) {
       const matchSearch = !q || e.title.toLowerCase().includes(q) || e.venue.toLowerCase().includes(q) || e.tags?.some(tag => tag.toLowerCase().includes(q))
       const eventDate = eventDateKey(e.date)
       const matchDate = !dateFilter || eventDate === dateFilter
-      const matchMonth = !calendarMonth || eventDate.startsWith(calendarMonth)
+      const matchMonth = !selectedMonthFilter || eventDate.startsWith(selectedMonthFilter)
       const matchPreset = datePreset === 'all' || (datePreset === 'today' && eventDate === today) || (datePreset === 'weekend' && weekendDates.includes(eventDate))
+      const notPast = selectedMonthFilter !== null || getEventEndTimestamp(e.date, e.time, e.end_time) >= Date.now()
       const minPrice = e.ticket_tiers?.length ? Math.min(...e.ticket_tiers.map(t => t.price)) : 0
       const matchPrice =
         priceFilter === 'any' ||
@@ -143,7 +146,7 @@ export default function EventsPage({ navigate }: Props) {
         (priceFilter === 'under25k' && minPrice < 25000) ||
         (priceFilter === 'under50k' && minPrice < 50000) ||
         (priceFilter === 'over50k' && minPrice >= 50000)
-      return matchCat && matchSearch && matchPrice && matchDate && matchMonth && matchPreset
+      return matchCat && matchSearch && matchPrice && matchDate && matchMonth && matchPreset && notPast
     })
   ).sort((a, b) => {
       const aIsUpcoming = getEventEndTimestamp(a.date, a.time, a.end_time) >= Date.now()
@@ -169,27 +172,68 @@ export default function EventsPage({ navigate }: Props) {
       const key = eventDateKey(event.date)
       groups.set(key, [...(groups.get(key) ?? []), event].sort((left, right) => getEventStartTimestamp(left.date, left.time) - getEventStartTimestamp(right.date, right.time)))
     })
-    const today = todayDateKey()
-    return [...groups.entries()].sort(([left], [right]) => {
-      const leftUpcoming = left >= today
-      const rightUpcoming = right >= today
-      if (leftUpcoming !== rightUpcoming) return leftUpcoming ? -1 : 1
-      return leftUpcoming ? left.localeCompare(right) : right.localeCompare(left)
-    })
+    return [...groups.entries()].sort(([left], [right]) => left.localeCompare(right))
   }, [filtered])
 
   const calendarDays = useMemo(() => monthDateKeys(calendarMonth), [calendarMonth])
   const eventsByDate = useMemo(() => new Map(dateGroups.map(([date, eventsOnDate]) => [date, eventsOnDate.length])), [dateGroups])
+  const eventMonths = useMemo(() => {
+    const counts = new Map<string, number>()
+    events.forEach(event => {
+      const month = eventDateKey(event.date).slice(0, 7)
+      counts.set(month, (counts.get(month) ?? 0) + 1)
+    })
+    return [...counts.entries()].sort(([left], [right]) => left.localeCompare(right))
+  }, [events])
+  const pickerMonths = eventMonths.filter(([month]) => month.startsWith(`${monthPickerYear}-`))
 
   useEffect(() => {
-    const focusDate = calendarMonth === today.slice(0, 7) ? today : `${calendarMonth}-01`
+    const focusDate = activeDate.startsWith(calendarMonth) ? activeDate : calendarMonth === today.slice(0, 7) ? today : `${calendarMonth}-01`
     const frame = window.requestAnimationFrame(() => {
       calendarDayRefs.current[focusDate]?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' })
     })
     return () => window.cancelAnimationFrame(frame)
-  }, [calendarMonth, calendarDays.length, loading, today])
+  }, [calendarMonth, calendarDays.length, loading, today, activeDate])
+
+  useEffect(() => {
+    if (!selectedMonthFilter || !dateGroups.length) return
+    const datesInMonth = dateGroups.filter(([date]) => date.startsWith(selectedMonthFilter)).map(([date]) => date)
+    const targetDate = datesInMonth.find(date => date >= today) ?? datesInMonth[0]
+    if (!targetDate) return
+    setActiveDate(targetDate)
+    const frame = window.requestAnimationFrame(() => dateSectionRefs.current[targetDate]?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    return () => window.cancelAnimationFrame(frame)
+  }, [selectedMonthFilter, dateGroups, today])
+
+  useEffect(() => {
+    if (loading || !dateGroups.length) return
+    let frame = 0
+    const syncCalendarToScroll = () => {
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(() => {
+        const anchor = 170
+        const sections = dateGroups
+          .map(([date]) => ({ date, top: dateSectionRefs.current[date]?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY }))
+          .filter(section => Number.isFinite(section.top))
+        if (!sections.length) return
+        const passedSections = sections.filter(section => section.top <= anchor)
+        const visible = passedSections[passedSections.length - 1] ?? sections[0]
+        setActiveDate(current => current === visible.date ? current : visible.date)
+        const visibleMonth = visible.date.slice(0, 7)
+        setCalendarMonth(current => current === visibleMonth ? current : visibleMonth)
+      })
+    }
+    window.addEventListener('scroll', syncCalendarToScroll, { passive: true })
+    syncCalendarToScroll()
+    return () => {
+      window.removeEventListener('scroll', syncCalendarToScroll)
+      window.cancelAnimationFrame(frame)
+    }
+  }, [dateGroups, loading])
 
   const scrollToDate = (date: string) => {
+    setActiveDate(date)
+    setCalendarMonth(date.slice(0, 7))
     dateSectionRefs.current[date]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
@@ -200,6 +244,7 @@ export default function EventsPage({ navigate }: Props) {
     }
     setDatePreset(preset)
     setDateFilter('')
+    setSelectedMonthFilter(null)
     setCalendarMonth((preset === 'today' ? today : weekendDates[0]).slice(0, 7))
   }
 
@@ -208,15 +253,16 @@ export default function EventsPage({ navigate }: Props) {
     setCalendarMonth(month)
     setDatePreset('all')
     setDateFilter('')
+    setSelectedMonthFilter(month)
   }
 
-  const selectMonthFromPicker = (monthIndex: number) => {
-    selectCalendarMonth(`${monthPickerYear}-${String(monthIndex + 1).padStart(2, '0')}`)
+  const selectMonthFromPicker = (month: string) => {
+    selectCalendarMonth(month)
     setShowMonthPicker(false)
   }
 
   const headerImg = 'https://images.unsplash.com/photo-1524368535928-5b5e00ddc76b?w=1400&h=500&fit=crop&auto=format'
-  const activeFilters = [search, category !== 'All' ? category : '', priceFilter !== 'any' ? priceFilter : '', dateFilter, datePreset !== 'all' ? datePreset : ''].filter(Boolean).length
+  const activeFilters = [search, category !== 'All' ? category : '', priceFilter !== 'any' ? priceFilter : '', dateFilter, selectedMonthFilter ?? '', datePreset !== 'all' ? datePreset : ''].filter(Boolean).length
   return (
     <div className="attendee-events-page" style={{ background: 'var(--background)', color: 'var(--foreground)', minHeight: '100vh' }}>
 
@@ -296,7 +342,7 @@ export default function EventsPage({ navigate }: Props) {
                   <p className="text-xs font-semibold mb-2" style={{ color: 'var(--muted-foreground)', letterSpacing: '0.06em' }}>DATE</p>
                   <label className="events-calendar-input flex h-9 max-w-xs items-center gap-2 rounded-lg px-3 text-xs font-medium">
                     <CalendarIcon size={14} />
-                    <input type="date" value={dateFilter} onChange={event => { const value = event.target.value; setDateFilter(value); setDatePreset('all'); if (value) setCalendarMonth(value.slice(0, 7)) }} aria-label="Filter events by date" className="min-w-0 flex-1 bg-transparent outline-none" />
+                    <input type="date" value={dateFilter} onChange={event => { const value = event.target.value; setDateFilter(value); setDatePreset('all'); setSelectedMonthFilter(null); if (value) setCalendarMonth(value.slice(0, 7)) }} aria-label="Filter events by date" className="min-w-0 flex-1 bg-transparent outline-none" />
                     {dateFilter && <button type="button" onClick={() => setDateFilter('')} aria-label="Clear date filter" className="shrink-0"><XIcon size={13} /></button>}
                   </label>
                 </div>
@@ -346,14 +392,15 @@ export default function EventsPage({ navigate }: Props) {
             {loading ? 'Loading…' : `${filtered.length} event${filtered.length !== 1 ? 's' : ''}`}
           </p>
           {activeFilters > 0 && (
-            <button onClick={() => { setSearch(''); setCategory('All'); setPriceFilter('any'); setDateFilter(''); setDatePreset('all'); setCalendarMonth(today.slice(0, 7)) }}
+            <button onClick={() => { setSearch(''); setCategory('All'); setPriceFilter('any'); setDateFilter(''); setDatePreset('all'); setSelectedMonthFilter(null); setCalendarMonth(today.slice(0, 7)) }}
               className="flex items-center gap-1.5 text-xs font-medium" style={{ color: 'var(--accent)' }}>
               <XIcon size={12} /> Clear all
             </button>
           )}
         </div>
 
-        {!loading && calendarDays.length > 0 && <div className="events-calendar-navigation mb-8">
+        {!loading && calendarDays.length > 0 && <>
+          <div className="events-calendar-navigation mb-5">
           <div className="events-calendar-filter-row mb-5 flex flex-col items-start" role="group" aria-label="Calendar filters">
             <div className="events-calendar-period-filters flex flex-wrap items-center gap-2">
               <button type="button" onClick={() => selectDatePreset('today')} className="events-calendar-filter-card inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold" data-active={datePreset === 'today'}>
@@ -389,18 +436,19 @@ export default function EventsPage({ navigate }: Props) {
                     <button type="button" onClick={() => setMonthPickerYear(year => year + 1)} aria-label="Next year" className="events-month-picker-year-button"><ChevronRightIcon size={16} /></button>
                   </div>
                   <div className="events-month-picker-grid">
-                    {Array.from({ length: 12 }, (_, monthIndex) => {
-                      const monthKey = `${monthPickerYear}-${String(monthIndex + 1).padStart(2, '0')}`
+                    {pickerMonths.length > 0 ? pickerMonths.map(([monthKey, monthCount]) => {
                       const isSelected = monthKey === calendarMonth
-                      return <button key={monthKey} type="button" onClick={() => selectMonthFromPicker(monthIndex)} className="events-month-picker-option" data-active={isSelected}>
-                        {calendarDate(`${monthKey}-01`, { month: 'short' })}
+                      return <button key={monthKey} type="button" onClick={() => selectMonthFromPicker(monthKey)} className="events-month-picker-option" data-active={isSelected}>
+                        <span>{calendarDate(`${monthKey}-01`, { month: 'short' })}</span><small>{monthCount}</small>
                       </button>
-                    })}
+                    }) : <p className="events-month-picker-empty">No events this year</p>}
                   </div>
                 </div>
               )}
             </div>
           </div>
+          </div>
+          <div className="events-calendar-date-sticky mb-8">
           <div className="mb-3 flex items-end justify-between gap-3">
             <div>
               <p className="text-sm font-semibold">{calendarDate(`${calendarMonth}-01`, { month: 'long', year: 'numeric' })}</p>
@@ -412,14 +460,15 @@ export default function EventsPage({ navigate }: Props) {
             {calendarDays.map(date => {
               const eventCount = eventsByDate.get(date) ?? 0
               const hasEvents = eventCount > 0
-              return <button key={date} ref={node => { calendarDayRefs.current[date] = node }} type="button" onClick={() => scrollToDate(date)} disabled={!hasEvents} className="events-calendar-day flex min-w-16 shrink-0 flex-col items-center rounded-2xl px-3 py-2 text-center" data-has-events={hasEvents} aria-label={`${calendarDate(date, { weekday: 'long', month: 'long', day: 'numeric' })}${hasEvents ? `, ${eventCount} event${eventCount === 1 ? '' : 's'}` : ', no events'}`}>
+              return <button key={date} ref={node => { calendarDayRefs.current[date] = node }} type="button" onClick={() => scrollToDate(date)} disabled={!hasEvents} className="events-calendar-day flex min-w-16 shrink-0 flex-col items-center rounded-2xl px-3 py-2 text-center" data-has-events={hasEvents} data-active={activeDate === date} aria-current={activeDate === date ? 'date' : undefined} aria-label={`${calendarDate(date, { weekday: 'long', month: 'long', day: 'numeric' })}${hasEvents ? `, ${eventCount} event${eventCount === 1 ? '' : 's'}` : ', no events'}`}>
                 <span className="text-[10px] font-semibold uppercase tracking-[0.12em]">{calendarDate(date, { weekday: 'short' })}</span>
                 <strong className="mt-0.5 text-base leading-none">{calendarDate(date, { day: 'numeric' })}</strong>
                 <span className="mt-1 text-[10px]">{hasEvents ? `${eventCount} event${eventCount === 1 ? '' : 's'}` : '—'}</span>
               </button>
             })}
           </div>
-        </div>}
+          </div>
+        </>}
 
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
@@ -433,7 +482,7 @@ export default function EventsPage({ navigate }: Props) {
               <header className="events-date-heading mb-3 flex items-end justify-between gap-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: date === today ? 'var(--primary-light)' : 'var(--muted-foreground)' }}>{date === today ? 'Today' : calendarDate(date, { weekday: 'long' })}</p>
-                  <h2 className="mt-1 text-2xl font-bold">{calendarDate(date, { month: 'long', day: 'numeric', year: 'numeric' })}</h2>
+                  <h3 className="mt-1 text-lg font-bold">{calendarDate(date, { month: 'long', day: 'numeric', year: 'numeric' })}</h3>
                 </div>
                 <span className="text-xs font-medium" style={{ color: 'var(--muted-foreground)' }}>{eventsOnDate.length} event{eventsOnDate.length === 1 ? '' : 's'}</span>
               </header>
@@ -459,7 +508,7 @@ export default function EventsPage({ navigate }: Props) {
             <p className="text-sm text-center max-w-xs" style={{ color: 'var(--muted-foreground)' }}>
               Try different filters or search terms, or check back later.
             </p>
-            <button onClick={() => { setSearch(''); setCategory('All'); setPriceFilter('any'); setDateFilter(''); setDatePreset('all'); setCalendarMonth(today.slice(0, 7)) }}
+            <button onClick={() => { setSearch(''); setCategory('All'); setPriceFilter('any'); setDateFilter(''); setDatePreset('all'); setSelectedMonthFilter(null); setCalendarMonth(today.slice(0, 7)) }}
               className="events-empty-action px-5 py-2.5 rounded-xl text-sm font-semibold">
               Clear filters
             </button>

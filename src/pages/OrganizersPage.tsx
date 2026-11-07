@@ -73,7 +73,7 @@ export default function OrganizersPage({ navigate }: Props) {
         <div className="organizer-launch-hero-copy">
           <h1>The simpler way to<br /><em>run your next event.</em></h1>
           <p className="organizer-launch-lede">Event pages, ticket sales, guests, check-in, and settlement in one place. Your team works from the same clear view, from the first announcement to the final scan.</p>
-          <div className="organizer-launch-actions"><button onClick={() => navigate('auth-organizer')}>Create an event <ArrowRightIcon size={16} /></button><a href="#event-day">See how it works</a></div>
+          <div className="organizer-launch-actions"><button onClick={() => navigate('auth-organizer')}>Create an event <ArrowRightIcon size={16} /></button><a href="#event-day">See how it works <ArrowRightIcon size={16} /></a></div>
         </div>
         <StudioPreview />
       </div>

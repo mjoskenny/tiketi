@@ -106,10 +106,8 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
     const active = current === page || (page === 'discover' && current === 'home')
     return (
     <button key={page} onClick={() => navigate(page)}
-      className={`nav-link text-sm font-bold transition-colors ${active ? 'is-active' : ''}`}
-      style={{ color: active ? 'var(--foreground)' : 'var(--muted-foreground)' }}
-      onMouseEnter={e => (e.currentTarget.style.color = 'var(--foreground)')}
-      onMouseLeave={e => (e.currentTarget.style.color = active ? 'var(--foreground)' : 'var(--muted-foreground)')}>
+      className={`nav-link ${active ? 'is-active' : ''}`}
+      aria-current={active ? 'page' : undefined}>
       {label}
     </button>
     )
@@ -117,7 +115,7 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
 
   return (
     <>
-      <nav className="fixed top-0 left-0 right-0 z-50 transition-colors duration-300"
+      <nav className="site-navbar fixed top-0 left-0 right-0 z-50 transition-colors duration-300"
         style={{ background: scrolled ? 'var(--navigation-surface)' : 'transparent', backdropFilter: scrolled ? 'blur(14px)' : 'none', WebkitBackdropFilter: scrolled ? 'blur(14px)' : 'none' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-[4.5rem]">
 
@@ -150,26 +148,22 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
                 )}
                 {!isOrganizer && (
                   <button onClick={() => navigate('my-tickets')}
-                    className="flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl transition-all"
-                    style={{ color: '#fff', background: current === 'my-tickets' ? 'var(--muted)' : 'transparent', border: '1px solid transparent' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--muted)'; e.currentTarget.style.color = '#fff' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = current === 'my-tickets' ? 'var(--muted)' : 'transparent'; e.currentTarget.style.color = '#fff' }}>
+                    className={`nav-account-action flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${current === 'my-tickets' ? 'is-current' : ''}`}
+                    style={{ color: 'var(--foreground)', background: current === 'my-tickets' ? 'var(--muted)' : 'transparent', border: '1px solid transparent' }}>
                     <TicketIcon size={16} /> My Tickets
                   </button>
                 )}
                 {shouldShowOrganizerDashboard && (
                   <button onClick={() => navigate('dashboard')}
-                    className="flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl transition-all"
-                    style={{ color: '#fff', background: current === 'dashboard' ? 'var(--muted)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.16)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'; e.currentTarget.style.color = '#fff' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = current === 'dashboard' ? 'var(--muted)' : 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; e.currentTarget.style.color = '#fff' }}>
+                    className={`nav-account-action nav-dashboard-action flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${current === 'dashboard' ? 'is-current' : ''}`}
+                    style={{ color: 'var(--foreground)', background: current === 'dashboard' ? 'var(--muted)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.16)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>
                     <BarChartIcon size={16} /> Dashboard
                   </button>
                 )}
                 {agentAssignments.length > 0 && (
                   <button onClick={() => navigate('agent-dashboard')}
-                    className="flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl transition-all"
-                    style={{ color: '#fff', background: current === 'agent-dashboard' ? 'var(--muted)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.16)' }}>
+                    className={`nav-account-action flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${current === 'agent-dashboard' ? 'is-current' : ''}`}
+                    style={{ color: 'var(--foreground)', background: current === 'agent-dashboard' ? 'var(--muted)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.16)' }}>
                     <TicketIcon size={16} /> Agent Dashboard
                   </button>
                 )}
@@ -235,17 +229,12 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
             ) : (
               <>
                 <button onClick={() => navigate('auth-customer')}
-                  className="text-sm font-medium px-4 py-2 rounded-xl transition-all"
-                  style={{ color: 'var(--muted-foreground)' }}
-                  onMouseEnter={e => { e.currentTarget.style.color = 'var(--foreground)'; e.currentTarget.style.background = 'var(--muted)' }}
-                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted-foreground)'; e.currentTarget.style.background = 'transparent' }}>
+                  className="nav-sign-in px-4 py-2 rounded-xl transition-all"
+                  style={{ color: 'var(--foreground)' }}>
                   Sign in
                 </button>
                 <button onClick={() => navigate('auth-organizer')}
-                  className="gradient-action text-sm font-semibold px-5 py-2.5 rounded-xl transition-all"
-                  style={{ boxShadow: '0 4px 20px rgba(249,112,21,0.2)' }}
-                  onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
-                  onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
+                  className="nav-create-event gradient-action px-5 py-2.5 rounded-xl transition-all">
                   Create Event
                 </button>
               </>
@@ -293,8 +282,7 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
                 </button>
               ))}
               <button onClick={() => { navigate('auth-organizer'); setMenuOpen(false) }}
-                className="gradient-action mt-2 rounded-xl px-4 py-3 text-sm font-bold text-center transition-all active:scale-[0.98]"
-                style={{ boxShadow: '0 4px 18px rgba(249,112,21,0.2)' }}>
+                className="nav-create-event gradient-action mt-2 rounded-xl px-4 py-3 text-sm font-bold text-center transition-all active:scale-[0.98]">
                 Create Event
               </button>
               {hasPendingInvitation && (

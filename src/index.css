@@ -745,7 +745,7 @@ button[style*="124,58,237"],
   min-width: max-content;
   gap: 1.25rem;
   will-change: transform;
-  animation: trending-events-marquee-scroll 30s linear infinite;
+  animation: trending-events-marquee-scroll 18s linear infinite;
 }
 .trending-events-marquee:hover .trending-events-track,
 .trending-events-marquee:focus-within .trending-events-track {
@@ -798,6 +798,15 @@ button[style*="124,58,237"],
   padding: 0.5rem 0.7rem;
   font-size: 0.56rem;
   letter-spacing: 0.13em;
+  color: #fff !important;
+  font-weight: 900;
+}
+.tixian-event-card-trending .trending-date-badge {
+  border-color: rgba(255,255,255,.1);
+  background: rgba(8,10,14,.58);
+  box-shadow: 0 12px 30px rgba(0,0,0,.38), inset 0 1px rgba(255,255,255,.12);
+  -webkit-backdrop-filter: blur(16px) saturate(145%);
+  backdrop-filter: blur(16px) saturate(145%);
 }
 .tixian-event-card-trending .event-card-details {
   inset-inline: 0.7rem;
@@ -832,7 +841,7 @@ button[style*="124,58,237"],
   text-shadow: 0 8px 18px rgba(0,0,0,0.35);
 }
 .tixian-event-card-trending .event-card-details-trending {
-  background: rgba(10,10,10,.78);
+  background: rgba(9,9,9,.38);
   border: 1px solid rgba(255,255,255,.15);
   box-shadow: 0 4px 12px rgba(0,0,0,.12);
 }
@@ -842,7 +851,7 @@ button[style*="124,58,237"],
 }
 .tixian-event-card-trending:hover .event-card-details {
   transform: translateY(0);
-  background: rgba(10,10,10,.84);
+  background: rgba(9,9,9,.48);
 }
 .tixian-event-card-trending .event-card-meta {
   position: relative;
@@ -3566,7 +3575,7 @@ button[style*="var(--brand-blue)"],
 }
 .attendee-events-page .events-month-picker {
   position: absolute;
-  z-index: 30;
+  z-index: 70;
   top: calc(100% + .625rem);
   left: 0;
   width: 17.5rem;
@@ -3599,6 +3608,10 @@ button[style*="var(--brand-blue)"],
   gap: .375rem;
 }
 .attendee-events-page .events-month-picker-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .35rem;
   min-height: 2.25rem;
   border: 0 !important;
   border-radius: .625rem;
@@ -3608,6 +3621,8 @@ button[style*="var(--brand-blue)"],
   font-weight: 700;
   transition: background-color .18s ease, color .18s ease;
 }
+.attendee-events-page .events-month-picker-option small { opacity: .7; font-size: .65rem; font-weight: 800; }
+.attendee-events-page .events-month-picker-empty { grid-column: 1 / -1; margin: 0; padding: .8rem .25rem; color: var(--muted-foreground); font-size: .8rem; text-align: center; }
 .attendee-events-page .events-month-picker-option:hover { background: var(--muted) !important; }
 .attendee-events-page .events-month-picker-option[data-active='true'],
 .attendee-events-page .events-month-picker-option[data-active='true']:hover {
@@ -3617,11 +3632,17 @@ button[style*="var(--brand-blue)"],
 .attendee-events-page .events-calendar-input input { color: inherit !important; }
 .attendee-events-page .events-calendar-input button { color: var(--muted-foreground) !important; }
 .attendee-events-page .events-calendar-day {
-  min-height: 4.5rem;
+  min-width: 3.75rem;
+  min-height: 3.75rem;
+  padding: .45rem .55rem !important;
+  border-radius: 1rem !important;
   background: #ffffff !important;
   color: #111827 !important;
   transition: background-color .18s ease, color .18s ease, transform .18s ease, opacity .18s ease;
 }
+.attendee-events-page .events-calendar-day > span:first-child { font-size: .58rem; }
+.attendee-events-page .events-calendar-day > strong { font-size: .95rem; }
+.attendee-events-page .events-calendar-day > span:last-child { font-size: .58rem; }
 .attendee-events-page .events-calendar-filter-card:hover,
 .attendee-events-page .events-calendar-day:hover,
 .attendee-events-page .events-calendar-today:hover { background: var(--hover) !important; }
@@ -3640,11 +3661,17 @@ button[style*="var(--brand-blue)"],
 }
 .attendee-events-page .events-calendar-day[data-has-events='false']:hover { background: var(--muted) !important; }
 .attendee-events-page .events-calendar-day[data-has-events='true'] {
-  background: #ffffff !important;
-  color: #111827 !important;
+  background: #bfdbfe !important;
+  color: #10233f !important;
   font-weight: 800;
 }
+.attendee-events-page .events-calendar-day[data-has-events='true'][data-active='true'] {
+  background: #080808 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 2px var(--brand-blue), 0 8px 18px rgba(0,0,0,.2);
+}
 .attendee-events-page .events-calendar-day[data-has-events='true']:hover { background: #f3f4f6 !important; }
+.attendee-events-page .events-calendar-day[data-has-events='true'][data-active='true']:hover { background: #080808 !important; }
 .attendee-events-page .events-calendar-days { scroll-snap-type: x proximity; }
 .attendee-events-page .events-calendar-day { scroll-snap-align: start; }
 .attendee-events-page .events-date-section { scroll-margin-top: 7rem; }
@@ -3680,6 +3707,10 @@ button[style*="var(--brand-blue)"],
   color: #ffffff !important;
 }
 :root[data-theme='light'] .attendee-events-page .events-calendar-day[data-has-events='true'] {
+  background: #bfdbfe !important;
+  color: #10233f !important;
+}
+:root[data-theme='light'] .attendee-events-page .events-calendar-day[data-has-events='true'][data-active='true'] {
   background: #000000 !important;
   color: #ffffff !important;
 }
@@ -3838,12 +3869,31 @@ button[style*="var(--brand-blue)"],
 
 /* The desktop Events calendar should not switch to white day cards in dark mode. */
 :root[data-theme='dark'] .attendee-theme .attendee-events-page .events-calendar-day[data-has-events='true'] {
-  background: var(--card) !important;
-  color: var(--foreground) !important;
+  background: #1d3c64 !important;
+  color: #dbeafe !important;
 }
 :root[data-theme='dark'] .attendee-theme .attendee-events-page .events-calendar-day[data-has-events='true']:hover {
   background: var(--hover) !important;
 }
+:root[data-theme='dark'] .attendee-theme .attendee-events-page .events-calendar-day[data-has-events='true'][data-active='true'],
+:root[data-theme='dark'] .attendee-theme .attendee-events-page .events-calendar-day[data-has-events='true'][data-active='true']:hover {
+  background: #080808 !important;
+  color: #ffffff !important;
+}
+
+/* Month summary and day strip stick beneath the main nav once scrolled into view. */
+.attendee-events-page .events-calendar-date-sticky {
+  position: sticky;
+  top: 4.5rem;
+  z-index: 40;
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  padding: 1rem max(1rem, calc((100vw - 80rem) / 2 + 1.5rem)) .75rem;
+  background: var(--background) !important;
+  box-shadow: none !important;
+}
+.attendee-events-page .events-calendar-date-sticky :is(button, .events-calendar-day) { box-shadow: none !important; }
+.attendee-events-page .events-date-section { scroll-margin-top: 15rem; }
 
 /* Keep the Filters glyph visible above the layered search-control styles. */
 .attendee-theme :is(.home-search-filter-row, .events-filter-row) .attendee-filter-button .attendee-control-icon {
@@ -4238,13 +4288,21 @@ button[style*="var(--brand-blue)"],
 
 @media (max-width: 760px) {
   .about-page .about-hero h1 { font-size: clamp(2.65rem, 11vw, 4.25rem) !important; }
-  .about-event-card-fan { height: 260px; margin-top: 2.5rem; }
-  .about-event-card-fan-card { top: 16px; width: clamp(118px, 36vw, 154px); transform-origin: 50% 145%; }
-  .about-event-card-fan-card[data-card='0'] { transform: translate(-50%, 24px) translateX(-112px) rotate(-25deg); }
-  .about-event-card-fan-card[data-card='1'] { transform: translate(-50%, 8px) translateX(-56px) rotate(-12deg); }
+  .about-page .about-hero { padding-bottom: 1.5rem; }
+  .about-page > .about-story { padding-top: 3.5rem; }
+  .about-event-card-fan { --fan-outer-offset: clamp(56px, 18vw, 137px); height: 280px; margin-top: 1.75rem; }
+  .about-event-card-fan-card { top: 16px; width: clamp(100px, 32vw, 154px); transform-origin: 50% 145%; }
+  .about-event-card-fan-card[data-card='0'] { transform: translate(-50%, 24px) translateX(calc(var(--fan-outer-offset) * -1)) rotate(-25deg); }
+  .about-event-card-fan-card[data-card='1'] { transform: translate(-50%, 8px) translateX(calc(var(--fan-outer-offset) / -2)) rotate(-12deg); }
   .about-event-card-fan-card[data-card='2'] { transform: translate(-50%, -24px) rotate(0deg); }
-  .about-event-card-fan-card[data-card='3'] { transform: translate(-50%, 8px) translateX(56px) rotate(12deg); }
-  .about-event-card-fan-card[data-card='4'] { transform: translate(-50%, 24px) translateX(112px) rotate(25deg); }
+  .about-event-card-fan-card[data-card='3'] { transform: translate(-50%, 8px) translateX(calc(var(--fan-outer-offset) / 2)) rotate(12deg); }
+  .about-event-card-fan-card[data-card='4'] { transform: translate(-50%, 24px) translateX(var(--fan-outer-offset)) rotate(25deg); }
+  .about-event-card-fan:hover .about-event-card-fan-card[data-card='0'] { transform: translate(-50%, 6px) translateX(calc(var(--fan-outer-offset) * -1)) rotate(-18deg); }
+  .about-event-card-fan:hover .about-event-card-fan-card[data-card='1'] { transform: translate(-50%, -16px) translateX(calc(var(--fan-outer-offset) / -2)) rotate(0deg); }
+  .about-event-card-fan:hover .about-event-card-fan-card[data-card='2'] { transform: translate(-50%, -16px) rotate(0deg); }
+  .about-event-card-fan:hover .about-event-card-fan-card[data-card='0']:hover { transform: translate(-50%, -14px) translateX(calc(var(--fan-outer-offset) * -1)) rotate(-18deg); }
+  .about-event-card-fan:hover .about-event-card-fan-card[data-card='1']:hover { transform: translate(-50%, -34px) translateX(calc(var(--fan-outer-offset) / -2)) rotate(0deg); }
+  .about-event-card-fan:hover .about-event-card-fan-card[data-card='2']:hover { transform: translate(-50%, -34px) rotate(0deg); }
 }
 
 /* Keep the hero compact on desktop so the complete card hand arrives in the
@@ -4254,13 +4312,30 @@ button[style*="var(--brand-blue)"],
   .about-page .about-hero {
     min-height: 0;
     padding-top: 6.25rem;
-    padding-bottom: 3.5rem;
+    padding-bottom: 2.5rem;
   }
+  .about-page > .about-story { padding-top: 2.25rem; }
   .about-page .about-hero h1 { font-size: clamp(3rem, 5.3vw, 4.7rem) !important; }
   .about-page .about-hero-copy { margin-top: 1.2rem; }
   .about-page .about-hero-actions { margin-top: 1.35rem; }
   .about-page .about-hero-note { margin-top: 1.75rem; }
-  .about-event-card-fan { height: 390px; margin-top: 2rem; }
+  .about-event-card-fan { --fan-outer-offset: clamp(170px, 24vw, 252px); height: 430px; margin-top: 1.5rem; }
+  .about-event-card-fan-card[data-card='0'] { transform: translate(-50%, 34px) translateX(calc(var(--fan-outer-offset) * -1)) rotate(-28deg); }
+  .about-event-card-fan-card[data-card='1'] { transform: translate(-50%, 10px) translateX(calc(var(--fan-outer-offset) / -2)) rotate(-14deg); }
+  .about-event-card-fan-card[data-card='3'] { transform: translate(-50%, 10px) translateX(calc(var(--fan-outer-offset) / 2)) rotate(14deg); }
+  .about-event-card-fan-card[data-card='4'] { transform: translate(-50%, 34px) translateX(var(--fan-outer-offset)) rotate(28deg); }
+}
+
+@media (hover: hover) and (pointer: fine) and (min-width: 761px) {
+  .about-event-card-fan:hover .about-event-card-fan-card[data-card='0'] { transform: translate(-50%, 40px) translateX(calc(var(--fan-outer-offset) * -1)) rotate(-30deg); }
+  .about-event-card-fan:hover .about-event-card-fan-card[data-card='1'] { transform: translate(-50%, 12px) translateX(calc(var(--fan-outer-offset) / -2)) rotate(-15deg); }
+  .about-event-card-fan:hover .about-event-card-fan-card[data-card='3'] { transform: translate(-50%, 12px) translateX(calc(var(--fan-outer-offset) / 2)) rotate(15deg); }
+  .about-event-card-fan:hover .about-event-card-fan-card[data-card='4'] { transform: translate(-50%, 40px) translateX(var(--fan-outer-offset)) rotate(30deg); }
+  .about-event-card-fan:hover .about-event-card-fan-card[data-card='0']:hover { z-index: 10; transform: translate(-50%, 8px) translateX(calc(var(--fan-outer-offset) * -1)) rotate(-30deg); }
+  .about-event-card-fan:hover .about-event-card-fan-card[data-card='1']:hover { z-index: 10; transform: translate(-50%, -20px) translateX(calc(var(--fan-outer-offset) / -2)) rotate(-15deg); }
+  .about-event-card-fan:hover .about-event-card-fan-card[data-card='2']:hover { z-index: 10; transform: translate(-50%, -36px) rotate(0deg); }
+  .about-event-card-fan:hover .about-event-card-fan-card[data-card='3']:hover { z-index: 10; transform: translate(-50%, -20px) translateX(calc(var(--fan-outer-offset) / 2)) rotate(15deg); }
+  .about-event-card-fan:hover .about-event-card-fan-card[data-card='4']:hover { z-index: 10; transform: translate(-50%, 8px) translateX(var(--fan-outer-offset)) rotate(30deg); }
 }
 
 @media (min-width: 761px) and (prefers-reduced-motion: no-preference) {
@@ -6223,14 +6298,11 @@ button[style*="var(--brand-blue)"],
   .organizer-launch-includes p { text-align: left; }
 }
 
-/* Return the homepage hero to its subtle grid canvas. */
+/* Keep the homepage hero's blue radial glow without the grid overlay. */
 .attendee-theme .hero-shell::before {
   background-color: var(--background) !important;
-  background-image:
-    linear-gradient(to right, color-mix(in srgb, var(--border) 32%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--border) 32%, transparent) 1px, transparent 1px),
-    radial-gradient(ellipse at 50% 0%, var(--brand-blue-soft), transparent 58%) !important;
-  background-size: 42px 42px, 42px 42px, auto !important;
+  background-image: radial-gradient(ellipse at 50% 0%, var(--brand-blue-soft), transparent 58%) !important;
+  background-size: auto !important;
   opacity: .48 !important;
 }
 .attendee-theme .hero-blur { display: none; }
@@ -6322,13 +6394,49 @@ button[style*="var(--brand-blue)"],
 .attendee-theme .organizer-launch-final-inner { text-align: center; }
 .attendee-theme .organizer-launch-final-copy { margin-inline: auto; }
 
-/* White horizontal All events cards with the requested black ticket action. */
-.attendee-theme .home-agenda-list { grid-template-columns: minmax(0, 1fr) !important; }
+/* Marketing page finishing touches: keep the complete hero card fan visible,
+   adapt the story feature card to light mode, and keep page buttons shadow-free. */
+.about-page .about-hero {
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  padding-bottom: 5.5rem;
+}
+.about-page .about-event-card-fan { flex: 0 0 auto; margin-bottom: .75rem; }
+.about-page button,
+.about-page button:hover,
+.about-page button:focus-visible,
+.about-page button:active { box-shadow: none !important; }
+:root[data-theme='light'] .attendee-theme .about-page .about-story-card-main {
+  border-color: #b7cbed !important;
+  background: linear-gradient(145deg, #eaf2ff, #d5e4fb) !important;
+  color: #15264a !important;
+}
+:root[data-theme='light'] .attendee-theme .about-page .about-story-card-main strong { color: #15264a !important; }
+:root[data-theme='light'] .attendee-theme .about-page .about-story-card-main span,
+:root[data-theme='light'] .attendee-theme .about-page .about-story-card-main small { color: #405779 !important; }
+@media (max-width: 760px) {
+  .about-page .about-hero { padding-bottom: 4.5rem; }
+  .about-page .about-event-card-fan { height: clamp(300px, 82vw, 350px); }
+}
+
+/* Shared event-list cards: fixed columns keep partial rows the same size. */
+.attendee-theme .home-agenda-list,
+.attendee-theme .qpassa-agenda-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  align-items: stretch;
+  gap: .75rem;
+}
 .attendee-theme .qpassa-agenda-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 9.5rem;
-  align-items: center;
-  gap: 1rem;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 9rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: .6rem;
   min-height: 7rem;
   padding: .8rem 1rem;
   border: 1px solid #e5e7eb;
@@ -6343,26 +6451,167 @@ button[style*="var(--brand-blue)"],
 .attendee-theme .qpassa-agenda-date strong,
 .attendee-theme .qpassa-agenda-copy > strong { color: #17191e !important; }
 .attendee-theme .qpassa-agenda-image { width: 4.5rem; height: 4.75rem; flex-basis: 4.5rem; border-radius: .65rem; }
+
+/* Home discovery refinements. */
+.attendee-theme .hero-shell { padding-top: 3rem !important; }
+.attendee-theme .home-hero-content > .text-center { padding-top: .75rem; margin-bottom: 1.25rem; }
+.attendee-theme .hero-title { font-size: clamp(2.4rem, 5.5vw, 4.25rem); }
+.attendee-theme .hero-copy { margin-top: .85rem; }
+.home-search-filter-row { border: 0 !important; outline: 0 !important; box-shadow: none !important; }
+.home-search-filter-row .attendee-search-input,
+.home-search-filter-row .attendee-search-input:focus,
+.home-search-filter-row .attendee-search-input:focus-visible {
+  border: 0 !important;
+  border-width: 0 !important;
+  border-color: transparent !important;
+  outline: 0 !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+}
+.home-all-events-heading { flex-wrap: wrap; }
+.home-events-view-toggle { border: 1px solid var(--border); background: var(--card); }
+.home-events-view-button {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  color: var(--muted-foreground) !important;
+  font-size: .72rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.home-events-view-toggle .home-events-view-button { border-radius: 9999px !important; }
+.home-events-view-toggle .home-events-view-button[data-active='true'] { background: var(--brand-blue) !important; color: #fff !important; }
+.home-all-events-grid,
+.home-event-card-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+.home-all-events-grid > article,
+.home-event-card-grid > article { width: 100% !important; }
+.home-active-events-rail > article { width: min(327px, 84vw) !important; }
+.tixian-event-card-poster .event-card-poster-price {
+  max-width: 100%;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #fff !important;
+  font-size: 1.1rem;
+  font-weight: 900;
+  line-height: 1.2;
+  letter-spacing: .01em;
+  text-shadow: 0 2px 12px rgba(0,0,0,.65);
+}
+.tixian-event-card-poster .poster-date-badge {
+  width: 3.75rem;
+  min-width: 3.75rem;
+  min-height: 4.25rem;
+  padding: .9rem .5rem !important;
+  justify-content: center;
+  border: 1px solid rgba(255,255,255,.07) !important;
+  border-radius: 9999px !important;
+  background: rgba(8,10,14,.58) !important;
+  color: #fff !important;
+  box-shadow: 0 12px 30px rgba(0,0,0,.38), inset 0 1px rgba(255,255,255,.12) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(145%);
+  backdrop-filter: blur(16px) saturate(145%);
+}
+.tixian-event-card-poster .poster-date-number { color: #fff !important; font-size: 1.35rem; font-weight: 900; text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+.tixian-event-card-poster .poster-date-month { color: rgba(255,255,255,.92) !important; font-size: .5rem; font-weight: 800; text-shadow: 0 1px 6px rgba(0,0,0,.55); }
+.tixian-event-card-poster .poster-date-weekday { color: rgba(255,255,255,.88) !important; font-size: .48rem; font-weight: 800; text-shadow: 0 1px 6px rgba(0,0,0,.55); }
+.tixian-event-card-poster .poster-card-price-actions {
+  min-width: 0;
+  margin-left: auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: .65rem;
+}
+.tixian-event-card-poster .poster-favorite-action { margin: 0; }
+.tixian-event-card-poster .poster-favorite-action,
+.tixian-event-card-poster .share-action-button {
+  border-color: rgba(15,18,24,.62) !important;
+}
+.tixian-event-card-poster .poster-favorite-action:hover,
+.tixian-event-card-poster .share-action-button:hover { border-color: rgba(15,18,24,.82) !important; }
+.home-events-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  color: var(--muted-foreground);
+  font-size: .8rem;
+}
+.home-events-pagination button {
+  padding: .55rem .85rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  font-weight: 700;
+}
+.home-events-pagination button:disabled { cursor: not-allowed; opacity: .4; }
+
+/* Smaller, less obtrusive mobile navigation capsule. */
+.attendee-bottom-nav-frame { height: 4.25rem !important; padding: .2rem !important; }
+.attendee-bottom-nav-items { padding: .2rem .55rem !important; gap: .15rem !important; }
+.attendee-theme .attendee-bottom-nav-item,
+.attendee-theme button.attendee-bottom-nav-item,
+.attendee-theme button.attendee-bottom-nav-item:not(.attendee-bottom-nav-center) { padding: .3rem .45rem !important; }
+.attendee-theme button.attendee-bottom-nav-item.is-active { padding-inline: .8rem !important; }
+.attendee-bottom-nav-content { gap: .35rem !important; }
+.attendee-bottom-nav-item svg { width: 1.25rem !important; height: 1.25rem !important; }
+.attendee-bottom-nav-label { max-width: min(32vw, 7rem); font-size: .75rem; }
+
+@media (max-width: 640px) {
+  .attendee-theme .hero-shell { padding-top: 2.5rem !important; }
+  .attendee-theme .home-hero-content > .text-center { padding-top: .5rem; margin-bottom: 1rem; }
+  .attendee-theme .hero-title { font-size: clamp(2.15rem, 9vw, 3rem) !important; }
+  .home-all-events-heading { align-items: center; gap: .5rem; }
+  .home-all-events-heading > div { gap: .35rem; }
+  .home-events-view-button { width: 1.9rem; height: 1.9rem; }
+  .attendee-bottom-nav-label { font-size: .7rem; }
+}
 .attendee-theme .qpassa-agenda-time { color: #4b5563; }
 .attendee-theme .qpassa-agenda-venue { color: #6b7280; }
-.attendee-theme .qpassa-agenda-actions { width: auto; justify-content: flex-end; gap: .75rem; padding: 0; }
-.attendee-theme .qpassa-agenda-price { color: #17191e; font-size: .82rem; text-align: right; }
+.attendee-theme .qpassa-agenda-actions { width: 100%; justify-content: space-between; gap: .55rem; margin-top: auto; padding: .35rem 0 0; }
+.attendee-theme .qpassa-agenda-price { color: var(--foreground); font-size: .82rem; text-align: left; }
+.attendee-theme .qpassa-agenda-card {
+  min-height: 6.35rem;
+  padding: .55rem .75rem;
+  border-color: var(--border);
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+  box-shadow: 0 3px 12px rgba(0,0,0,.16);
+}
+.attendee-theme .qpassa-agenda-card:hover { border-color: var(--brand-blue-border); background: var(--elevated) !important; }
+.attendee-theme .qpassa-agenda-date { background: var(--background-secondary); color: var(--muted-foreground); }
+.attendee-theme .qpassa-agenda-date strong,
+.attendee-theme .qpassa-agenda-copy > strong { color: var(--foreground) !important; }
+.attendee-theme .qpassa-agenda-time { color: var(--brand-blue) !important; }
+.attendee-theme .qpassa-agenda-venue { color: var(--muted-foreground) !important; }
 .attendee-theme .qpassa-agenda-cta,
 :root[data-theme='light'] .attendee-theme .qpassa-agenda-cta {
   width: auto;
-  min-width: 7rem;
-  min-height: 2.45rem;
+  min-width: 6.25rem;
+  min-height: 1.9rem;
   flex: 0 0 auto;
-  padding: 0 .85rem;
-  border-radius: .65rem;
+  padding: 0 .65rem;
+  border-radius: .55rem;
   background: #111318 !important;
   color: #fff !important;
-  font-size: .75rem;
+  font-size: .68rem;
 }
 .attendee-theme .qpassa-agenda-cta:hover:not(:disabled) { background: #343942 !important; }
 .attendee-theme .qpassa-agenda-card.is-ended { opacity: .72; }
 @media (max-width: 640px) {
-  .attendee-theme .qpassa-agenda-card { grid-template-columns: minmax(0, 1fr); gap: .6rem; padding: .7rem; }
+  .attendee-theme .home-agenda-list,
+  .attendee-theme .qpassa-agenda-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .attendee-theme .qpassa-agenda-card { gap: .6rem; padding: .7rem; }
   .attendee-theme .qpassa-agenda-card-main { gap: .6rem; }
   .attendee-theme .qpassa-agenda-media { width: auto; min-width: 0; flex: 0 0 auto; gap: .35rem; }
   .attendee-theme .qpassa-agenda-date { width: 3rem; min-width: 3rem; height: 3.6rem; flex-basis: 3rem; border-radius: .7rem; }
@@ -6371,3 +6620,249 @@ button[style*="var(--brand-blue)"],
   .attendee-theme .qpassa-agenda-venue { font-size: .68rem; }
   .attendee-theme .qpassa-agenda-actions { width: 100%; justify-content: space-between; padding-left: 3.35rem; }
 }
+@media (min-width: 641px) and (max-width: 1023px) {
+  .attendee-theme .home-agenda-list,
+  .attendee-theme .qpassa-agenda-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+
+/* Final marketing hero fit: contain the rotated event fan and remove the
+   oversized margin/padding that separated it from the first story section. */
+:root[data-theme] .attendee-theme .about-page .about-hero {
+  padding-block-start: clamp(5.5rem, 8vw, 7rem);
+  padding-block-end: 1.25rem;
+}
+:root[data-theme] .attendee-theme .about-page .about-hero-copy { margin-top: 1rem; }
+:root[data-theme] .attendee-theme .about-page .about-hero-actions { margin-top: 1.25rem; }
+:root[data-theme] .attendee-theme .about-page .about-event-card-fan {
+  height: 410px;
+  margin-top: 1.5rem;
+  margin-bottom: .5rem;
+}
+:root[data-theme] .attendee-theme .about-page > .about-story {
+  margin-top: 0;
+  padding-top: 2rem;
+}
+@media (min-width: 761px) {
+  :root[data-theme] .attendee-theme .about-page .about-hero {
+    padding-block-start: clamp(4rem, 5.5vw, 5rem);
+  }
+  :root[data-theme] .attendee-theme .about-page .about-event-card-fan {
+    margin-top: 3.5rem;
+    margin-bottom: 2rem;
+  }
+}
+@media (max-width: 760px) {
+  :root[data-theme] .attendee-theme .about-page .about-hero {
+    padding-block-start: clamp(5.5rem, 16vw, 7rem);
+    padding-block-end: 5rem;
+  }
+  :root[data-theme] .attendee-theme .about-page .about-event-card-fan {
+    height: clamp(400px, 82vw, 460px);
+    margin-top: 2.5rem;
+    margin-bottom: .25rem;
+  }
+  :root[data-theme] .attendee-theme .about-page .about-event-card-fan-card { top: 40px; }
+  :root[data-theme] .attendee-theme .about-page > .about-story { padding-top: 4.5rem; }
+}
+
+/* Marketing page buttons: remove all shadow treatments and use the brand blue. */
+:root[data-theme] .attendee-theme .about-page button,
+:root[data-theme] .attendee-theme .about-page button:hover,
+:root[data-theme] .attendee-theme .about-page button:focus-visible,
+:root[data-theme] .attendee-theme .about-page button:active {
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none;
+}
+:root[data-theme] .attendee-theme .about-page.about-page :is(.about-primary-button, .about-glass-button, .about-product-action, .about-phone-ticket button, .event-card-action) {
+  border: 1px solid var(--brand-blue) !important;
+  background: var(--brand-blue) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: #fff !important;
+}
+:root[data-theme] .attendee-theme .about-page.about-page :is(.about-text-button, .about-price-grid button, .about-faq-item button) {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--brand-blue) !important;
+}
+:root[data-theme] .attendee-theme .about-page.about-page :is(.about-primary-button, .about-glass-button, .about-product-action, .about-phone-ticket button, .event-card-action):hover {
+  border-color: #1d4ed8 !important;
+  background: #1d4ed8 !important;
+  box-shadow: none !important;
+  color: #fff !important;
+}
+:root[data-theme] .attendee-theme .about-page.about-page :is(.about-text-button, .about-price-grid button, .about-faq-item button):hover {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #1d4ed8 !important;
+}
+:root[data-theme] .attendee-theme .about-page.about-page .about-hero-actions .about-text-button,
+:root[data-theme] .attendee-theme .about-page.about-page .about-hero-actions .about-text-button:hover {
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--foreground) !important;
+}
+:root[data-theme] .attendee-theme .about-studio-page .about-studio-hero-actions .about-studio-hero-secondary,
+:root[data-theme] .attendee-theme .about-studio-page .about-studio-hero-actions .about-studio-hero-secondary:hover {
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--foreground) !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme='dark'] .attendee-theme .organizer-launch-page {
+  --organizer-section-base: #0e1725;
+  --organizer-section-highlight: #111d2d;
+  --organizer-section-highlight-alt: #152235;
+}
+:root[data-theme='light'] .attendee-theme .organizer-launch-page {
+  --organizer-section-base: #f3f6fb;
+  --organizer-section-highlight: #eaf1ff;
+  --organizer-section-highlight-alt: #edf2f8;
+}
+:root[data-theme] .attendee-theme .organizer-launch-page > section {
+  border-top: 0 !important;
+  border-bottom: 0 !important;
+}
+:root[data-theme] .attendee-theme .organizer-launch-page > .organizer-launch-hero,
+:root[data-theme] .attendee-theme .organizer-launch-page > .organizer-launch-pricing {
+  background: var(--organizer-section-base) !important;
+}
+:root[data-theme] .attendee-theme .organizer-launch-page > .organizer-launch-intro,
+:root[data-theme] .attendee-theme .organizer-launch-page > .organizer-launch-connection,
+:root[data-theme] .attendee-theme .organizer-launch-page > .organizer-launch-faq {
+  background: var(--organizer-section-highlight) !important;
+}
+:root[data-theme] .attendee-theme .organizer-launch-page > .organizer-launch-event-day,
+:root[data-theme] .attendee-theme .organizer-launch-page > .organizer-launch-final {
+  background: var(--organizer-section-highlight-alt) !important;
+}
+:root[data-theme] .attendee-theme .organizer-launch-page > .organizer-launch-workflow,
+:root[data-theme] .attendee-theme .organizer-launch-page > .organizer-launch-faq {
+  position: relative;
+  isolation: isolate;
+  background: transparent !important;
+}
+:root[data-theme] .attendee-theme .organizer-launch-page > .organizer-launch-workflow::before,
+:root[data-theme] .attendee-theme .organizer-launch-page > .organizer-launch-faq::before {
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 100vw;
+  background: var(--organizer-section-highlight-alt);
+  content: '';
+  transform: translateX(-50%);
+}
+:root[data-theme] .attendee-theme .organizer-launch-page .organizer-launch-actions a,
+:root[data-theme] .attendee-theme .organizer-launch-page .organizer-launch-actions a:hover,
+:root[data-theme] .attendee-theme .organizer-launch-page .organizer-launch-actions a:focus-visible {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  padding-inline: .25rem;
+  border: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  color: var(--foreground) !important;
+  box-shadow: none !important;
+}
+:root[data-theme] .attendee-theme .organizer-launch-page .organizer-launch-actions a:hover {
+  text-decoration: underline;
+  text-underline-offset: .2em;
+}
+
+/* Add breathing room above the organizer CTA, pricing, and FAQ chapters. */
+:root[data-theme] .attendee-theme .about-page > .about-organizers {
+  padding-top: 5rem !important;
+}
+:root[data-theme] .attendee-theme .about-page > .about-pricing,
+:root[data-theme] .attendee-theme .about-page > .about-faq {
+  padding-top: 5rem !important;
+}
+@media (max-width: 760px) {
+  :root[data-theme] .attendee-theme .about-page > .about-organizers {
+    padding-top: 3.5rem !important;
+  }
+  :root[data-theme] .attendee-theme .about-page > .about-pricing,
+  :root[data-theme] .attendee-theme .about-page > .about-faq {
+    padding-top: 3.5rem !important;
+  }
+}
+
+/* Public navbar: compact editorial type with a smooth cobalt active indicator. */
+.attendee-theme .site-navbar > div { height: 4.5rem; }
+.attendee-theme .site-navbar > div > button:first-child { font-size: 1.125rem !important; }
+.attendee-theme .site-navbar > div > div:nth-child(2) { gap: 1.75rem; }
+.attendee-theme .nav-link {
+  position: relative;
+  padding: .55rem 0;
+  color: var(--muted-foreground) !important;
+  font-size: .9375rem;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  transition: color .18s ease, transform .18s ease;
+}
+.attendee-theme .nav-link::after {
+  right: 0;
+  bottom: .05rem;
+  left: 0;
+  height: 2px;
+  background: var(--brand-blue);
+  box-shadow: none;
+  opacity: 0;
+  transform: scaleX(.35);
+  transform-origin: left center;
+  transition: opacity .2s ease, transform .24s cubic-bezier(.2,.8,.2,1);
+}
+.attendee-theme .nav-link:hover,
+.attendee-theme .nav-link.is-active { color: var(--foreground) !important; }
+.attendee-theme .nav-link:hover { transform: translateY(-1px); }
+.attendee-theme .nav-link:hover::after,
+.attendee-theme .nav-link.is-active::after { opacity: 1; transform: scaleX(1); }
+.attendee-theme :is(.nav-sign-in, .nav-account-action) {
+  min-height: 2.5rem;
+  border: 1px solid transparent !important;
+  border-radius: .7rem !important;
+  background: transparent !important;
+  color: var(--foreground) !important;
+  font-size: .875rem;
+  font-weight: 600;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  transition: color .18s ease, background-color .18s ease, border-color .18s ease, transform .18s ease;
+}
+.attendee-theme :is(.nav-sign-in, .nav-account-action):hover {
+  border-color: var(--border) !important;
+  background: var(--hover) !important;
+  color: var(--foreground) !important;
+  transform: translateY(-1px);
+}
+.attendee-theme .nav-create-event {
+  border: 1px solid var(--brand-blue) !important;
+  border-radius: .7rem !important;
+  background: var(--brand-blue) !important;
+  background-image: none !important;
+  color: #fff !important;
+  font-size: .875rem;
+  font-weight: 700;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  transition: background-color .18s ease, border-color .18s ease, transform .18s ease;
+}
+.attendee-theme .nav-create-event:hover {
+  border-color: var(--brand-blue-hover) !important;
+  background: var(--brand-blue-hover) !important;
+  color: #fff !important;
+  transform: translateY(-1px);
+}
+:root[data-theme='light'] .attendee-theme .nav-sign-in,
+:root[data-theme='light'] .attendee-theme .nav-account-action { color: #111827 !important; }
+:root[data-theme='dark'] .attendee-theme .nav-sign-in,
+:root[data-theme='dark'] .attendee-theme .nav-account-action { color: #ffffff !important; }
+:root[data-theme='light'] .attendee-theme .nav-account-action:hover { color: #111827 !important; }
+:root[data-theme='dark'] .attendee-theme .nav-account-action:hover { color: #ffffff !important; }
+.attendee-theme .nav-mobile-drawer .nav-create-event { width: 100%; }
