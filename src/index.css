@@ -7777,3 +7777,264 @@ button[style*="var(--brand-blue)"],
   .organizer-event-view-stat > p:nth-of-type(1) { font-size: 1.05rem !important; }
   .organizer-event-view-tier { padding: .9rem !important; }
 }
+
+/* Mobile dashboard: favor readable type and comfortable touch-sized surfaces. */
+@media (max-width: 767px) {
+  .organizer-dashboard-shell .organizer-dashboard-main > main > div.flex-1.overflow-auto {
+    padding: 1rem .9rem 6.5rem !important;
+  }
+  .organizer-dashboard-shell .qpassa-workspace-header-title strong { font-size: .95rem !important; }
+  .organizer-dashboard-shell .qpassa-workspace-header-title span { font-size: .65rem !important; }
+  .organizer-dashboard-shell .qpassa-workspace-header :is(.qpassa-workspace-menu-button, .qpassa-workspace-icon-button) {
+    width: 2.65rem;
+    height: 2.65rem;
+    flex-basis: 2.65rem;
+  }
+  .organizer-dashboard-shell .qpassa-workspace-header :is(.qpassa-workspace-menu-button, .qpassa-workspace-icon-button) svg { width: 1.25rem; height: 1.25rem; }
+  .organizer-finance-stat { min-height: 6rem; padding: 1rem !important; border-radius: 1rem !important; }
+  .organizer-finance-stat :is(p, strong) { font-size: .82rem; }
+  .organizer-finance-stat p:first-child { font-size: .7rem; }
+  .organizer-finance-panel { border-radius: 1rem !important; }
+  .organizer-finance-panel > :is(div, section) { font-size: .85rem; }
+
+  .organizer-overview-page { gap: 1rem !important; }
+  .organizer-overview-alerts { gap: .55rem; padding: .85rem; }
+  .organizer-overview-alert-heading { font-size: .8rem; }
+  .organizer-overview-alerts > button { min-height: 3.4rem; padding: .6rem .7rem; }
+  .organizer-overview-alerts > button strong { font-size: .78rem; }
+  .organizer-overview-alerts > button small,
+  .organizer-overview-alerts > p { font-size: .68rem; line-height: 1.4; }
+  .organizer-overview-stat-grid { gap: .65rem; padding: .15rem .2rem .55rem; }
+  .organizer-overview-stat {
+    flex-basis: min(72vw, 17rem);
+    min-height: 6rem;
+    grid-template-columns: 2.1rem minmax(0, 1fr);
+    column-gap: .65rem;
+    padding: .8rem;
+    border-radius: 1rem;
+  }
+  .organizer-overview-stat-icon { width: 2.1rem; height: 2.1rem; }
+  .organizer-overview-stat-icon > svg { width: 1.2rem; height: 1.2rem; }
+  .organizer-overview-stat > small { font-size: .68rem; }
+  .organizer-overview-stat > strong { font-size: 1.05rem; }
+  .organizer-overview-stat > span:last-child { overflow: visible; font-size: .62rem; white-space: normal; }
+  .organizer-overview-quick-heading .organizer-overview-card-kicker { font-size: .68rem; }
+  .organizer-overview-quick-heading > span { font-size: .62rem; }
+  .organizer-overview-quick-grid { gap: .7rem; }
+  #root .organizer-dashboard-shell .organizer-overview-quick-grid > button { min-height: 6.25rem; gap: .7rem; padding: .85rem; border-radius: 1rem !important; }
+  .organizer-overview-quick-icon { width: 2.65rem; height: 2.65rem; flex-basis: 2.65rem; }
+  .organizer-overview-quick-icon svg { width: 1.25rem; height: 1.25rem; }
+  .organizer-overview-quick-grid strong { font-size: .82rem; }
+  .organizer-overview-quick-grid small { font-size: .68rem; white-space: normal; }
+  .organizer-overview-quick-grid > button > svg:last-child { width: 1.1rem; height: 1.1rem; }
+  .organizer-overview-calendar { min-height: 23rem; padding: 1.15rem; border-radius: 1.2rem; }
+  .organizer-overview-calendar-heading { grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem; }
+  .organizer-overview-calendar-heading > button { width: 2.5rem; height: 2.5rem; }
+  .organizer-overview-calendar-heading > button svg { width: 1.25rem; height: 1.25rem; }
+  .organizer-overview-calendar-heading h3 { font-size: 1.05rem; }
+  .organizer-overview-calendar-weekday { font-size: .6rem; }
+  .organizer-overview-calendar-grid { gap: .28rem .12rem; }
+  .organizer-overview-calendar-grid > button { width: 2.35rem; height: 2.35rem; font-size: .75rem; }
+  .organizer-overview-calendar-agenda > strong { font-size: .68rem; }
+  .organizer-overview-calendar-agenda > span,
+  .organizer-overview-calendar-agenda > button > span > strong { font-size: .7rem; }
+  .organizer-overview-calendar-agenda > button > span > small { font-size: .62rem; }
+  .organizer-overview-panel { padding: 1.1rem !important; border-radius: 1.1rem !important; }
+  .organizer-overview-panel-heading h3 { font-size: 1rem; }
+  .organizer-overview-panel-heading > button { width: 2.5rem; height: 2.5rem; }
+  .organizer-overview-event-list > button,
+  .organizer-overview-order-list > button { min-height: 4.5rem; gap: .7rem; padding: .75rem .35rem; }
+  .organizer-overview-event-thumb,
+  .organizer-overview-order-icon { width: 2.8rem; height: 2.8rem; flex-basis: 2.8rem; }
+  .organizer-overview-event-thumb svg,
+  .organizer-overview-order-icon svg { width: 1.2rem; height: 1.2rem; }
+  .organizer-overview-event-list > button strong,
+  .organizer-overview-order-list > button strong { font-size: .78rem; }
+  .organizer-overview-event-list > button small,
+  .organizer-overview-order-list > button small { font-size: .66rem; }
+
+  .organizer-events-page { gap: .9rem; }
+  .organizer-events-heading h1 { font-size: 2rem; }
+  .organizer-events-heading p:last-child { font-size: .78rem; }
+  .organizer-events-create { min-height: 2.8rem; padding-inline: 1rem; font-size: .75rem; }
+  .organizer-events-create svg { width: 1.15rem; height: 1.15rem; }
+  .organizer-events-tabs > button { min-height: 2.75rem; padding-inline: .8rem; font-size: .75rem; }
+  .organizer-events-tabs > button > small { min-width: 1.55rem; height: 1.55rem; font-size: .65rem; }
+  .organizer-events-search,
+  .organizer-events-category { min-height: 3.1rem; padding-inline: 1rem; }
+  .organizer-events-search input,
+  .organizer-events-category select { font-size: .9rem; }
+  .organizer-events-search svg,
+  .organizer-events-category svg { width: 1.2rem; height: 1.2rem; }
+  .organizer-events-result-count { padding: .55rem .9rem; font-size: .68rem; }
+  .organizer-events-grid { gap: 1rem; }
+  .organizer-event-card { border-radius: 1.35rem; }
+  .organizer-event-card-art { height: clamp(10rem, 42vw, 13rem); }
+  .organizer-event-card-copy { gap: .5rem; padding: .95rem 1rem 1rem; }
+  .organizer-event-card-category { padding: .25rem .6rem; font-size: .62rem; }
+  .organizer-event-card-copy > strong { font-size: 1.05rem; }
+  .organizer-event-card-meta { gap: .4rem; font-size: .75rem; }
+  .organizer-event-card-meta svg { width: 1rem; height: 1rem; }
+  .organizer-event-sales { gap: .5rem; padding: .7rem .75rem; }
+  .organizer-event-sales-label b { font-size: .72rem; }
+  .organizer-event-sales-label small { font-size: .68rem; }
+  .organizer-event-progress { height: .38rem; }
+
+  .qpassa-workspace-mobile-nav { height: 6rem; gap: .35rem; padding: .4rem .55rem; }
+  .qpassa-workspace-mobile-nav > button { min-width: 3.2rem; height: 4.2rem; gap: .45rem; padding: .4rem .6rem; }
+  .qpassa-workspace-mobile-nav > button > svg { width: 1.6rem; height: 1.6rem; }
+  .qpassa-workspace-mobile-nav > button > span { font-size: .75rem; }
+  .qpassa-workspace-mobile-nav > button > i { top: .05rem; right: calc(50% - 1rem); min-width: 1rem; font-size: .55rem; }
+
+  .organizer-event-view-page { gap: 1rem; }
+  .organizer-event-view-hero,
+  .organizer-event-view-hero > div { min-height: 16rem !important; }
+  .organizer-event-view-hero > div { padding: 1.25rem !important; }
+  .organizer-event-view-hero h1 { font-size: clamp(1.7rem, 7vw, 2.15rem) !important; }
+  .organizer-event-view-hero p { font-size: .9rem !important; }
+  .organizer-event-view-hero p svg { width: 1.1rem; height: 1.1rem; }
+  #root .organizer-dashboard-shell .organizer-event-view-stat { min-height: 9.5rem; padding: 1rem !important; }
+  .organizer-event-view-stat-icon { width: 2.65rem !important; height: 2.65rem !important; margin-bottom: .8rem; }
+  .organizer-event-view-stat-icon svg { width: 1.2rem; height: 1.2rem; }
+  .organizer-event-view-stat > p:nth-of-type(1) { margin-top: .75rem !important; font-size: 1.2rem !important; }
+  .organizer-event-view-stat > p:nth-of-type(2) { font-size: .78rem !important; }
+  .organizer-event-view-stat > p:nth-of-type(3) { font-size: .66rem !important; line-height: 1.4; }
+  .organizer-event-view-panel { padding: 1.15rem !important; }
+  .organizer-event-view-panel h2 { font-size: 1.15rem !important; }
+  .organizer-event-view-panel [class*="uppercase tracking"] { font-size: .68rem !important; }
+  .organizer-event-view-panel :is(p, small, b, span) { line-height: 1.45; }
+  .organizer-event-view-detail { gap: .75rem; padding: .9rem !important; }
+  .organizer-event-view-detail-icon { width: 2.4rem; height: 2.4rem; flex-basis: 2.4rem; }
+  .organizer-event-view-detail-icon svg { width: 1.15rem; height: 1.15rem; }
+  .organizer-event-view-detail small { font-size: .68rem; }
+  .organizer-event-view-detail b { font-size: .86rem; }
+  .organizer-event-view-tier { padding: 1.1rem !important; }
+  .organizer-event-view-tier h3 { font-size: 1rem; }
+  .organizer-event-view-tier p { font-size: .78rem !important; }
+  .organizer-event-view-tier p[style*="var(--primary)"] { font-size: 1.2rem !important; }
+  .organizer-event-view-tier button { min-height: 2.65rem; padding-inline: .9rem; font-size: .72rem !important; }
+  .organizer-event-view-tier button svg { width: 1rem; height: 1rem; }
+  .organizer-event-view-customers > div:nth-child(2) label,
+  .organizer-event-view-customers > div:nth-child(2) select { min-height: 3rem; font-size: .85rem; }
+  .organizer-event-view-customers thead th { font-size: .7rem; }
+  .organizer-event-view-customers tbody td { padding-top: 1rem; padding-bottom: 1rem; font-size: .78rem; }
+  .organizer-event-view-manual-sale :is(input, select) { min-height: 3rem; font-size: 1rem; }
+  .organizer-event-view-manual-sale label { font-size: .8rem; }
+  .organizer-event-view-manual-sale > button { min-height: 3rem; font-size: .85rem; }
+
+  .organizer-dashboard-main :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { font-size: 1rem; }
+  .organizer-dashboard-main :is(button, a) { min-height: 2.75rem; }
+  .organizer-dashboard-main :is(button, a) svg { flex-shrink: 0; }
+}
+
+@media (max-width: 767px) {
+  .organizer-dashboard-shell {
+    --text-xs: calc(.75rem + .15rem);
+    --text-sm: calc(.875rem + .15rem);
+    --text-base: calc(1rem + .15rem);
+    --text-lg: calc(1.125rem + .15rem);
+    --text-xl: calc(1.25rem + .15rem);
+    --text-2xl: calc(1.5rem + .15rem);
+    --text-3xl: calc(1.875rem + .15rem);
+    --text-4xl: calc(2.25rem + .15rem);
+    --text-5xl: calc(3rem + .15rem);
+    --text-6xl: calc(3.75rem + .15rem);
+    --text-7xl: calc(4.5rem + .15rem);
+    --text-8xl: calc(6rem + .15rem);
+    --text-9xl: calc(8rem + .15rem);
+  }
+  .organizer-overview-alert-heading { font-size: calc(.8rem + .15rem); }
+  .organizer-overview-alerts > button strong { font-size: calc(.78rem + .15rem); }
+  .organizer-overview-alerts > button small,
+  .organizer-overview-alerts > p { font-size: calc(.68rem + .15rem); }
+  .organizer-overview-stat > small { font-size: calc(.68rem + .15rem); }
+  .organizer-overview-stat > strong { font-size: calc(1.05rem + .15rem); }
+  .organizer-overview-stat > span:last-child { font-size: calc(.62rem + .15rem); }
+  .organizer-overview-quick-heading .organizer-overview-card-kicker { font-size: calc(.68rem + .15rem); }
+  .organizer-overview-quick-heading > span { font-size: calc(.62rem + .15rem); }
+  .organizer-overview-quick-grid strong { font-size: calc(.82rem + .15rem); }
+  .organizer-overview-quick-grid small { font-size: calc(.68rem + .15rem); }
+  .organizer-overview-calendar-heading h3 { font-size: calc(1.05rem + .15rem); }
+  .organizer-overview-calendar-weekday { font-size: calc(.6rem + .15rem); }
+  .organizer-overview-calendar-grid > button { font-size: calc(.75rem + .15rem); }
+  .organizer-overview-calendar-agenda > strong,
+  .organizer-overview-calendar-agenda > span,
+  .organizer-overview-calendar-agenda > button > span > strong { font-size: calc(.7rem + .15rem); }
+  .organizer-overview-calendar-agenda > button > span > small { font-size: calc(.62rem + .15rem); }
+  .organizer-overview-event-list > button strong,
+  .organizer-overview-order-list > button strong { font-size: calc(.78rem + .15rem); }
+  .organizer-overview-event-list > button small,
+  .organizer-overview-order-list > button small { font-size: calc(.66rem + .15rem); }
+  .organizer-events-heading p:last-child { font-size: calc(.78rem + .15rem); }
+  .organizer-events-create,
+  .organizer-events-tabs > button { font-size: calc(.75rem + .15rem); }
+  .organizer-events-tabs > button > small { font-size: calc(.65rem + .15rem); }
+  .organizer-events-search input,
+  .organizer-events-category select { font-size: calc(.9rem + .15rem); }
+  .organizer-events-result-count { font-size: calc(.68rem + .15rem); }
+  .organizer-event-card-category { font-size: calc(.62rem + .15rem); }
+  .organizer-event-card-copy > strong { font-size: calc(1.05rem + .15rem); }
+  .organizer-event-card-meta { font-size: calc(.75rem + .15rem); }
+  .organizer-event-sales-label b { font-size: calc(.72rem + .15rem); }
+  .organizer-event-sales-label small { font-size: calc(.68rem + .15rem); }
+  .qpassa-workspace-mobile-nav > button > span { font-size: calc(.75rem + .15rem); }
+  .organizer-event-view-hero h1 { font-size: clamp(calc(1.7rem + .15rem), 7vw, calc(2.15rem + .15rem)) !important; }
+  .organizer-event-view-hero p { font-size: calc(.9rem + .15rem) !important; }
+  .organizer-event-view-stat > p:nth-of-type(1) { font-size: calc(1.2rem + .15rem) !important; }
+  .organizer-event-view-stat > p:nth-of-type(2) { font-size: calc(.78rem + .15rem) !important; }
+  .organizer-event-view-stat > p:nth-of-type(3) { font-size: calc(.66rem + .15rem) !important; }
+  .organizer-event-view-panel h2 { font-size: calc(1.15rem + .15rem) !important; }
+  .organizer-event-view-panel [class*="uppercase tracking"] { font-size: calc(.68rem + .15rem) !important; }
+  .organizer-event-view-detail small { font-size: calc(.68rem + .15rem); }
+  .organizer-event-view-detail b { font-size: calc(.86rem + .15rem); }
+  .organizer-event-view-tier h3 { font-size: calc(1rem + .15rem); }
+  .organizer-event-view-tier p { font-size: calc(.78rem + .15rem) !important; }
+  .organizer-event-view-tier p[style*="var(--primary)"] { font-size: calc(1.2rem + .15rem) !important; }
+  .organizer-event-view-customers thead th { font-size: calc(.7rem + .15rem); }
+  .organizer-event-view-customers tbody td { font-size: calc(.78rem + .15rem); }
+  .organizer-event-view-manual-sale label { font-size: calc(.8rem + .15rem); }
+}
+
+@media (max-width: 767px) {
+  .organizer-dashboard-shell .qpassa-workspace-sidebar .qpassa-workspace-org-copy strong { font-size: calc(.62rem + .3rem); }
+  .organizer-dashboard-shell .qpassa-workspace-sidebar .qpassa-workspace-org-copy small { font-size: calc(.52rem + .3rem); }
+  .organizer-dashboard-shell .qpassa-workspace-sidebar .qpassa-workspace-link-group h6 { font-size: calc(.49rem + .3rem); }
+  .organizer-dashboard-shell .qpassa-workspace-sidebar .qpassa-workspace-link { min-height: 2.1rem; font-size: calc(.64rem + .3rem); }
+  .organizer-dashboard-shell .qpassa-workspace-sidebar .qpassa-workspace-link > i { font-size: calc(.56rem + .3rem); }
+  .organizer-dashboard-shell .qpassa-workspace-sidebar .qpassa-workspace-create-card > strong { font-size: calc(.66rem + .3rem); }
+  .organizer-dashboard-shell .qpassa-workspace-sidebar .qpassa-workspace-create-card > span:nth-of-type(2) { font-size: calc(.54rem + .3rem); }
+  .organizer-dashboard-shell .qpassa-workspace-sidebar .qpassa-workspace-create-card > button { min-height: 2rem; font-size: calc(.55rem + .3rem); }
+  .organizer-dashboard-shell .qpassa-workspace-sidebar .qpassa-workspace-user-copy strong { font-size: calc(.61rem + .3rem); }
+  .organizer-dashboard-shell .qpassa-workspace-sidebar .qpassa-workspace-user-copy small { font-size: calc(.53rem + .3rem); }
+  .organizer-dashboard-shell .qpassa-workspace-sidebar .qpassa-workspace-org-menu > p { font-size: calc(.58rem + .3rem); }
+  .organizer-dashboard-shell .qpassa-workspace-sidebar .qpassa-workspace-org-menu > button > span:nth-child(2) { font-size: calc(.65rem + .3rem); }
+  .organizer-dashboard-shell .qpassa-workspace-sidebar .qpassa-workspace-org-empty { font-size: calc(.62rem + .3rem); }
+  .organizer-dashboard-shell .qpassa-workspace-sidebar .qpassa-workspace-user-menu > p { font-size: calc(.6rem + .3rem); }
+  .organizer-dashboard-shell .qpassa-workspace-sidebar .qpassa-workspace-user-menu > button { min-height: 2.5rem; font-size: calc(.67rem + .3rem); }
+}
+
+.organizer-overview-calendar-grid > button {
+  box-sizing: border-box;
+  width: 2.35rem !important;
+  height: 2.35rem !important;
+  aspect-ratio: 1 / 1;
+  justify-self: center;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  line-height: 1;
+}
+.organizer-overview-calendar-grid > button:is([data-today='true'], [data-has-events='true'], [aria-pressed='true']) {
+  border-radius: 50% !important;
+}
+.organizer-overview-calendar-grid > button[aria-pressed='true']:not([data-today='true']) {
+  background: color-mix(in srgb, var(--primary) 16%, var(--card)) !important;
+  color: var(--foreground) !important;
+  outline: 2px solid var(--primary);
+  outline-offset: 0;
+}
+@media (max-width: 767px) {
+  .organizer-overview-calendar-grid > button {
+    width: 2.65rem !important;
+    height: 2.65rem !important;
+  }
+}
