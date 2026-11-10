@@ -1,46 +1,51 @@
+// Organizer operations workspace, including the filterable event-card listing.
 import { useState, useEffect, useCallback } from 'react'
 import { signOut, supabase } from '../lib/supabase'
 import { fetchAllRows } from '../lib/supabasePagination'
 import { useAuth } from '../context/AuthContext'
 import { formatPrice } from '../data/events'
-import { BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, UsersIcon, UserIcon, KeyIcon, TagIcon, DollarSignIcon, TicketIcon, TrendingUpIcon, CheckIcon, ArrowLeftIcon, EyeIcon, LinkIcon, ShieldIcon, EditIcon, TrashIcon, XIcon } from '../components/Icon'
+import { BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, UsersIcon, UserIcon, KeyIcon, TagIcon, DollarSignIcon, TicketIcon, TrendingUpIcon, CheckIcon, EyeIcon, ShieldIcon, EditIcon, TrashIcon, XIcon } from '../components/Icon'
 import type { Event, Order, Customer, Transaction, OrganizerWithdrawal, OrganizerMember, OrganizerRole, Subscription, Ticket, AgentAssignment } from '../lib/types'
 import { FEATURES } from '../lib/features'
 import OrganizerEventViewPage from './OrganizerEventViewPage'
 import { sendOrderTicketEmails } from '../lib/ticketEmail'
 import { currentLocale, formatLocaleDate } from '../lib/locale'
-import { LanguageSwitcher } from '../components/LocaleContent'
 import StatusBadge from '../components/StatusBadge'
+import OrganizerDashboardNav from '../components/OrganizerDashboardNav'
+import { AlertCircle, ArrowUpRight, Bell, CalendarDays, CalendarPlus, ChartNoAxesCombined, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardList, Filter, Heart, LayoutDashboard, MapPin, MoreHorizontal, Plus, ReceiptText, Search, Settings, Tag, TicketCheck, UserRound, UsersRound, Wallet, type LucideIcon } from 'lucide-react'
 
-type Section = 'overview' | 'events' | 'orders' | 'customers' | 'followers' | 'members' | 'settings' | 'subscriptions' | 'transactions' | 'payouts' | 'refunds' | 'notifications'
+type Section = 'overview' | 'analytics' | 'events' | 'orders' | 'customers' | 'followers' | 'members' | 'settings' | 'subscriptions' | 'transactions' | 'payouts' | 'refunds' | 'notifications'
 type AnalyticsRange = 'all' | 'day' | 'week' | 'month' | 'year' | 'custom'
 type StatementFilter = 'all' | 'payment' | 'fee' | 'refund' | 'payout'
 type StatementView = 'activity' | 'payouts'
 type TeamTab = 'users' | 'invitations'
 type NotificationFilter = 'all' | 'unread' | 'events' | 'sales' | 'followers' | 'team'
+type EventsFilter = 'all' | 'active' | 'review' | 'inactive' | 'drafts' | 'past'
 type OrganizerNotification = { id: string; type: string; title: string; body: string; created_at: string; read_at: string | null; event_id?: string | null; recipient_scope?: string }
 type AgentOrderMeta = { order_id: string; agent_user_id: string; payment_mode: 'digital' | 'cash'; status: string; quantity: number; profiles?: { full_name: string | null; email: string | null } | null }
 type RefundRequest = { id: string; order_id: string; ticket_id: string | null; customer_id: string; reason: string; status: 'pending' | 'approved' | 'rejected' | 'processed'; created_at: string; profiles?: { full_name: string | null; email: string | null } | null; events?: { title: string | null } | null }
 
 type Props = { navigate: (p: string, extra?: unknown) => void }
 
-const NAV_ICONS: Record<Section, React.FC<{ size?: number }>> = {
-  overview: BarChartIcon,
-  events: CalendarIcon,
-  orders: ClipboardIcon,
-  customers: UsersIcon,
-  followers: UsersIcon,
-  members: UserIcon,
-  settings: KeyIcon,
-  subscriptions: TagIcon,
-  transactions: DollarSignIcon,
-  payouts: DollarSignIcon,
-  refunds: DollarSignIcon,
-  notifications: BellIcon,
+const NAV_ICONS: Record<Section, LucideIcon> = {
+  overview: LayoutDashboard,
+  analytics: ChartNoAxesCombined,
+  events: CalendarDays,
+  orders: ClipboardList,
+  customers: UsersRound,
+  followers: Heart,
+  members: UserRound,
+  settings: Settings,
+  subscriptions: Tag,
+  transactions: ReceiptText,
+  payouts: Wallet,
+  refunds: CircleDollarSign,
+  notifications: Bell,
 }
 
 const NAV: { key: Section; label: string }[] = [
-  { key: 'overview', label: 'Overview' },
+  { key: 'overview', label: 'Dashboard' },
+  { key: 'analytics', label: 'Analytics' },
   { key: 'events', label: 'Events' },
   { key: 'orders', label: 'Orders' },
   { key: 'customers', label: 'Customers' },
@@ -54,15 +59,14 @@ const NAV: { key: Section; label: string }[] = [
 ]
 
 const NAV_GROUPS: { label: string; keys: Section[] }[] = [
-  { label: 'Workspace', keys: ['overview'] },
-  { label: 'Event operations', keys: ['events', 'orders', 'customers', 'followers'] },
-  { label: 'Team access', keys: ['members', 'settings'] },
-  { label: 'Finance', keys: ['transactions', 'payouts', 'refunds'] },
-  { label: 'Updates', keys: ['notifications'] },
+  { label: 'Main', keys: ['overview', 'analytics'] },
+  { label: 'Operations', keys: ['events', 'orders', 'customers', 'followers'] },
+  { label: 'Account', keys: ['members', 'settings', 'transactions', 'payouts', 'refunds'] },
 ]
 
 const SECTION_PATHS: Record<Section, string> = {
-  overview: '/dashboard/analytics',
+  overview: '/dashboard/overview',
+  analytics: '/dashboard/analytics',
   events: '/dashboard/events',
   orders: '/dashboard/orders',
   customers: '/dashboard/customers',
@@ -93,6 +97,10 @@ function eventIdFromPath(pathname: string) {
   return parts[0] === 'dashboard' && parts[1] === 'events' ? parts[2] ?? null : null
 }
 
+function localDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
 const STATUS_COLORS: Record<string, string> = {
   published: '#22c55e', draft: '#F0A500', cancelled: '#ef4444', completed: '#888',
   confirmed: '#22c55e', pending: '#F0A500', refunded: '#ef4444',
@@ -102,18 +110,6 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 const Badge = StatusBadge
-
-function DashboardThemeIcon({ theme }: { theme: 'dark' | 'light' }) {
-  return theme === 'dark' ? (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" />
-    </svg>
-  ) : (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z" />
-    </svg>
-  )
-}
 
 function StatCard({ Icon, label, value, sub, color = 'var(--foreground)' }: { Icon: React.FC<{ size?: number }>; label: string; value: string; sub?: string; color?: string }) {
   return (
@@ -196,12 +192,13 @@ function EventPerformanceChart({ events, performance }: { events: Event[]; perfo
 }
 
 export default function OrganizerDashboardPage({ navigate }: Props) {
-  const { user, profile, organizer, teamMembership } = useAuth()
+  const { user, profile, organizer, organizerOptions, switchOrganizer, teamMembership } = useAuth()
   const [section, setSection] = useState<Section>(() => sectionFromPath(window.location.pathname))
   const [eventViewId, setEventViewId] = useState<string | null>(() => eventIdFromPath(window.location.pathname))
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [utilityPopup, setUtilityPopup] = useState<'notifications' | 'calendar' | 'profile' | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => document.documentElement.dataset.theme === 'light' ? 'light' : 'dark')
+  const [overviewCalendarMonth, setOverviewCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+  const [overviewCalendarDate, setOverviewCalendarDate] = useState(() => localDateKey(new Date()))
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark'
@@ -237,6 +234,11 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const [statementFilter, setStatementFilter] = useState<StatementFilter>('all')
   const [statementView, setStatementView] = useState<StatementView>('activity')
   const [statementSearch, setStatementSearch] = useState('')
+  const [dashboardSearch, setDashboardSearch] = useState('')
+  const [eventsFilter, setEventsFilter] = useState<EventsFilter>('all')
+  const [eventsSearch, setEventsSearch] = useState('')
+  const [eventsCategory, setEventsCategory] = useState('all')
+  const [openEventMenu, setOpenEventMenu] = useState<string | null>(null)
   const [teamTab, setTeamTab] = useState<TeamTab>('users')
   const [teamSearch, setTeamSearch] = useState('')
   const [payoutAmount, setPayoutAmount] = useState('')
@@ -260,8 +262,10 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const orgId = organizer?.id
   const isOwner = !!organizer && organizer.user_id === profile?.id
   const membershipPermissions = (teamMembership?.organizer_roles?.permissions ?? {}) as Record<string, boolean>
-  const canAccessSection = (key: Section) => key === 'payouts' ? isOwner : key === 'settings' ? isOwner || membershipPermissions.all === true || membershipPermissions.roles === true : isOwner || membershipPermissions.all === true || membershipPermissions[key] === true || (key === 'overview' && membershipPermissions.analytics === true) || (key === 'events' && (membershipPermissions.checkin === true || membershipPermissions.orders === true))
-  const canUseCalendar = isOwner || membershipPermissions.all === true || membershipPermissions.calendar === true
+  const canAccessSection = (key: Section) => key === 'payouts' ? isOwner : key === 'settings' ? isOwner || membershipPermissions.all === true || membershipPermissions.roles === true : key === 'overview' ? isOwner || membershipPermissions.all === true || membershipPermissions.analytics === true || membershipPermissions.events === true || membershipPermissions.orders === true || membershipPermissions.customers === true : isOwner || membershipPermissions.all === true || membershipPermissions[key] === true || (key === 'events' && (membershipPermissions.checkin === true || membershipPermissions.orders === true))
+  const canViewOverviewAnalytics = isOwner || membershipPermissions.all === true || membershipPermissions.analytics === true
+  const canViewOverviewOrders = isOwner || membershipPermissions.all === true || membershipPermissions.orders === true
+  const canViewOverviewCustomers = isOwner || membershipPermissions.all === true || membershipPermissions.customers === true
   const canViewEvents = isOwner || membershipPermissions.all === true || membershipPermissions.events === true || membershipPermissions.checkin === true || membershipPermissions.orders === true
   const canCheckIn = isOwner || membershipPermissions.all === true || membershipPermissions.checkin === true
   const canRecordTransactions = isOwner || membershipPermissions.all === true || membershipPermissions.orders === true
@@ -280,7 +284,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     if (!canAccessSection(nextSection)) return
     setSection(nextSection)
     setEventViewId(null)
-    setSidebarOpen(false)
+    setSidebarOpen(window.innerWidth >= 768)
     const nextPath = SECTION_PATHS[nextSection]
     if (window.location.pathname !== nextPath) window.history.pushState({}, '', nextPath)
   }
@@ -289,7 +293,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     if (!canViewEvents) return
     setSection('events')
     setEventViewId(event.id)
-    setSidebarOpen(false)
+    setSidebarOpen(window.innerWidth >= 768)
     const nextPath = `/dashboard/events/${event.id}`
     if (window.location.pathname !== nextPath) window.history.pushState({}, '', nextPath)
   }
@@ -344,7 +348,6 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
       .eq('recipient_scope', 'organizer')
     if (error) { setActionError(error.message); return }
     setOrganizerNotifications(current => current.map(item => item.id === notification.id ? { ...item, read_at: readAt } : item))
-    setUtilityPopup(null)
     const title = notification.title.toLowerCase()
     if (title.includes('member') || title.includes('role') || title.includes('permission') || title.includes('invite')) selectSection('members')
     else if (title.includes('order') || title.includes('ticket') || title.includes('inventory') || title.includes('sold out')) selectSection('events')
@@ -475,17 +478,6 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
   useEffect(() => {
     if (!orgId) return
-    const refresh = () => { void load() }
-    const interval = window.setInterval(refresh, 60_000)
-    window.addEventListener('focus', refresh)
-    return () => {
-      window.clearInterval(interval)
-      window.removeEventListener('focus', refresh)
-    }
-  }, [orgId, load])
-
-  useEffect(() => {
-    if (!orgId) return
     const loadFollowers = async () => {
       const { data } = await supabase
         .from('organizer_followers')
@@ -506,10 +498,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     return () => { void supabase.removeChannel(channel) }
   }, [orgId])
 
-  const localDateStart = (value: string) => {
-    const [year, month, day] = value.split('-').map(Number)
-    return new Date(year, month - 1, day, 0, 0, 0, 0)
-  }
+  // Keep server-defined event states compatible with the organizer event filters.
   const rangeEnd = new Date()
   const rangeStart = new Date(rangeEnd)
   if (analyticsRange === 'all') {
@@ -961,6 +950,57 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     if (notificationFilter === 'team') return notification.type === 'team' || notification.title.toLowerCase().includes('member') || notification.title.toLowerCase().includes('role')
     return true
   })
+  const overviewCalendarYear = overviewCalendarMonth.getFullYear()
+  const overviewCalendarMonthIndex = overviewCalendarMonth.getMonth()
+  const overviewCalendarDays = new Date(overviewCalendarYear, overviewCalendarMonthIndex + 1, 0).getDate()
+  const overviewCalendarOffset = (new Date(overviewCalendarYear, overviewCalendarMonthIndex, 1).getDay() + 6) % 7
+  const overviewCalendarCells = Array.from({ length: 42 }, (_, index) => {
+    const day = index - overviewCalendarOffset + 1
+    if (day < 1) {
+      const previousMonthDay = new Date(overviewCalendarYear, overviewCalendarMonthIndex, 0).getDate() + day
+      return { day: previousMonthDay, date: new Date(overviewCalendarYear, overviewCalendarMonthIndex - 1, previousMonthDay), inMonth: false }
+    }
+    if (day > overviewCalendarDays) {
+      return { day: day - overviewCalendarDays, date: new Date(overviewCalendarYear, overviewCalendarMonthIndex + 1, day - overviewCalendarDays), inMonth: false }
+    }
+    return { day, date: new Date(overviewCalendarYear, overviewCalendarMonthIndex, day), inMonth: true }
+  })
+  const overviewCalendarEventDays = new Set(events.map(event => event.date.slice(0, 10)))
+  const overviewCalendarUpcomingEvents = events
+    .filter(event => event.status === 'published' && event.date.slice(0, 10) >= localDateKey(new Date()))
+    .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime())
+  const nextPublishedEvent = events
+    .filter(event => event.status === 'published')
+    .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime())[0]
+  const getEventListStatus = (event: Event): Exclude<EventsFilter, 'all'> => {
+    const status = String(event.status)
+    if (status === 'draft') return 'drafts'
+    if (status === 'in_review' || status === 'review') return 'review'
+    if (status === 'cancelled' || status === 'inactive') return 'inactive'
+    if (status === 'completed') return 'past'
+    if (status === 'published') {
+      const eventEnd = new Date(`${event.end_date || event.date}T${event.end_time || event.time || '23:59'}`).getTime()
+      return Number.isFinite(eventEnd) && eventEnd < Date.now() ? 'past' : 'active'
+    }
+    return 'inactive'
+  }
+  const eventFilterTabs: { key: EventsFilter; label: string }[] = [
+    { key: 'all', label: 'All events' }, { key: 'active', label: 'Active' }, { key: 'review', label: 'In review' },
+    { key: 'inactive', label: 'Inactive' }, { key: 'drafts', label: 'Drafts' }, { key: 'past', label: 'Past' },
+  ]
+  const eventCategories = [...new Set(events.map(event => event.category).filter(Boolean))].sort()
+  const filteredEvents = events.filter(event => {
+    const query = eventsSearch.trim().toLowerCase() || dashboardSearch.trim().toLowerCase()
+    const matchesSearch = !query || `${event.title} ${event.venue} ${event.category}`.toLowerCase().includes(query)
+    const matchesStatus = eventsFilter === 'all' || getEventListStatus(event) === eventsFilter
+    const matchesCategory = eventsCategory === 'all' || event.category === eventsCategory
+    return matchesSearch && matchesStatus && matchesCategory
+  })
+  const overviewTicketsRemaining = events.reduce((total, event) => total + Math.max(0, event.capacity - (event.ticket_tiers?.reduce((sold, tier) => sold + tier.sold, 0) ?? 0)), 0)
+  const runDashboardSearch = () => {
+    if (!dashboardSearch.trim()) return
+    selectSection('events')
+  }
 
   return (
     <div className="organizer-dashboard-shell flex min-h-screen" style={{ background: 'linear-gradient(135deg, #0b0c0c 0%, #11100e 48%, #0b0c0c 100%)', color: 'var(--foreground)' }}>
@@ -1017,140 +1057,141 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
         </div>
       )}
 
-      {/* Sidebar */}
-      <aside className={`organizer-dashboard-sidebar fixed left-[18px] top-[18px] bottom-[18px] z-40 flex w-[264px] flex-col transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-[120%] lg:translate-x-0'}`}>
-        <div className="organizer-sidebar-brand">
-          <a href="/dashboard/analytics" onClick={event => { event.preventDefault(); selectSection('overview') }} className="flex items-center gap-3">
-            <span className="organizer-sidebar-logo">Q</span>
-            <span className="min-w-0"><strong>QPassa</strong><small>Organizer workspace</small></span>
-          </a>
-        </div>
-        <div className="organizer-sidebar-workspace">
-          <span className="organizer-sidebar-avatar">{(profile?.full_name?.trim() || organizer.name).slice(0, 1).toUpperCase()}</span>
-          <span className="min-w-0 flex-1"><strong className="block truncate">{organizer.name}</strong><small className="block truncate">{profile?.full_name?.trim() || organizer.name}</small></span>
-          <span className="organizer-sidebar-workspace-dot" aria-hidden="true" />
-        </div>
+      <OrganizerDashboardNav
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(value => !value)}
+        currentSection={section}
+        navItems={visibleNav}
+        navGroups={NAV_GROUPS}
+        navIcons={NAV_ICONS}
+        sectionPaths={SECTION_PATHS}
+        onSelectSection={key => selectSection(key as Section)}
+        organizationName={organizer.name}
+        organizationRole={isOwner ? 'Owner' : teamMembership?.organizer_roles?.name ?? 'Team member'}
+        organizerOptions={organizerOptions}
+        activeOrganizerId={organizer.id}
+        onSwitchOrganizer={switchOrganizer}
+        fullName={profile?.full_name?.trim() || organizer.name}
+        email={profile?.email || user?.email || ''}
+        avatarUrl={profile?.profile_image || profile?.avatar_url || null}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        searchValue={dashboardSearch}
+        onSearchChange={setDashboardSearch}
+        onSearch={runDashboardSearch}
+        canCreateEvent={canAccessSection('events')}
+        onCreateEvent={() => setShowNewEvent(true)}
+        notifications={organizerNotifications}
+        onOpenNotification={notification => { void openOrganizerNotification(notification) }}
+        onViewNotifications={() => selectSection('notifications')}
+        onNavigate={(page, extra) => navigate(page, extra ?? (page === 'organizer-profile' ? organizer : undefined))}
+        onSignOut={handleSignOut}
+      />
 
-        <nav className="organizer-sidebar-nav flex-1 overflow-y-auto" aria-label="Organizer dashboard sections">
-          {NAV_GROUPS.map(group => {
-            const groupItems = group.keys.flatMap(key => {
-              const item = visibleNav.find(navItem => navItem.key === key)
-              return item ? [item] : []
-            })
-            if (!groupItems.length) return null
-            return <div className="organizer-sidebar-group" key={group.label}>
-              <p className="organizer-sidebar-group-label">{group.label}</p>
-              {groupItems.map(({ key, label }) => {
-                const NavIcon = NAV_ICONS[key]
-                return <a key={key} href={SECTION_PATHS[key]} onClick={event => { event.preventDefault(); selectSection(key) }} aria-current={section === key ? 'page' : undefined} className="organizer-sidebar-link">
-                  <NavIcon size={17} />
-                  <span>{label}</span>
-                  {key === 'notifications' && unreadOrganizerNotifications.length > 0 && <i>{unreadOrganizerNotifications.length > 99 ? '99+' : unreadOrganizerNotifications.length}</i>}
-                </a>
-              })}
-            </div>
-          })}
-        </nav>
-
-        <div className="organizer-sidebar-footer">
-          <a href="/" onClick={event => { event.preventDefault(); navigate('home') }}><ArrowLeftIcon size={16} /><span>Back to site</span></a>
-          <small>QPassa · Burundi</small>
-        </div>
-      </aside>
-
-      {/* Overlay for mobile sidebar */}
-      {sidebarOpen && <div className="fixed inset-0 z-30 bg-black/60 lg:hidden" onClick={() => setSidebarOpen(false)} />}
-
-      <div className="organizer-dashboard-main flex min-w-0 flex-1 flex-col lg:pl-[300px]">
+      <div className={`organizer-dashboard-main flex min-w-0 flex-1 flex-col ${sidebarOpen ? 'organizer-sidebar-is-open' : ''}`}>
         {/* Main */}
         <main className="flex-1 min-w-0 flex flex-col">
-          {/* Top bar */}
-          <header className="sticky top-0 z-20 flex items-center justify-between px-5 py-3.5 border-b" style={{ background: 'rgba(11,12,12,0.88)', backdropFilter: 'blur(20px)', borderColor: 'rgba(255,255,255,0.09)' }}>
-            <div className="flex items-center gap-3">
-              <button className="lg:hidden p-1.5 rounded-lg" style={{ background: 'var(--muted)' }} onClick={() => setSidebarOpen(v => !v)}>
-                <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><rect y="2" width="16" height="1.5" rx="1"/><rect y="7" width="16" height="1.5" rx="1"/><rect y="12" width="16" height="1.5" rx="1"/></svg>
-              </button>
-              <div>
-                <div className="flex items-center gap-2"><h1 className="font-black text-base" style={{ fontFamily: 'Outfit, sans-serif' }}>
-                  {visibleNav.find(n => n.key === section)?.label ?? 'Dashboard'}
-                </h1><span className="hidden sm:inline rounded-md px-2 py-1 text-[10px] font-mono" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--muted-foreground)' }}>{SECTION_PATHS[section]}</span></div>
-                <p className="mt-1 text-[10px] font-mono sm:hidden" style={{ color: 'var(--muted-foreground)' }}>{SECTION_PATHS[section]}</p>
-                <p className="text-xs hidden sm:block" style={{ color: 'var(--muted-foreground)' }}>
-                  Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {profile?.full_name?.split(' ')[0] ?? 'Organizer'} 👋
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {utilityPopup && <button className="fixed inset-0 z-10 cursor-default" aria-label="Close popup" onClick={() => setUtilityPopup(null)} />}
-              <LanguageSwitcher bare />
-              <button type="button" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} className="organizer-theme-toggle flex h-9 w-9 items-center justify-center rounded-lg" style={{ color: 'var(--muted-foreground)', background: 'transparent' }}>
-                <DashboardThemeIcon theme={theme} />
-              </button>
-              <div className="relative z-20">
-                <button onClick={() => setUtilityPopup(current => current === 'notifications' ? null : 'notifications')} aria-label="Notifications" title="Notifications" className="relative flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: utilityPopup === 'notifications' ? 'rgba(200,169,110,0.14)' : 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}>
-                  <BellIcon size={18} />
-                  {organizerNotifications.filter(notification => !notification.read_at).length > 0 && <span className="absolute -right-2 -top-2 min-w-5 rounded-full px-1 text-center text-[10px] font-black" style={{ background: '#f97316', color: '#fff' }}>{organizerNotifications.filter(notification => !notification.read_at).length > 99 ? '99+' : organizerNotifications.filter(notification => !notification.read_at).length}</span>}
-                </button>
-                {utilityPopup === 'notifications' && (
-                  <div className="organizer-popover absolute right-0 top-11 flex h-80 w-72 flex-col rounded-xl p-4" style={{ background: 'var(--card)' }}>
-                    <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold">Organizer notifications</p><BellIcon size={15} /></div>
-                    <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto">
-                      {organizerNotifications.map(notification => (
-                        <button key={notification.id} type="button" onClick={() => void openOrganizerNotification(notification)} className="w-full rounded-xl px-3 py-2 text-left" style={{ background: notification.read_at ? 'rgba(255,255,255,0.04)' : 'rgba(200,169,110,0.12)' }}>
-                          <p className="text-xs font-semibold">{notification.title}</p>
-                          <p className="mt-1 text-[11px] leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>{notification.body}</p>
-                        </button>
-                      ))}
-                      {organizerNotifications.length === 0 && <p className="py-2 text-xs leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>No organizer notifications yet.</p>}
-                      <button type="button" onClick={() => { setUtilityPopup(null); selectSection('notifications') }} className="mt-2 w-full rounded-lg py-2 text-xs font-bold" style={{ color: 'var(--primary)', background: 'rgba(249,112,21,0.08)' }}>View all notifications</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              {canUseCalendar && <div className="relative z-20">
-                <button onClick={() => setUtilityPopup(current => current === 'calendar' ? null : 'calendar')} aria-label="Calendar" title="Calendar" className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: utilityPopup === 'calendar' ? 'rgba(200,169,110,0.14)' : 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}>
-                  <CalendarIcon size={18} />
-                </button>
-                {utilityPopup === 'calendar' && (
-                  <div className="organizer-popover absolute right-0 top-11 w-80 rounded-xl p-4" style={{ background: 'var(--card)' }}>
-                    <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold">Event calendar</p><CalendarIcon size={15} /></div>
-                    <div className="mt-3 space-y-2">
-                      {events.slice(0, 3).map(event => (
-                        <button key={event.id} onClick={() => { setUtilityPopup(null); openEventView(event) }} className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                          <span className="min-w-0 truncate text-xs font-semibold">{event.title}</span>
-                          <span className="shrink-0 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{event.date}</span>
-                        </button>
-                      ))}
-                      {events.length === 0 && <p className="py-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>No events scheduled yet.</p>}
-                    </div>
-                    {canViewEvents && <button onClick={() => { setUtilityPopup(null); selectSection('events') }} className="mt-4 w-full rounded-xl border px-3 py-2 text-xs font-bold" style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'var(--foreground)' }}>Open all events</button>}
-                  </div>
-                )}
-              </div>}
-              <a href={`/organizers/${organizer.id}/${organizer.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`} onClick={event => { event.preventDefault(); navigate('organizer-profile', organizer) }} className="hidden sm:flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold" style={{ borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}><LinkIcon size={14} /> Public profile</a>
-              <div className="relative z-20">
-                <button onClick={() => setUtilityPopup(current => current === 'profile' ? null : 'profile')} aria-label="Profile menu" title="Profile menu" className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors" style={{ background: utilityPopup === 'profile' ? 'rgba(200,169,110,0.14)' : 'transparent', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.78)' }}>
-                  {profile?.profile_image || profile?.avatar_url
-                    ? <img src={profile.profile_image || profile.avatar_url || ''} className="h-7 w-7 rounded-full object-cover" alt={profile.full_name ?? ''} />
-                    : <UserIcon size={18} />}
-                </button>
-                {utilityPopup === 'profile' && (
-                  <div className="organizer-popover absolute right-0 top-11 w-56 rounded-xl p-2" style={{ background: 'var(--card)' }}>
-                    <p className="px-3 py-2 text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{profile?.full_name?.trim() || organizer.name}</p>
-                    <button onClick={() => { setUtilityPopup(null); navigate('profile') }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-white/5"><UserIcon size={14} /> Account profile</button>
-                    <button onClick={() => { setUtilityPopup(null); navigate('organizer-profile', organizer) }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-white/5"><LinkIcon size={14} /> Organizer profile</button>
-                    <button onClick={() => { setUtilityPopup(null); navigate('home') }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-white/5"><EyeIcon size={14} /> View site</button>
-                    <button onClick={handleSignOut} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-white/5" style={{ color: '#f87171' }}><ArrowLeftIcon size={14} /> Sign out</button>
-                  </div>
-                )}
-              </div>
-              <a href="/" onClick={event => { event.preventDefault(); navigate('home') }} className="hidden md:flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.78)' }}><EyeIcon size={14} /> View site</a>
-            </div>
-          </header>
-
         {/* Content */}
-        <div className="flex-1 overflow-auto p-5">
-          {section === 'overview' && <div className="organizer-compliance-alert mb-5 rounded-2xl p-4">
+        <div className="flex-1 overflow-auto px-4 pb-4 pt-3">
+          {section === 'overview' && <section className="organizer-overview-page space-y-7">
+            <section className="organizer-overview-alerts" aria-label="Overview alerts">
+              <div className="organizer-overview-alert-heading"><AlertCircle size={15} /><strong>Overview alerts</strong></div>
+              {orders.filter(order => order.status === 'pending').length > 0 && <button type="button" onClick={() => selectSection('orders')}>
+                <span><strong>{orders.filter(order => order.status === 'pending').length} pending order{orders.filter(order => order.status === 'pending').length === 1 ? '' : 's'}</strong><small>Review payments and ticket orders</small></span><ArrowUpRight size={15} />
+              </button>}
+              {unreadOrganizerNotifications.length > 0 && <button type="button" onClick={() => selectSection('notifications')}>
+                <span><strong>{unreadOrganizerNotifications.length} unread update{unreadOrganizerNotifications.length === 1 ? '' : 's'}</strong><small>Check recent event and workspace activity</small></span><ArrowUpRight size={15} />
+              </button>}
+              {orders.every(order => order.status !== 'pending') && unreadOrganizerNotifications.length === 0 && <p>You’re all caught up. New order and workspace alerts will appear here.</p>}
+            </section>
+            <div className="organizer-overview-stat-grid">
+              <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><TicketCheck size={17} strokeWidth={1.8} /></span><small>Tickets sold</small><strong>{canViewOverviewAnalytics ? totalTicketsSold.toLocaleString() : '—'}</strong><span>{canViewOverviewAnalytics ? `${overviewTicketsRemaining.toLocaleString()} still available` : 'Analytics access required'}</span></article>
+              <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><CalendarDays size={17} strokeWidth={1.8} /></span><small>Published events</small><strong>{canViewEvents ? publishedEvents : '—'}</strong><span>{canViewEvents ? `${events.length} total in your workspace` : 'Event access required'}</span></article>
+              <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><CircleDollarSign size={17} strokeWidth={1.8} /></span><small>Net ticket revenue</small><strong>{canViewOverviewAnalytics || canAccessSection('transactions') ? formatPrice(totalRevenue) : '—'}</strong><span>{canViewOverviewAnalytics || canAccessSection('transactions') ? 'From confirmed ticket orders' : 'Finance access required'}</span></article>
+              <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><UsersRound size={17} strokeWidth={1.8} /></span><small>Customers</small><strong>{canViewOverviewCustomers ? customers.length.toLocaleString() : '—'}</strong><span>{canViewOverviewCustomers ? `${orders.length.toLocaleString()} orders recorded` : 'Customer access required'}</span></article>
+            </div>
+
+            <div className="organizer-overview-feature-grid">
+              <div className="organizer-overview-feature-left">
+              <button type="button" className="organizer-overview-featured-event" onClick={() => nextPublishedEvent ? openEventView(nextPublishedEvent) : setShowNewEvent(true)}>
+                <span className="organizer-overview-event-art">
+                  {nextPublishedEvent?.cover_image ? <img src={nextPublishedEvent.cover_image} alt="" /> : <span className="organizer-overview-art-mark"><TicketCheck size={38} strokeWidth={1.5} /></span>}
+                </span>
+                <span className="organizer-overview-event-copy">
+                  <span className="organizer-overview-card-kicker"><span className="organizer-live-dot" /> {nextPublishedEvent ? 'UP NEXT · PUBLISHED EVENT' : 'YOUR EVENT WORKSPACE'}</span>
+                  <strong>{nextPublishedEvent?.title ?? 'Your next big moment starts here'}</strong>
+                  <span>{nextPublishedEvent ? `${new Date(nextPublishedEvent.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${nextPublishedEvent.venue}` : 'Build an event page and start selling tickets.'}</span>
+                  <span className="organizer-overview-progress"><i style={{ width: `${nextPublishedEvent?.capacity ? `${Math.min(100, Math.round(((nextPublishedEvent.ticket_tiers?.reduce((sold, tier) => sold + tier.sold, 0) ?? 0) / nextPublishedEvent.capacity) * 100))}%` : '0%'}` }} /></span>
+                  <span className="organizer-overview-event-action">{nextPublishedEvent ? 'Open event' : 'Create your first event'} <ArrowUpRight size={16} /></span>
+                </span>
+              </button>
+
+              <section className="organizer-overview-quick-actions" aria-label="Quick actions">
+                <div className="organizer-overview-quick-heading"><p className="organizer-overview-card-kicker">QUICK ACTIONS</p><span>Jump back into your workflow</span></div>
+                <div className="organizer-overview-quick-grid">
+                  {canAccessSection('events') && <button type="button" onClick={() => setShowNewEvent(true)}>
+                    <span className="organizer-overview-quick-icon"><CalendarPlus size={17} /></span>
+                    <span><strong>Create an event</strong><small>Set up your next experience</small></span>
+                    <ArrowUpRight size={16} />
+                  </button>}
+                  {canAccessSection('events') && <button type="button" onClick={() => selectSection('events')}>
+                    <span className="organizer-overview-quick-icon"><CalendarDays size={17} /></span>
+                    <span><strong>Manage events</strong><small>Update listings and tickets</small></span>
+                    <ArrowUpRight size={16} />
+                  </button>}
+                  {canAccessSection('orders') && <button type="button" onClick={() => selectSection('orders')}>
+                    <span className="organizer-overview-quick-icon"><ClipboardList size={17} /></span>
+                    <span><strong>Review orders</strong><small>Check recent ticket sales</small></span>
+                    <ArrowUpRight size={16} />
+                  </button>}
+                  {canViewOverviewAnalytics && <button type="button" onClick={() => selectSection('analytics')}>
+                    <span className="organizer-overview-quick-icon"><ChartNoAxesCombined size={17} /></span>
+                    <span><strong>View analytics</strong><small>Track revenue and attendance</small></span>
+                    <ArrowUpRight size={16} />
+                  </button>}
+                </div>
+              </section>
+              </div>
+
+              <div className="organizer-overview-calendar-column">
+              <section className="organizer-overview-calendar" aria-label="Event calendar">
+                <div className="organizer-overview-calendar-heading">
+                  <button type="button" aria-label="Previous month" onClick={() => setOverviewCalendarMonth(month => new Date(month.getFullYear(), month.getMonth() - 1, 1))}><ChevronLeft size={17} /></button>
+                  <h3>{overviewCalendarMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</h3>
+                  <button type="button" aria-label="Next month" onClick={() => setOverviewCalendarMonth(month => new Date(month.getFullYear(), month.getMonth() + 1, 1))}><ChevronRight size={17} /></button>
+                </div>
+                <div className="organizer-overview-calendar-grid" role="grid" aria-label={overviewCalendarMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}>
+                  {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day, index) => <span className="organizer-overview-calendar-weekday" key={`${day}-${index}`} role="columnheader">{day}</span>)}
+                  {overviewCalendarCells.map(({ day, date, inMonth }) => {
+                    const dateKey = localDateKey(date)
+                    const hasEvents = overviewCalendarEventDays.has(dateKey)
+                    return <button key={dateKey} type="button" role="gridcell" aria-label={`${date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}${hasEvents ? ', events scheduled' : ''}`} aria-pressed={overviewCalendarDate === dateKey} data-today={dateKey === localDateKey(new Date()) || undefined} data-has-events={hasEvents || undefined} data-in-month={inMonth || undefined} onClick={() => { setOverviewCalendarDate(dateKey); if (!inMonth) setOverviewCalendarMonth(new Date(date.getFullYear(), date.getMonth(), 1)) }}>{day}{hasEvents && <i />}</button>
+                  })}
+                </div>
+                <div className="organizer-overview-calendar-agenda">
+                  <strong>Upcoming events</strong>
+                  {overviewCalendarUpcomingEvents.length ? <>
+                    {overviewCalendarUpcomingEvents.slice(0, 3).map(event => <button key={event.id} type="button" onClick={() => openEventView(event)}><span><strong>{event.title}</strong><small>{new Date(`${event.date.slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</small></span><ArrowUpRight size={13} /></button>)}
+                    {overviewCalendarUpcomingEvents.length > 3 && <button type="button" className="organizer-overview-calendar-see-more" onClick={() => selectSection('events')}>See more <ArrowUpRight size={13} /></button>}
+                  </> : <span>No upcoming events</span>}
+                </div>
+              </section>
+              </div>
+            </div>
+
+            <div className="organizer-overview-bottom-grid">
+              <section className="organizer-overview-panel">
+                <div className="organizer-overview-panel-heading"><div><p className="organizer-overview-card-kicker">YOUR WORKSPACE</p><h3>Pick up where you left off</h3></div><button type="button" onClick={() => selectSection('events')} aria-label="View all events"><ArrowUpRight size={17} /></button></div>
+                {events.slice(0, 3).length ? <div className="organizer-overview-event-list">{events.slice(0, 3).map(event => <button key={event.id} type="button" onClick={() => openEventView(event)}><span className="organizer-overview-event-thumb">{event.cover_image ? <img src={event.cover_image} alt="" /> : <CalendarDays size={18} />}</span><span className="min-w-0 flex-1"><strong>{event.title}</strong><small>{new Date(event.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} · {event.venue}</small></span><Badge label={event.status} color={STATUS_COLORS[event.status] ?? '#888'} /><ChevronRight size={15} /></button>)}</div> : <div className="organizer-overview-empty"><p>No events yet—your first one can start today.</p><button type="button" onClick={() => setShowNewEvent(true)}>Create event <Plus size={15} /></button></div>}
+              </section>
+              {canViewOverviewOrders && <section className="organizer-overview-panel organizer-overview-orders-panel">
+                <div className="organizer-overview-panel-heading"><div><p className="organizer-overview-card-kicker">RECENT ACTIVITY</p><h3>Latest orders</h3></div><button type="button" onClick={() => selectSection('orders')} aria-label="View all orders"><ArrowUpRight size={17} /></button></div>
+                {orders.slice(0, 3).length ? <div className="organizer-overview-order-list">{orders.slice(0, 3).map(order => <button type="button" key={order.id} onClick={() => { selectSection('orders'); setSelectedOrder(order) }}><span className="organizer-overview-order-icon"><TicketCheck size={16} /></span><span className="min-w-0 flex-1"><strong>{(order as any).profiles?.full_name ?? 'Ticket buyer'}</strong><small>{(order as any).events?.title ?? 'Event ticket'} · {new Date(order.created_at).toLocaleDateString()}</small></span><span className="organizer-overview-order-total">{formatPrice(order.total)}</span></button>)}</div> : <div className="organizer-overview-empty"><p>New ticket orders will show up here.</p><button type="button" onClick={() => selectSection('events')}>Explore events <ArrowUpRight size={15} /></button></div>}
+              </section>}
+            </div>
+          </section>}
+
+          {section === 'analytics' && <div className="organizer-compliance-alert mb-5 rounded-2xl p-4">
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(249,112,21,0.12)', color: 'var(--primary)' }}>
                 <ShieldIcon size={18} />
@@ -1163,16 +1204,9 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
             </div>
           </div>}
 
-          {dataLoading && (
-            <div className="flex items-center justify-center py-20">
-              <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
-            </div>
-          )}
-
-          {!dataLoading && (
-            <>
+          <>
               {/* ── ANALYTICS / OVERVIEW ── */}
-              {section === 'overview' && (
+              {section === 'analytics' && (
                 <div className="space-y-6">
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3" style={{ borderColor: 'var(--border)' }}>
                     <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Analytics range</p>
@@ -1380,68 +1414,68 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                   onEdit={event => setEditingEvent(event)}
                   navigate={navigate}
                 /> :
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div><h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Events</h2><p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{events.length} event{events.length === 1 ? '' : 's'} in your workspace</p></div>
-                    <button onClick={() => setShowNewEvent(true)} className="shrink-0 rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: 'var(--primary)', color: '#000' }}>+ New Event</button>
-                  </div>
-                  {events.length === 0 && (
-                    <div className="text-center py-20">
-                      <p className="text-4xl mb-4">🎭</p>
-                      <p className="font-bold text-lg mb-2">No events yet</p>
-                      <button onClick={() => setShowNewEvent(true)} className="mt-4 px-6 py-3 rounded-xl text-sm font-bold" style={{ background: 'var(--primary)', color: '#000' }}>
-                        + Create your first event
+                <section className="organizer-events-page">
+                  <header className="organizer-events-heading">
+                    <h1>Events</h1>
+                    <button type="button" className="organizer-events-create" onClick={() => setShowNewEvent(true)}><Plus size={17} />Create event</button>
+                  </header>
+
+                  <div className="organizer-events-tabs" role="tablist" aria-label="Filter events by status">
+                    {eventFilterTabs.map(tab => {
+                      const count = tab.key === 'all' ? events.length : events.filter(event => getEventListStatus(event) === tab.key).length
+                      return <button key={tab.key} type="button" role="tab" aria-selected={eventsFilter === tab.key} onClick={() => setEventsFilter(tab.key)}>
+                        <span>{tab.label}</span><small>{count}</small>
                       </button>
-                    </div>
-                  )}
-                  {events.map(ev => {
-                    const sold = ev.ticket_tiers?.reduce((s, t) => s + t.sold, 0) ?? 0
-                    const pct = ev.capacity > 0 ? Math.round((sold / ev.capacity) * 100) : 0
-                    return (
-                      <div key={ev.id} className="rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row gap-4 sm:items-center" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                        <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0" style={{ background: '#1a1a1a' }}>
-                          {ev.cover_image && <img src={ev.cover_image} alt={ev.title} className="w-full h-full object-cover" />}
+                    })}
+                  </div>
+
+                  <div className="organizer-events-toolbar">
+                    <label className="organizer-events-search"><Search size={17} aria-hidden="true" /><input type="search" value={eventsSearch} onChange={event => setEventsSearch(event.target.value)} placeholder="Search by event title…" aria-label="Search events by title" /></label>
+                    <label className="organizer-events-category"><Filter size={15} aria-hidden="true" /><select value={eventsCategory} onChange={event => setEventsCategory(event.target.value)} aria-label="Filter by category"><option value="all">All categories</option>{eventCategories.map(category => <option key={category} value={category}>{category}</option>)}</select></label>
+                    <span className="organizer-events-result-count">{filteredEvents.length} shown</span>
+                  </div>
+
+                  {filteredEvents.length === 0 ? <div className="organizer-events-empty">
+                    <span><CalendarDays size={23} /></span><h2>{events.length ? 'No events match these filters' : 'Your next event starts here'}</h2>
+                    <p>{events.length ? 'Try another status, category, or search term.' : 'Create an event page and bring your next experience to life.'}</p>
+                    <button type="button" onClick={() => events.length ? (setEventsFilter('all'), setEventsCategory('all'), setEventsSearch(''), setDashboardSearch('')) : setShowNewEvent(true)}>{events.length ? 'Clear filters' : 'Create your first event'} <ArrowUpRight size={15} /></button>
+                  </div> : <div className="organizer-events-grid">
+                    {filteredEvents.map(ev => {
+                      const sold = ev.ticket_tiers?.reduce((sum, tier) => sum + tier.sold, 0) ?? 0
+                      const capacity = ev.capacity || ev.ticket_tiers?.reduce((sum, tier) => sum + tier.quantity, 0) || 0
+                      const pct = capacity > 0 ? Math.min(100, Math.round((sold / capacity) * 100)) : 0
+                      const eventStatus = getEventListStatus(ev)
+                      const dateValue = ev.date ? new Date(`${ev.date.slice(0, 10)}T${ev.time || '12:00'}`) : null
+                      const validDate = dateValue && Number.isFinite(dateValue.getTime())
+                      const dateLabel = validDate ? dateValue.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : 'Date to be announced'
+                      return <article key={ev.id} className="organizer-event-card">
+                        <div className="organizer-event-card-art">
+                          <button type="button" className="organizer-event-card-image" onClick={() => openEventView(ev)} aria-label={`Open ${ev.title}`}>
+                            {ev.cover_image ? <img src={ev.cover_image} alt="" loading="lazy" /> : <span className="organizer-event-card-placeholder"><TicketCheck size={34} strokeWidth={1.5} /><small>{ev.category}</small></span>}
+                            <span className="organizer-event-card-shade" />
+                          </button>
+                          <span className={`organizer-event-status is-${eventStatus}`}>{eventStatus === 'review' ? 'In review' : eventStatus === 'drafts' ? 'Draft' : eventStatus === 'active' ? 'Published' : eventStatus === 'past' ? 'Past event' : 'Inactive'}</span>
+                          <button type="button" className="organizer-event-more" aria-label={`More actions for ${ev.title}`} aria-expanded={openEventMenu === ev.id} onClick={() => setOpenEventMenu(current => current === ev.id ? null : ev.id)}><MoreHorizontal size={19} /></button>
+                          {openEventMenu === ev.id && <div className="organizer-event-menu" role="menu">
+                            <button type="button" role="menuitem" onClick={() => { setOpenEventMenu(null); openEventView(ev) }}><EyeIcon size={15} />View details</button>
+                            <button type="button" role="menuitem" onClick={() => { setOpenEventMenu(null); setEditingEvent(ev) }}><EditIcon size={15} />Edit event</button>
+                            <button type="button" role="menuitem" onClick={() => { setOpenEventMenu(null); void toggleEventStatus(ev) }}>{ev.status === 'published' ? <XIcon size={15} /> : <CheckIcon size={15} />}{ev.status === 'published' ? 'Unpublish' : 'Publish'}</button>
+                            <button type="button" role="menuitem" className="is-danger" onClick={() => { setOpenEventMenu(null); void deleteEvent(ev.id) }}><TrashIcon size={15} />Delete event</button>
+                          </div>}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <p className="font-bold text-sm truncate">{ev.title}</p>
-                            <Badge label={ev.status} color={STATUS_COLORS[ev.status] ?? '#888'} />
-                          </div>
-                          <p className="text-xs mb-2" style={{ color: 'var(--muted-foreground)' }}>
-                            📅 {new Date(ev.date).toLocaleDateString()} · 📍 {ev.venue} · {ev.category}
-                          </p>
-                          <div className="flex items-center gap-3">
-                            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)', maxWidth: 120 }}>
-                              <div className="h-full rounded-full" style={{ width: `${pct}%`, background: pct > 80 ? '#ef4444' : 'var(--primary)' }} />
-                            </div>
-                            <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{sold}/{ev.capacity} sold</p>
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 items-center justify-end gap-2 self-stretch sm:self-auto">
-                          <button type="button" onClick={() => openEventView(ev)} aria-label={`View ${ev.title}`} title="View event" className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ background: 'rgba(255,255,255,0.06)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
-                            <EyeIcon size={16} />
-                          </button>
-                          <button type="button" onClick={() => setEditingEvent(ev)} aria-label={`Edit ${ev.title}`} title="Edit event" className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors hover:bg-orange-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ background: 'rgba(249,112,21,0.1)', borderColor: 'rgba(249,112,21,0.2)', color: 'var(--primary)' }}>
-                            <EditIcon size={16} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => toggleEventStatus(ev)}
-                            aria-label={`${ev.status === 'published' ? 'Unpublish' : 'Publish'} ${ev.title}`}
-                            title={ev.status === 'published' ? 'Unpublish event' : 'Publish event'}
-                            className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-                            style={{ background: ev.status === 'published' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)', borderColor: ev.status === 'published' ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)', color: ev.status === 'published' ? '#ef4444' : '#22c55e' }}
-                          >
-                            {ev.status === 'published' ? <XIcon size={16} /> : <CheckIcon size={16} />}
-                          </button>
-                          <button type="button" onClick={() => deleteEvent(ev.id)} aria-label={`Delete ${ev.title}`} title="Delete event" className="flex h-9 w-9 items-center justify-center rounded-xl border transition-colors hover:bg-red-500/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ background: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.16)', color: '#ef4444' }}>
-                            <TrashIcon size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                        <button type="button" className="organizer-event-card-copy" onClick={() => openEventView(ev)}>
+                          <span className="organizer-event-card-category">{ev.category || 'Event'}</span>
+                          <strong>{ev.title || 'Untitled event'}</strong>
+                          <span className="organizer-event-card-meta"><span><CalendarDays size={14} />{dateLabel}</span><span><MapPin size={14} />{ev.venue || 'Location to be announced'}</span></span>
+                          <span className="organizer-event-sales">
+                            <span className="organizer-event-sales-label"><b>Ticket sales</b><small>{sold.toLocaleString()} / {capacity.toLocaleString()} sold</small></span>
+                            <span className="organizer-event-progress"><i style={{ width: `${pct}%` }} /></span>
+                          </span>
+                        </button>
+                      </article>
+                    })}
+                  </div>}
+                </section>
                 
               )}
 
@@ -1699,7 +1733,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                     {refundRequests.length === 0 ? <div className="px-5 py-14 text-center"><p className="font-bold">No refund requests</p><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>New requests from ticket holders will appear here.</p></div> : <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
                       {refundRequests.map(request => <div key={request.id} className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-bold text-sm">{request.profiles?.full_name || request.profiles?.email || 'Customer'}</p><Badge label={request.status} color={STATUS_COLORS[request.status] ?? '#888'} /></div><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{request.events?.title || 'Event'} · {new Date(request.created_at).toLocaleString()}</p><p className="mt-3 text-sm leading-relaxed">{request.reason}</p><p className="mt-2 font-mono text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Order {request.order_id.slice(0, 8)}…{request.ticket_id ? ` · Ticket ${request.ticket_id.slice(0, 8)}…` : ''}</p></div>
-                        <div className="flex shrink-0 flex-wrap gap-2">{request.status === 'pending' && <><button type="button" onClick={() => void reviewRefundRequest(request, 'approved')} className="rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'rgba(34,197,94,0.14)', color: '#86efac' }}>Approve</button><button type="button" onClick={() => void reviewRefundRequest(request, 'rejected')} className="rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'rgba(239,68,68,0.14)', color: '#fca5a5' }}>Decline</button></>}<a href="mailto:hello@qpassa.events?subject=Refund%20request%20review" className="rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>Contact support</a></div>
+                        <div className="flex shrink-0 flex-wrap gap-2">{request.status === 'pending' && <><button type="button" onClick={() => void reviewRefundRequest(request, 'approved')} className="rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'rgba(255,106,0,0.14)', color: 'var(--primary)' }}>Approve</button><button type="button" onClick={() => void reviewRefundRequest(request, 'rejected')} className="rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'rgba(239,68,68,0.14)', color: '#fca5a5' }}>Decline</button></>}<a href="mailto:hello@qpassa.events?subject=Refund%20request%20review" className="rounded-xl px-3 py-2 text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>Contact support</a></div>
                       </div>)}
                     </div>}
                   </div>
@@ -1860,8 +1894,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                   </div>
                 </div>
               )}
-            </>
-          )}
+          </>
         </div>
       </main>
       </div>

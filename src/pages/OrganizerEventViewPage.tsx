@@ -29,8 +29,8 @@ function formatDate(value: string) {
 }
 
 function Detail({ Icon, label, value }: { Icon: React.FC<{ size?: number }>; label: string; value: string }) {
-  return <div className="flex min-w-0 items-start gap-3 rounded-xl border p-4" style={{ background: 'rgba(255,255,255,0.025)', borderColor: 'var(--border)' }}>
-    <span className="mt-0.5 text-[var(--primary)]"><Icon size={17} /></span>
+  return <div className="organizer-event-view-detail flex min-w-0 items-start gap-3 rounded-xl border p-4" style={{ background: 'rgba(255,255,255,0.025)', borderColor: 'var(--border)' }}>
+    <span className="organizer-event-view-detail-icon mt-0.5 text-[var(--primary)]"><Icon size={17} /></span>
     <span className="min-w-0"><small className="block text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>{label}</small><b className="mt-1 block break-words text-sm">{value}</b></span>
   </div>
 }
@@ -213,17 +213,17 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
   const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`
 
   return <>
-  <div className="mx-auto w-full max-w-6xl space-y-5 pb-10">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <button type="button" onClick={onBack} aria-label="Back to all events" title="Back to all events" className="flex h-10 w-10 items-center justify-center rounded-xl border transition hover:bg-white/5" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={18} /></button>
+  <div className="organizer-event-view-page mx-auto w-full max-w-6xl space-y-5 pb-10">
+    <div className="organizer-event-view-toolbar flex flex-wrap items-center justify-between gap-3">
+      <button type="button" onClick={onBack} aria-label="Back to all events" title="Back to all events" className="organizer-event-view-icon-button flex h-10 w-10 items-center justify-center rounded-xl border transition hover:bg-white/5" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={18} /></button>
       <div className="flex flex-wrap gap-2">
-        {event.status === 'published' && <button type="button" onClick={() => navigate('event-detail', event)} aria-label="Preview public event page" title="Preview public page" className="flex h-10 w-10 items-center justify-center rounded-xl border transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.04)', color: 'var(--foreground)' }}><EyeIcon size={17} /></button>}
-        {canCheckIn && event.status === 'published' && <button type="button" onClick={() => setCheckInOpen(true)} aria-label="Check in guests" title="Check in guests" className="flex h-10 w-10 items-center justify-center rounded-xl border transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.04)', color: 'var(--foreground)' }}><QrCodeIcon size={17} /></button>}
-        <button type="button" onClick={() => onEdit(event)} aria-label="Edit event" title="Edit event" className="flex h-10 w-10 items-center justify-center rounded-xl transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ background: 'var(--primary)', color: '#111' }}><EditIcon size={17} /></button>
+        {event.status === 'published' && <button type="button" onClick={() => navigate('event-detail', event)} aria-label="Preview public event page" title="Preview public page" className="organizer-event-view-icon-button flex h-10 w-10 items-center justify-center rounded-xl border transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.04)', color: 'var(--foreground)' }}><EyeIcon size={17} /></button>}
+        {canCheckIn && event.status === 'published' && <button type="button" onClick={() => setCheckInOpen(true)} aria-label="Check in guests" title="Check in guests" className="organizer-event-view-icon-button flex h-10 w-10 items-center justify-center rounded-xl border transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.04)', color: 'var(--foreground)' }}><QrCodeIcon size={17} /></button>}
+        <button type="button" onClick={() => onEdit(event)} aria-label="Edit event and ticket tiers" title="Edit event and ticket tiers" className="organizer-event-view-edit inline-flex h-10 items-center justify-center gap-2 rounded-full px-4 text-xs font-bold transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ background: 'var(--primary)', color: '#111' }}><EditIcon size={15} /> Edit event</button>
       </div>
     </div>
 
-    <section className="relative min-h-[260px] overflow-hidden rounded-3xl border" style={{ borderColor: 'var(--border)', background: event.cover_image ? `linear-gradient(90deg, rgba(7,8,8,.94) 0%, rgba(7,8,8,.72) 54%, rgba(7,8,8,.2) 100%), url(${event.cover_image}) center/cover` : 'linear-gradient(130deg, #262018, #121414 70%)' }}>
+    <section className="organizer-event-view-hero relative min-h-[260px] overflow-hidden rounded-3xl border" style={{ borderColor: 'var(--border)', background: event.cover_image ? `linear-gradient(90deg, rgba(7,8,8,.94) 0%, rgba(7,8,8,.72) 54%, rgba(7,8,8,.2) 100%), url(${event.cover_image}) center/cover` : 'linear-gradient(130deg, #262018, #121414 70%)' }}>
       <div className="flex min-h-[260px] flex-col justify-end p-6 sm:p-9">
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <span className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider" style={{ color: event.status === 'published' ? '#86efac' : event.status === 'draft' ? '#ffd27a' : '#fca5a5', background: event.status === 'published' ? 'rgba(34,197,94,.13)' : event.status === 'draft' ? 'rgba(240,165,0,.14)' : 'rgba(239,68,68,.14)' }}>{event.status}</span>
@@ -234,26 +234,26 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
       </div>
     </section>
 
-    <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <section className="organizer-event-view-stats grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {[
         { label: 'Net In-App Sales', value: formatPrice(netInAppSales), note: 'After fees, agent commissions, and processed refunds', Icon: DollarSignIcon, color: 'var(--primary)' },
         { label: 'Net Cash Sales', value: formatPrice(cashSales), note: 'After fees, agent commissions, and processed refunds', Icon: DollarSignIcon, color: '#86efac' },
         { label: 'Platform Commissions', value: formatPrice(platformCommission), note: 'Deducted from organizer proceeds', Icon: DollarSignIcon, color: '#c4a7ff' },
         { label: 'Agent Commissions', value: formatPrice(agentCommission), note: 'Earned by ticket agents', Icon: UsersIcon, color: '#7dd3fc' },
-      ].map(({ label, value, note, Icon, color }) => <div key={label} className="rounded-2xl border p-4 sm:p-5" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: `${color}18`, color }}><Icon size={17} /></div>
+      ].map(({ label, value, note, Icon, color }) => <div key={label} className="organizer-event-view-stat rounded-2xl border p-4 sm:p-5" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+        <div className="organizer-event-view-stat-icon flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: `${color}18`, color }}><Icon size={17} /></div>
         <p className="mt-4 break-words text-lg font-black sm:text-2xl">{value}</p><p className="mt-1 text-xs font-semibold">{label}</p><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{note}</p>
       </div>)}
     </section>
 
     <div className="grid gap-5 lg:grid-cols-2">
-    <section className="rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+    <section className="organizer-event-view-panel rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
       <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Traffic</p><h2 className="mt-1 text-lg font-bold">Ticket activity</h2></div><span className="rounded-lg px-2.5 py-1 text-[10px] font-bold" style={{ background: 'rgba(249,112,21,.1)', color: 'var(--primary)' }}>Last 7 days</span></div>
       <TrafficChart orders={trafficOrders} />
       <p className="mt-3 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Orders per day. Public page visit tracking is not currently collected.</p>
     </section>
 
-    <section className="rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+    <section className="organizer-event-view-panel rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Attendance and inventory</p><h2 className="mt-1 text-lg font-bold">Tickets summary</h2></div>
       </div>
@@ -263,7 +263,7 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
     </section>
     </div>
 
-    <section className="overflow-hidden rounded-2xl border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+    <section className="organizer-event-view-panel organizer-event-view-customers overflow-hidden rounded-2xl border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
       <div className="flex flex-col gap-4 border-b p-5 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--border)' }}>
         <div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Audience</p><h2 className="mt-1 text-lg font-bold">Event customers <span className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>({filteredCustomers.length})</span></h2></div>
         <button type="button" onClick={exportCustomers} disabled={!filteredCustomers.length} className="inline-flex items-center justify-center gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40" style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}><DownloadIcon size={14} /> Export CSV</button>
@@ -282,7 +282,7 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
       </div>
     </section>
 
-    {canRecordTransaction && <section className="rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+    {canRecordTransaction && <section className="organizer-event-view-panel organizer-event-view-manual-sale rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
       <div className="mb-5"><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Manual sale</p><h2 className="mt-1 text-lg font-bold">Record Transaction</h2><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Record a completed payment and issue tickets to the customer.</p></div>
       {saleError && <p role="alert" className="mb-4 rounded-xl border px-4 py-3 text-xs" style={{ borderColor: 'rgba(239,68,68,.3)', background: 'rgba(239,68,68,.08)', color: '#fca5a5' }}>{saleError}</p>}
       {saleMessage && <p role="status" className="mb-4 rounded-xl border px-4 py-3 text-xs" style={{ borderColor: 'rgba(34,197,94,.3)', background: 'rgba(34,197,94,.08)', color: '#86efac' }}>{saleMessage}</p>}
@@ -299,7 +299,7 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
 
     <div className="grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
       <div className="space-y-5">
-        <section className="rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+        <section className="organizer-event-view-panel rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
           <div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Event overview</p><h2 className="mt-1 text-lg font-bold">Details</h2></div><TrendingUpIcon size={18} /></div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Detail Icon={CalendarIcon} label="Date" value={event.end_date && event.end_date !== event.date ? `${formatDate(event.date)} – ${formatDate(event.end_date)}` : formatDate(event.date)} />
@@ -321,13 +321,13 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
           {!!eventTags.length && <div className="mt-5 flex flex-wrap gap-2">{eventTags.map(tag => <span key={tag} className="rounded-full border px-3 py-1 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>#{tag}</span>)}</div>}
         </section>
 
-        <section className="rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+        <section className="organizer-event-view-panel organizer-event-view-tiers rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
           <div className="mb-4 flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Inventory</p><h2 className="mt-1 text-lg font-bold">Ticket tiers</h2></div><span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{ticketsReserved.toLocaleString()} reserved</span></div>
           {tiers.length === 0 ? <p className="rounded-xl border p-5 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>No ticket tiers have been added.</p> : <div className="space-y-3">{tiers.map(tier => {
             const tierRemaining = Math.max(0, tier.quantity - tier.sold)
             const tierPercent = tier.quantity ? Math.min(100, Math.round(tier.sold / tier.quantity * 100)) : 0
-            return <div key={tier.id} className="rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.02)' }}>
-              <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-bold">{tier.name}</h3><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{tier.price === 0 ? 'Free' : formatPrice(tier.price)} · {tier.ticket_type === 'consumable' ? 'Consumable' : 'Non-consumable'}</p></div><span className="text-xs font-bold" style={{ color: 'var(--primary)' }}>{tier.sold.toLocaleString()} sold</span></div>
+            return <div key={tier.id} className="organizer-event-view-tier rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.02)' }}>
+              <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="text-sm font-bold">{tier.name}</h3><p className="mt-1 text-lg font-black tracking-tight" style={{ color: 'var(--primary)' }}>{tier.price === 0 ? 'Free' : formatPrice(tier.price)}</p><p className="mt-0.5 text-[11px]" style={{ color: 'var(--muted-foreground)' }}>{tier.ticket_type === 'consumable' ? 'Consumable' : 'Non-consumable'}</p></div><div className="flex items-center gap-2"><span className="rounded-full px-3 py-1 text-[10px] font-bold" style={{ color: 'var(--primary)', background: 'color-mix(in srgb, var(--primary) 12%, transparent)' }}>{tier.sold.toLocaleString()} sold</span><button type="button" onClick={() => onEdit(event)} aria-label={`Edit ${tier.name} ticket tier`} title={`Edit ${tier.name} ticket tier`} className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[10px] font-bold transition hover:brightness-110" style={{ background: 'var(--card)', color: 'var(--foreground)' }}><EditIcon size={12} /> Edit tier</button></div></div>
               {tier.description && <p className="mt-2 text-xs leading-5" style={{ color: 'var(--muted-foreground)' }}>{tier.description}</p>}
               {(tier.extra_info || (tier.group_size ?? 1) > 1 || tier.expires_at || tier.ticket_type === 'consumable') && <p className="mt-2 text-[11px]" style={{ color: 'var(--muted-foreground)' }}>{[tier.extra_info, tier.consumable_amount ? `Includes ${tier.consumable_amount} consumable(s)` : null, (tier.group_size ?? 1) > 1 ? `${tier.group_size} tickets per purchase` : null, tier.expires_at ? `Expires ${formatDate(tier.expires_at)}` : null].filter(Boolean).join(' · ')}</p>}
               <div className="mt-3 flex items-center gap-3"><div className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}><div className="h-full rounded-full" style={{ width: `${tierPercent}%`, background: 'var(--primary)' }} /></div><span className="shrink-0 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{tierRemaining.toLocaleString()} left / {tier.quantity.toLocaleString()}</span></div>
@@ -337,19 +337,19 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
       </div>
 
       <div className="space-y-5">
-        <section className="rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+        <section className="organizer-event-view-panel rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
           <div className="mb-4"><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Location</p><h2 className="mt-1 text-lg font-bold">Venue</h2></div>
           <div className="mb-4 flex items-start gap-3"><MapPinIcon size={17} /><div><p className="text-sm font-semibold">{event.venue}</p><p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{event.city}</p></div></div>
           <div className="overflow-hidden rounded-xl border" style={{ borderColor: 'var(--border)' }}><iframe title={`${event.venue} location map`} src={`https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed`} className="h-56 w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" /></div>
           <a href={mapUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block text-xs font-bold" style={{ color: 'var(--primary)' }}>Open in Google Maps ↗</a>
         </section>
 
-        <section className="rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+        <section className="organizer-event-view-panel organizer-event-view-policies rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
           <p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Entry information</p><h2 className="mt-1 text-lg font-bold">Policies</h2>
           <div className="mt-4 space-y-3"><div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,.03)' }}><p className="text-xs font-bold">Refund policy</p><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>{event.refund_policy || 'Tickets are non-refundable'}</p></div><div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,.03)' }}><p className="text-xs font-bold">Entry policy</p><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>{event.entry_policy || 'Valid ID required at entry'}</p></div></div>
         </section>
 
-        <section className="rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+        <section className="organizer-event-view-panel rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
           <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Sales progress</p><h2 className="mt-1 text-lg font-bold">Capacity</h2></div><span className="text-sm font-black">{salesProgress}%</span></div>
           <div className="mt-4 h-2.5 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}><div className="h-full rounded-full" style={{ width: `${salesProgress}%`, background: 'linear-gradient(90deg, var(--primary), #ffc176)' }} /></div>
           <div className="mt-2 flex justify-between text-xs" style={{ color: 'var(--muted-foreground)' }}><span>{ticketsReserved.toLocaleString()} reserved</span><span>{maxTickets.toLocaleString()} total tickets</span></div>

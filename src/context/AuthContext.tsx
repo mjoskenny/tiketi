@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { type User, type Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { Profile, Organizer, TeamMembership, AgentInvitation, AgentAssignment } from '../lib/types'
@@ -8,6 +8,8 @@ type AuthState = {
   session: Session | null
   profile: Profile | null
   organizer: Organizer | null
+  organizerOptions: Array<{ organizer: Organizer; membership: TeamMembership | null }>
+  switchOrganizer: (organizerId: string) => void
   teamMembership: TeamMembership | null
   agentInvitations: AgentInvitation[]
   agentAssignments: AgentAssignment[]
@@ -22,6 +24,8 @@ const AuthContext = createContext<AuthState>({
   session: null,
   profile: null,
   organizer: null,
+  organizerOptions: [],
+  switchOrganizer: () => {},
   teamMembership: null,
   agentInvitations: [],
   agentAssignments: [],
@@ -165,11 +169,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [organizer, setOrganizer] = useState<Organizer | null>(null)
+  const [organizerOptions, setOrganizerOptions] = useState<Array<{ organizer: Organizer; membership: TeamMembership | null }>>([])
   const [teamMembership, setTeamMembership] = useState<TeamMembership | null>(null)
   const [agentInvitations, setAgentInvitations] = useState<AgentInvitation[]>([])
   const [agentAssignments, setAgentAssignments] = useState<AgentAssignment[]>([])
   const [loading, setLoading] = useState(true)
   const [profileLoading, setProfileLoading] = useState(true)
+  const profileLoadUserId = useRef<string | null>(null)
 
   const isOrganizer = teamMembership
     ? teamMembership.status === 'active'
@@ -187,24 +193,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const role = resolvedRole(verified)
 
-      const { data: membership } = await supabase
-        .from('organizer_members')
-        .select('*, organizer_roles(*), organizers(*, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email))')
-        .eq('user_id', verified.id)
-        .in('status', ['pending', 'active'])
-        .maybeSingle()
-      const teamOrganizer = membership?.organizer
-        ?? (membership?.organizer_id
-          ? (await supabase
-            .from('organizers')
-            .select('*, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email)')
-            .eq('id', membership.organizer_id)
-            .maybeSingle()).data
-          : null)
-      const resolvedMembership = membership
-        ? { ...membership, organizer: teamOrganizer ?? undefined } as TeamMembership
-        : null
-      setTeamMembership(resolvedMembership)
+      const [{ data: memberships }, { data: ownedOrganizers }] = await Promise.all([
+        supabase.from('organizer_members')
+          .select('*, organizer_roles(*), organizers(*, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email))')
+          .eq('user_id', verified.id)
+          .in('status', ['pending', 'active'])
+          .order('created_at', { ascending: true }),
+        supabase.from('organizers')
+          .select('*, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email)')
+          .eq('user_id', verified.id)
+          .order('created_at', { ascending: true }),
+      ])
 
       const [{ data: invitations }, { data: assignments }] = await Promise.all([
         supabase.from('agent_invitations').select('*, organizers(*)').eq('user_id', verified.id).eq('status', 'pending').order('created_at', { ascending: false }),
@@ -220,19 +219,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('id', verified.id)
         .single()
 
+      let resolvedProfile: Profile
       if (prof) {
         const finalRole: Profile['role'] = prof.role ?? role
-        setProfile({ ...prof, role: finalRole })
-        if (finalRole === 'organizer' && !membership) {
-          setOrganizer(await ensureOrganizerAccount(verified))
-        } else if (teamOrganizer) {
-          setOrganizer(teamOrganizer)
-        }
+        resolvedProfile = { ...prof, role: finalRole }
       } else {
-        setProfile(syntheticProfile(verified, role))
-        if (role === 'organizer' && !resolvedMembership) setOrganizer(await ensureOrganizerAccount(verified))
-        else if (teamOrganizer) setOrganizer(teamOrganizer)
+        resolvedProfile = syntheticProfile(verified, role)
       }
+      setProfile(resolvedProfile)
+
+      const membershipChoices = (memberships ?? []).flatMap(membership => {
+        const joinedOrganizer = membership.organizer ?? membership.organizers
+        return joinedOrganizer ? [{ organizer: joinedOrganizer as Organizer, membership: { ...membership, organizer: joinedOrganizer } as TeamMembership }] : []
+      })
+      const availableOrganizers = (ownedOrganizers ?? []).map(item => ({ organizer: item as Organizer, membership: null as TeamMembership | null }))
+
+      let defaultOrganizer = availableOrganizers[0]?.organizer ?? null
+      if (!defaultOrganizer && resolvedProfile.role === 'organizer') {
+        const ensuredOrganizer = await ensureOrganizerAccount(verified)
+        if (ensuredOrganizer) {
+          if (!availableOrganizers.some(item => item.organizer.id === ensuredOrganizer.id)) availableOrganizers.unshift({ organizer: ensuredOrganizer, membership: null })
+          defaultOrganizer = ensuredOrganizer
+        }
+      }
+      const savedOrganizerId = window.localStorage.getItem('qpassa-active-organizer')
+      const selectedChoice = availableOrganizers.find(item => item.organizer.id === savedOrganizerId)
+        ?? availableOrganizers.find(item => item.organizer.id === defaultOrganizer?.id)
+        ?? availableOrganizers[0]
+        ?? membershipChoices.find(choice => choice.membership.status === 'active')
+        ?? membershipChoices[0]
+      setOrganizerOptions(availableOrganizers)
+      setOrganizer(selectedChoice?.organizer ?? null)
+      setTeamMembership(selectedChoice?.membership ?? null)
     } catch {
       // Network or DB failure — still show user as logged in using cached user metadata
       const role = resolvedRole(cachedUser)
@@ -244,6 +262,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = async () => {
     if (user) await doLoadProfile(user)
+  }
+
+  const switchOrganizer = (organizerId: string) => {
+    const choice = organizerOptions.find(item => item.organizer.id === organizerId)
+    if (!choice) return
+    setOrganizer(choice.organizer)
+    setTeamMembership(choice.membership)
+    window.localStorage.setItem('qpassa-active-organizer', organizerId)
   }
 
   useEffect(() => {
@@ -260,19 +286,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(s.user)
         setLoading(false) // unblock the spinner — we know auth state
 
-        // Set up new user record if first time, then load profile
-        try {
-          await Promise.race([
-            handleNewUser(s.user),
-            new Promise<void>(res => setTimeout(res, 4000)),
-          ])
-        } catch { /* non-fatal */ }
-
-        await doLoadProfile(s.user)
+        // Hydrate once per signed-in user. Token refreshes and repeated
+        // SIGNED_IN events must not restart dashboard profile loading.
+        if (profileLoadUserId.current !== s.user.id || _event === 'USER_UPDATED') {
+          profileLoadUserId.current = s.user.id
+          // Profile hydration does not need to wait for this first-time setup.
+          void handleNewUser(s.user)
+          await doLoadProfile(s.user)
+        }
       } else {
+        profileLoadUserId.current = null
         setUser(null)
         setProfile(null)
         setOrganizer(null)
+        setOrganizerOptions([])
         setTeamMembership(null)
           setAgentInvitations([])
           setAgentAssignments([])
@@ -335,7 +362,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user?.id, teamMembership?.organizer_id])
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, organizer, teamMembership, agentInvitations, agentAssignments, loading, profileLoading, isOrganizer, refreshProfile }}>
+    <AuthContext.Provider value={{ user, session, profile, organizer, organizerOptions, switchOrganizer, teamMembership, agentInvitations, agentAssignments, loading, profileLoading, isOrganizer, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )

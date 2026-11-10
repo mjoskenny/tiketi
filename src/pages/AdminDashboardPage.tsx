@@ -161,6 +161,51 @@ type AdminEventDraft = Omit<AdminEventRow, 'id' | 'organizer' | 'status'> & { id
 
 type ReportDatasetKey = 'orders' | 'payments' | 'transactions' | 'events' | 'tickets' | 'refunds' | 'payouts' | 'agents' | 'users' | 'organizers'
 type ReportDataset = { label: string; columns: string[]; rows: Array<Array<string | number>>; snapshot?: boolean }
+type AdminDashboardSnapshot = {
+  version: 1
+  generatedAt: string
+  platformStats: { totalEvents: number; ticketsSold: number; grossTicketValue: number; platformRevenue: number; activeOrganizers: number; activeUsers: number }
+  statDeltas: { totalEvents: string; ticketsSold: string; grossTicketValue: string; platformRevenue: string; activeOrganizers: string; activeUsers: string }
+  weekTrend: number[]
+  monthlyOrderCounts: number[]
+  monthlyRevenue: number[]
+  topOrganizers: Array<{ name: string; sales: string; share: string }>
+}
+
+const adminDashboardCacheKey = (userId: string, range: AdminDateRange) => `qpassa-admin-dashboard:v1:${userId}:${range}`
+
+function readAdminDashboardSnapshot(userId: string | undefined): AdminDashboardSnapshot | null {
+  if (!userId || typeof window === 'undefined') return null
+
+  try {
+    const raw = window.localStorage.getItem(adminDashboardCacheKey(userId, 'year'))
+    if (!raw) return null
+    const snapshot = JSON.parse(raw) as AdminDashboardSnapshot
+    const generatedAt = new Date(snapshot.generatedAt)
+    const isNumberArray = (value: unknown, length: number) => Array.isArray(value)
+      && value.length === length
+      && value.every(item => typeof item === 'number' && Number.isFinite(item))
+
+    if (snapshot.version !== 1 || Number.isNaN(generatedAt.getTime())) return null
+    if (!snapshot.platformStats || !snapshot.statDeltas || !isNumberArray(snapshot.weekTrend, 7)) return null
+    if (!isNumberArray(snapshot.monthlyOrderCounts, 12) || !isNumberArray(snapshot.monthlyRevenue, 12)) return null
+    if (!Array.isArray(snapshot.topOrganizers) || !snapshot.topOrganizers.every(item =>
+      typeof item?.name === 'string' && typeof item.sales === 'string' && typeof item.share === 'string')) return null
+
+    return snapshot
+  } catch {
+    return null
+  }
+}
+
+function saveAdminDashboardSnapshot(userId: string | undefined, range: AdminDateRange, snapshot: AdminDashboardSnapshot) {
+  if (!userId || typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(adminDashboardCacheKey(userId, range), JSON.stringify(snapshot))
+  } catch {
+    // The dashboard remains usable if browser storage is unavailable or full.
+  }
+}
 
 const ORGANIZER_ROLE_PERMISSIONS = [
   { key: 'events', label: 'Event management', description: 'Create and edit events, ticket tiers, and publishing status.' },
@@ -336,12 +381,13 @@ function ToggleSetting({ label, description, checked, onChange, disabled = false
 
 export default function AdminDashboardPage({ navigate }: { navigate: (page: string) => void }) {
   const { profile, user } = useAuth()
+  const [cachedDashboardSnapshot] = useState(() => readAdminDashboardSnapshot(user?.id))
   const [section, setSection] = useState<Section>(() => sectionFromPath(window.location.pathname))
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [loading, setLoading] = useState(!cachedDashboardSnapshot)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(() => cachedDashboardSnapshot ? new Date(cachedDashboardSnapshot.generatedAt) : null)
   const [dashboardError, setDashboardError] = useState('')
-  const [platformStats, setPlatformStats] = useState({
+  const [platformStats, setPlatformStats] = useState(cachedDashboardSnapshot?.platformStats ?? {
     totalEvents: 0,
     ticketsSold: 0,
     grossTicketValue: 0,
@@ -349,7 +395,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
     activeOrganizers: 0,
     activeUsers: 0,
   })
-  const [statDeltas, setStatDeltas] = useState({
+  const [statDeltas, setStatDeltas] = useState(cachedDashboardSnapshot?.statDeltas ?? {
     totalEvents: '+0.0%',
     ticketsSold: '+0.0%',
     grossTicketValue: '+0.0%',
@@ -357,10 +403,10 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
     activeOrganizers: '+0.0%',
     activeUsers: '+0.0%',
   })
-  const [weekTrend, setWeekTrend] = useState<number[]>([0, 0, 0, 0, 0, 0, 0])
-  const [monthlyOrderCounts, setMonthlyOrderCounts] = useState<number[]>(Array(12).fill(0))
-  const [monthlyRevenue, setMonthlyRevenue] = useState<number[]>(Array(12).fill(0))
-  const [topOrganizers, setTopOrganizers] = useState<Array<{ name: string; sales: string; share: string }>>([])
+  const [weekTrend, setWeekTrend] = useState<number[]>(cachedDashboardSnapshot?.weekTrend ?? [0, 0, 0, 0, 0, 0, 0])
+  const [monthlyOrderCounts, setMonthlyOrderCounts] = useState<number[]>(cachedDashboardSnapshot?.monthlyOrderCounts ?? Array(12).fill(0))
+  const [monthlyRevenue, setMonthlyRevenue] = useState<number[]>(cachedDashboardSnapshot?.monthlyRevenue ?? Array(12).fill(0))
+  const [topOrganizers, setTopOrganizers] = useState<Array<{ name: string; sales: string; share: string }>>(cachedDashboardSnapshot?.topOrganizers ?? [])
   const [recentOrders, setRecentOrders] = useState<Array<{ customer: string; event: string; value: string; status: string }>>([])
   const [recentPayouts, setRecentPayouts] = useState<Array<{ organizer: string; amount: string; status: string; method: string }>>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -1015,6 +1061,25 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
           activeOrganizers: computeDelta(organizers.length, previousOrganizers.length),
           activeUsers: computeDelta(profiles.length, previousProfiles.length),
         }
+        const generatedAt = new Date()
+
+        saveAdminDashboardSnapshot(user?.id, dateRange, {
+          version: 1,
+          generatedAt: generatedAt.toISOString(),
+          platformStats: {
+            totalEvents,
+            ticketsSold,
+            grossTicketValue,
+            platformRevenue,
+            activeOrganizers: organizers.length,
+            activeUsers: profiles.length,
+          },
+          statDeltas: nextStatDeltas,
+          weekTrend: mondayToSunday,
+          monthlyOrderCounts: monthlyCounts,
+          monthlyRevenue: monthlySales,
+          topOrganizers: organizerRows.length ? organizerRows : [{ name: 'No organizers yet', sales: 'BIF 0', share: '0%' }],
+        })
 
         setPlatformStats({
           totalEvents,
@@ -1061,7 +1126,7 @@ export default function AdminDashboardPage({ navigate }: { navigate: (page: stri
         setHealthMetrics(health)
         setReportCards(reports)
         setReportDatasets(reportDatasetsData)
-        setLastUpdated(new Date())
+        setLastUpdated(generatedAt)
       } catch (error) {
         if (isMounted) setDashboardError(error instanceof Error ? error.message : 'Unable to load admin dashboard data.')
       } finally {

@@ -637,11 +637,7 @@ export default function App() {
                 <button onClick={() => navigate('auth-organizer')} className="px-6 py-3 rounded-xl font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>Sign in as Organizer</button>
               </div>
             : profileLoading
-              // Profile still loading from server — never flash "access denied"
-              ? <div className="flex items-center justify-center min-h-screen flex-col gap-3 pt-16">
-                  <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--primary)', borderTopColor: 'transparent' }} />
-                  <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Loading your dashboard…</p>
-                </div>
+                ? null
               : (isOrganizer || teamMembership?.status === 'pending')
                 ? <OrganizerDashboardPage navigate={navigate} />
                 : <div className="flex items-center justify-center min-h-screen flex-col gap-4 pt-16">
