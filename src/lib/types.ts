@@ -124,6 +124,7 @@ export type Event = {
   tags: string[] | null
   refund_policy?: string | null
   entry_policy?: string | null
+  terms_and_conditions?: string | null
   created_at: string
   updated_at: string
   ticket_tiers?: TicketTier[]

@@ -4,7 +4,7 @@ import { signOut, supabase } from '../lib/supabase'
 import { fetchAllRows } from '../lib/supabasePagination'
 import { useAuth } from '../context/AuthContext'
 import { formatPrice } from '../data/events'
-import { BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, UsersIcon, UserIcon, KeyIcon, TagIcon, DollarSignIcon, TicketIcon, TrendingUpIcon, CheckIcon, EyeIcon, ShieldIcon, EditIcon, TrashIcon, XIcon } from '../components/Icon'
+import { ArrowRightIcon, BarChartIcon, BellIcon, CalendarIcon, ClipboardIcon, UsersIcon, UserIcon, KeyIcon, TagIcon, DollarSignIcon, TicketIcon, TrendingUpIcon, CheckIcon, EyeIcon, EditIcon, TrashIcon, XIcon } from '../components/Icon'
 import type { Event, Order, Customer, Transaction, OrganizerWithdrawal, OrganizerMember, OrganizerRole, Subscription, Ticket, AgentAssignment } from '../lib/types'
 import { FEATURES } from '../lib/features'
 import OrganizerEventViewPage from './OrganizerEventViewPage'
@@ -12,12 +12,12 @@ import { sendOrderTicketEmails } from '../lib/ticketEmail'
 import { currentLocale, formatLocaleDate } from '../lib/locale'
 import StatusBadge from '../components/StatusBadge'
 import OrganizerDashboardNav from '../components/OrganizerDashboardNav'
-import { AlertCircle, ArrowUpRight, Bell, CalendarDays, CalendarPlus, ChartNoAxesCombined, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardList, Filter, Heart, LayoutDashboard, MapPin, MoreHorizontal, Plus, ReceiptText, Search, Settings, Tag, TicketCheck, UserRound, UsersRound, Wallet, type LucideIcon } from 'lucide-react'
+import RichTextEditor, { RichTextContent } from '../components/RichTextEditor'
+import { ArrowDownLeft, ArrowUpRight, Bell, CalendarDays, CalendarPlus, ChartNoAxesCombined, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardList, Download, Filter, Heart, LayoutDashboard, MapPin, MoreHorizontal, Plus, ReceiptText, RotateCcw, Search, Settings, Shield, Tag, TicketCheck, UserRound, UsersRound, Wallet, type LucideIcon } from 'lucide-react'
 
 type Section = 'overview' | 'analytics' | 'events' | 'orders' | 'customers' | 'followers' | 'members' | 'settings' | 'subscriptions' | 'transactions' | 'payouts' | 'refunds' | 'notifications'
 type AnalyticsRange = 'all' | 'day' | 'week' | 'month' | 'year' | 'custom'
 type StatementFilter = 'all' | 'payment' | 'fee' | 'refund' | 'payout'
-type StatementView = 'activity' | 'payouts'
 type TeamTab = 'users' | 'invitations'
 type NotificationFilter = 'all' | 'unread' | 'events' | 'sales' | 'followers' | 'team'
 type EventsFilter = 'all' | 'active' | 'review' | 'inactive' | 'drafts' | 'past'
@@ -85,6 +85,7 @@ function sectionFromPath(pathname: string): Section {
   const exactMatch = Object.entries(SECTION_PATHS).find(([, path]) => path === normalizedPath)
   if (exactMatch) return exactMatch[0] as Section
   const pathParts = normalizedPath.split('/').filter(Boolean)
+  if (pathParts[0] === 'dashboard' && pathParts[1] === 'events') return 'events'
   const slug = pathParts[pathParts.length - 1]
   const legacyFinanceRoutes: Record<string, Section> = { transactions: 'transactions', payouts: 'payouts', roles: 'settings' }
   if (slug && legacyFinanceRoutes[slug]) return legacyFinanceRoutes[slug]
@@ -94,7 +95,14 @@ function sectionFromPath(pathname: string): Section {
 
 function eventIdFromPath(pathname: string) {
   const parts = pathname.split('/').filter(Boolean)
-  return parts[0] === 'dashboard' && parts[1] === 'events' ? parts[2] ?? null : null
+  return parts[0] === 'dashboard' && parts[1] === 'events' && parts[2] !== 'new' && parts[3] !== 'edit' ? parts[2] ?? null : null
+}
+
+function eventWizardIdFromPath(pathname: string) {
+  const parts = pathname.split('/').filter(Boolean)
+  if (parts[0] !== 'dashboard' || parts[1] !== 'events') return null
+  if (parts[2] === 'new') return 'new'
+  return parts[3] === 'edit' ? parts[2] ?? null : null
 }
 
 function localDateKey(date: Date) {
@@ -195,10 +203,12 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const { user, profile, organizer, organizerOptions, switchOrganizer, teamMembership } = useAuth()
   const [section, setSection] = useState<Section>(() => sectionFromPath(window.location.pathname))
   const [eventViewId, setEventViewId] = useState<string | null>(() => eventIdFromPath(window.location.pathname))
+  const [eventWizardId, setEventWizardId] = useState<string | null>(() => eventWizardIdFromPath(window.location.pathname))
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 768)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => document.documentElement.dataset.theme === 'light' ? 'light' : 'dark')
   const [overviewCalendarMonth, setOverviewCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [overviewCalendarDate, setOverviewCalendarDate] = useState(() => localDateKey(new Date()))
+  const [complianceReminderVisible, setComplianceReminderVisible] = useState(true)
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark'
@@ -232,7 +242,6 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const [analyticsMonthInterval, setAnalyticsMonthInterval] = useState(1)
   const [notificationFilter, setNotificationFilter] = useState<NotificationFilter>('all')
   const [statementFilter, setStatementFilter] = useState<StatementFilter>('all')
-  const [statementView, setStatementView] = useState<StatementView>('activity')
   const [statementSearch, setStatementSearch] = useState('')
   const [dashboardSearch, setDashboardSearch] = useState('')
   const [eventsFilter, setEventsFilter] = useState<EventsFilter>('all')
@@ -248,8 +257,6 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const [payoutNotice, setPayoutNotice] = useState('')
 
   // Modals
-  const [showNewEvent, setShowNewEvent] = useState(false)
-  const [editingEvent, setEditingEvent] = useState<Event | null>(null)
   const [showInviteMember, setShowInviteMember] = useState(false)
   const [showInviteAgent, setShowInviteAgent] = useState(false)
   const [actionError, setActionError] = useState('')
@@ -275,6 +282,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     const handlePathChange = () => {
       setSection(sectionFromPath(window.location.pathname))
       setEventViewId(eventIdFromPath(window.location.pathname))
+      setEventWizardId(eventWizardIdFromPath(window.location.pathname))
     }
     window.addEventListener('popstate', handlePathChange)
     return () => window.removeEventListener('popstate', handlePathChange)
@@ -284,6 +292,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     if (!canAccessSection(nextSection)) return
     setSection(nextSection)
     setEventViewId(null)
+    setEventWizardId(null)
     setSidebarOpen(window.innerWidth >= 768)
     const nextPath = SECTION_PATHS[nextSection]
     if (window.location.pathname !== nextPath) window.history.pushState({}, '', nextPath)
@@ -293,8 +302,26 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     if (!canViewEvents) return
     setSection('events')
     setEventViewId(event.id)
+    setEventWizardId(null)
     setSidebarOpen(window.innerWidth >= 768)
     const nextPath = `/dashboard/events/${event.id}`
+    if (window.location.pathname !== nextPath) window.history.pushState({}, '', nextPath)
+  }
+
+  const openCreateEvent = () => {
+    setSection('events')
+    setEventViewId(null)
+    setEventWizardId('new')
+    setSidebarOpen(window.innerWidth >= 768)
+    if (window.location.pathname !== '/dashboard/events/new') window.history.pushState({}, '', '/dashboard/events/new')
+  }
+
+  const openEditEvent = (event: Event) => {
+    setSection('events')
+    setEventViewId(null)
+    setEventWizardId(event.id)
+    setSidebarOpen(window.innerWidth >= 768)
+    const nextPath = `/dashboard/events/${event.id}/edit`
     if (window.location.pathname !== nextPath) window.history.pushState({}, '', nextPath)
   }
 
@@ -1080,7 +1107,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
         onSearchChange={setDashboardSearch}
         onSearch={runDashboardSearch}
         canCreateEvent={canAccessSection('events')}
-        onCreateEvent={() => setShowNewEvent(true)}
+        onCreateEvent={openCreateEvent}
         notifications={organizerNotifications}
         onOpenNotification={notification => { void openOrganizerNotification(notification) }}
         onViewNotifications={() => selectSection('notifications')}
@@ -1093,17 +1120,19 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
         <main className="flex-1 min-w-0 flex flex-col">
         {/* Content */}
         <div className="flex-1 overflow-auto px-4 pb-4 pt-3">
+          {complianceReminderVisible && <aside className="organizer-compliance-alert mb-5" aria-label="Compliance reminder">
+            <div className="organizer-compliance-alert-content">
+              <span className="organizer-compliance-alert-icon"><Shield size={16} strokeWidth={1.8} /></span>
+              <div className="organizer-compliance-alert-copy">
+                <p className="organizer-compliance-alert-kicker">Compliance reminder</p>
+                <p className="organizer-compliance-alert-title">Keep event information accurate, refund policies transparent, and contact details up to date.</p>
+                <p className="organizer-compliance-alert-description">Review your listings before every event to reduce disputes and maintain customer trust.</p>
+              </div>
+              <button type="button" className="organizer-compliance-alert-close" aria-label="Dismiss compliance reminder" title="Dismiss reminder" onClick={() => setComplianceReminderVisible(false)}><XIcon size={15} /></button>
+            </div>
+          </aside>}
+
           {section === 'overview' && <section className="organizer-overview-page space-y-7">
-            <section className="organizer-overview-alerts" aria-label="Overview alerts">
-              <div className="organizer-overview-alert-heading"><AlertCircle size={15} /><strong>Overview alerts</strong></div>
-              {orders.filter(order => order.status === 'pending').length > 0 && <button type="button" onClick={() => selectSection('orders')}>
-                <span><strong>{orders.filter(order => order.status === 'pending').length} pending order{orders.filter(order => order.status === 'pending').length === 1 ? '' : 's'}</strong><small>Review payments and ticket orders</small></span><ArrowUpRight size={15} />
-              </button>}
-              {unreadOrganizerNotifications.length > 0 && <button type="button" onClick={() => selectSection('notifications')}>
-                <span><strong>{unreadOrganizerNotifications.length} unread update{unreadOrganizerNotifications.length === 1 ? '' : 's'}</strong><small>Check recent event and workspace activity</small></span><ArrowUpRight size={15} />
-              </button>}
-              {orders.every(order => order.status !== 'pending') && unreadOrganizerNotifications.length === 0 && <p>You’re all caught up. New order and workspace alerts will appear here.</p>}
-            </section>
             <div className="organizer-overview-stat-grid">
               <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><TicketCheck size={17} strokeWidth={1.8} /></span><small>Tickets sold</small><strong>{canViewOverviewAnalytics ? totalTicketsSold.toLocaleString() : '—'}</strong><span>{canViewOverviewAnalytics ? `${overviewTicketsRemaining.toLocaleString()} still available` : 'Analytics access required'}</span></article>
               <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><CalendarDays size={17} strokeWidth={1.8} /></span><small>Published events</small><strong>{canViewEvents ? publishedEvents : '—'}</strong><span>{canViewEvents ? `${events.length} total in your workspace` : 'Event access required'}</span></article>
@@ -1113,7 +1142,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
             <div className="organizer-overview-feature-grid">
               <div className="organizer-overview-feature-left">
-              <button type="button" className="organizer-overview-featured-event" onClick={() => nextPublishedEvent ? openEventView(nextPublishedEvent) : setShowNewEvent(true)}>
+              <button type="button" className="organizer-overview-featured-event" onClick={() => nextPublishedEvent ? openEventView(nextPublishedEvent) : openCreateEvent()}>
                 <span className="organizer-overview-event-art">
                   {nextPublishedEvent?.cover_image ? <img src={nextPublishedEvent.cover_image} alt="" /> : <span className="organizer-overview-art-mark"><TicketCheck size={38} strokeWidth={1.5} /></span>}
                 </span>
@@ -1129,7 +1158,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
               <section className="organizer-overview-quick-actions" aria-label="Quick actions">
                 <div className="organizer-overview-quick-heading"><p className="organizer-overview-card-kicker">QUICK ACTIONS</p><span>Jump back into your workflow</span></div>
                 <div className="organizer-overview-quick-grid">
-                  {canAccessSection('events') && <button type="button" onClick={() => setShowNewEvent(true)}>
+                  {canAccessSection('events') && <button type="button" onClick={openCreateEvent}>
                     <span className="organizer-overview-quick-icon"><CalendarPlus size={17} /></span>
                     <span><strong>Create an event</strong><small>Set up your next experience</small></span>
                     <ArrowUpRight size={16} />
@@ -1182,7 +1211,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
             <div className="organizer-overview-bottom-grid">
               <section className="organizer-overview-panel">
                 <div className="organizer-overview-panel-heading"><div><p className="organizer-overview-card-kicker">YOUR WORKSPACE</p><h3>Pick up where you left off</h3></div><button type="button" onClick={() => selectSection('events')} aria-label="View all events"><ArrowUpRight size={17} /></button></div>
-                {events.slice(0, 3).length ? <div className="organizer-overview-event-list">{events.slice(0, 3).map(event => <button key={event.id} type="button" onClick={() => openEventView(event)}><span className="organizer-overview-event-thumb">{event.cover_image ? <img src={event.cover_image} alt="" /> : <CalendarDays size={18} />}</span><span className="min-w-0 flex-1"><strong>{event.title}</strong><small>{new Date(event.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} · {event.venue}</small></span><Badge label={event.status} color={STATUS_COLORS[event.status] ?? '#888'} /><ChevronRight size={15} /></button>)}</div> : <div className="organizer-overview-empty"><p>No events yet—your first one can start today.</p><button type="button" onClick={() => setShowNewEvent(true)}>Create event <Plus size={15} /></button></div>}
+                {events.slice(0, 3).length ? <div className="organizer-overview-event-list">{events.slice(0, 3).map(event => <button key={event.id} type="button" onClick={() => openEventView(event)}><span className="organizer-overview-event-thumb">{event.cover_image ? <img src={event.cover_image} alt="" /> : <CalendarDays size={18} />}</span><span className="min-w-0 flex-1"><strong>{event.title}</strong><small>{new Date(event.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} · {event.venue}</small></span><Badge label={event.status} color={STATUS_COLORS[event.status] ?? '#888'} /><ChevronRight size={15} /></button>)}</div> : <div className="organizer-overview-empty"><p>No events yet—your first one can start today.</p><button type="button" onClick={openCreateEvent}>Create event <Plus size={15} /></button></div>}
               </section>
               {canViewOverviewOrders && <section className="organizer-overview-panel organizer-overview-orders-panel">
                 <div className="organizer-overview-panel-heading"><div><p className="organizer-overview-card-kicker">RECENT ACTIVITY</p><h3>Latest orders</h3></div><button type="button" onClick={() => selectSection('orders')} aria-label="View all orders"><ArrowUpRight size={17} /></button></div>
@@ -1190,19 +1219,6 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
               </section>}
             </div>
           </section>}
-
-          {section === 'analytics' && <div className="organizer-compliance-alert mb-5 rounded-2xl p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: 'rgba(249,112,21,0.12)', color: 'var(--primary)' }}>
-                <ShieldIcon size={18} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: 'var(--muted-foreground)' }}>Compliance reminder</p>
-                <p className="mt-1 text-sm font-semibold">Keep event information accurate, refund policies transparent, and contact details up to date.</p>
-                <p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Review your listings before every event to reduce disputes and maintain customer trust.</p>
-              </div>
-            </div>
-          </div>}
 
           <>
               {/* ── ANALYTICS / OVERVIEW ── */}
@@ -1400,7 +1416,12 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
               {/* ── EVENTS ── */}
               {section === 'events' && (
-                eventViewId ? <OrganizerEventViewPage
+                eventWizardId ? eventWizardId === 'new'
+                  ? <CreateEventPage orgId={orgId!} onClose={() => selectSection('events')} onCreated={() => { selectSection('events'); void load() }} />
+                  : events.find(event => event.id === eventWizardId)
+                    ? <CreateEventPage orgId={orgId!} event={events.find(event => event.id === eventWizardId)!} onClose={() => selectSection('events')} onCreated={() => { selectSection('events'); void load() }} />
+                    : <div className="organizer-event-wizard-loading" role="status">Loading event details…</div>
+                : eventViewId ? <OrganizerEventViewPage
                   event={events.find(event => event.id === eventViewId) ?? null}
                   orders={orders}
                   tickets={checkinTickets}
@@ -1411,13 +1432,13 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                   onSaleRecorded={() => { void load() }}
                   loading={dataLoading}
                   onBack={() => selectSection('events')}
-                  onEdit={event => setEditingEvent(event)}
+                  onEdit={openEditEvent}
                   navigate={navigate}
                 /> :
                 <section className="organizer-events-page">
                   <header className="organizer-events-heading">
                     <h1>Events</h1>
-                    <button type="button" className="organizer-events-create" onClick={() => setShowNewEvent(true)}><Plus size={17} />Create event</button>
+                    <button type="button" className="organizer-events-create" onClick={openCreateEvent}><Plus size={17} />Create event</button>
                   </header>
 
                   <div className="organizer-events-tabs" role="tablist" aria-label="Filter events by status">
@@ -1438,7 +1459,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                   {filteredEvents.length === 0 ? <div className="organizer-events-empty">
                     <span><CalendarDays size={23} /></span><h2>{events.length ? 'No events match these filters' : 'Your next event starts here'}</h2>
                     <p>{events.length ? 'Try another status, category, or search term.' : 'Create an event page and bring your next experience to life.'}</p>
-                    <button type="button" onClick={() => events.length ? (setEventsFilter('all'), setEventsCategory('all'), setEventsSearch(''), setDashboardSearch('')) : setShowNewEvent(true)}>{events.length ? 'Clear filters' : 'Create your first event'} <ArrowUpRight size={15} /></button>
+                    <button type="button" onClick={() => events.length ? (setEventsFilter('all'), setEventsCategory('all'), setEventsSearch(''), setDashboardSearch('')) : openCreateEvent()}>{events.length ? 'Clear filters' : 'Create your first event'} <ArrowUpRight size={15} /></button>
                   </div> : <div className="organizer-events-grid">
                     {filteredEvents.map(ev => {
                       const sold = ev.ticket_tiers?.reduce((sum, tier) => sum + tier.sold, 0) ?? 0
@@ -1458,7 +1479,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                           <button type="button" className="organizer-event-more" aria-label={`More actions for ${ev.title}`} aria-expanded={openEventMenu === ev.id} onClick={() => setOpenEventMenu(current => current === ev.id ? null : ev.id)}><MoreHorizontal size={19} /></button>
                           {openEventMenu === ev.id && <div className="organizer-event-menu" role="menu">
                             <button type="button" role="menuitem" onClick={() => { setOpenEventMenu(null); openEventView(ev) }}><EyeIcon size={15} />View details</button>
-                            <button type="button" role="menuitem" onClick={() => { setOpenEventMenu(null); setEditingEvent(ev) }}><EditIcon size={15} />Edit event</button>
+                            <button type="button" role="menuitem" onClick={() => { setOpenEventMenu(null); openEditEvent(ev) }}><EditIcon size={15} />Edit event</button>
                             <button type="button" role="menuitem" onClick={() => { setOpenEventMenu(null); void toggleEventStatus(ev) }}>{ev.status === 'published' ? <XIcon size={15} /> : <CheckIcon size={15} />}{ev.status === 'published' ? 'Unpublish' : 'Publish'}</button>
                             <button type="button" role="menuitem" className="is-danger" onClick={() => { setOpenEventMenu(null); void deleteEvent(ev.id) }}><TrashIcon size={15} />Delete event</button>
                           </div>}
@@ -1742,156 +1763,142 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
               {/* ── STATEMENTS ── */}
               {section === 'transactions' && (
-                <div className="mx-auto max-w-6xl space-y-6">
+                <div className="organizer-finance-page organizer-statements-page mx-auto max-w-6xl space-y-6">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--primary)' }}>Finance · ledger</p>
-                      <h2 className="mt-1 text-2xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Statements</h2>
-                      <p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>Review settlement activity and payout history for {organizer.name}.</p>
+                    <div className="organizer-finance-heading">
+                      <span className="organizer-finance-heading-mark"><ReceiptText size={20} /></span>
+                      <div><p className="organizer-finance-eyebrow">Finance · ledger</p>
+                      <h2 className="organizer-finance-title">Statements</h2>
+                      <p className="organizer-finance-description">A clear record of payments, platform fees, refunds, and completed wallet withdrawals for {organizer.name}.</p></div>
                     </div>
-                    <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Updated {lastUpdated?.toLocaleTimeString() ?? 'loading'}</p>
+                    <div className="organizer-finance-header-actions"><button type="button" className="organizer-finance-secondary-action" onClick={() => selectSection('payouts')}><Wallet size={14} /> Open wallet</button><div className="organizer-finance-header-meta"><span className="organizer-finance-live-dot" />Updated {lastUpdated?.toLocaleTimeString() ?? 'loading'}</div></div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                  <div className="organizer-statement-kpi-grid grid grid-cols-2 gap-3 xl:grid-cols-4">
                     {([
                       ['Payments', 'payment'], ['Fees', 'fee'], ['Refunds', 'refund'], ['Payouts', 'payout'],
                     ] as const).map(([label, type]) => {
+                      const StatIcon = type === 'payment' ? ArrowDownLeft : type === 'payout' ? ArrowUpRight : type === 'refund' ? RotateCcw : ReceiptText
                       const amount = transactions.filter(item => item.type === type && item.status === 'completed').reduce((sum, item) => sum + item.amount, 0)
                       const count = transactions.filter(item => item.type === type).length
-                      return <div key={type} className="organizer-finance-stat rounded-2xl p-4"><p className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted-foreground)' }}>{label}</p><p className="mt-2 text-xl font-black" style={{ color: type === 'refund' ? 'var(--error)' : 'var(--foreground)' }}>{formatPrice(amount)}</p><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{count} record{count === 1 ? '' : 's'}</p></div>
+                      return <div key={type} className="organizer-finance-stat organizer-statement-stat rounded-2xl p-4"><span className={`organizer-statement-stat-icon is-${type}`}><StatIcon size={15} /></span><div><p className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted-foreground)' }}>{label}</p><p className="mt-2 text-xl font-black" style={{ color: type === 'refund' ? 'var(--error)' : 'var(--foreground)' }}>{formatPrice(amount)}</p><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{count} ledger record{count === 1 ? '' : 's'}</p></div></div>
                     })}
                   </div>
 
                   <section className="organizer-finance-panel overflow-hidden rounded-2xl">
                     <div className="flex flex-col gap-4 border-b p-5 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--border)' }}>
-                      <div><h3 className="font-bold">Financial statements</h3><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Ledger transactions and withdrawal requests</p></div>
-                      <button type="button" onClick={exportStatements} disabled={!filteredStatementTransactions.length || statementView === 'payouts'} className="rounded-xl px-4 py-2.5 text-xs font-bold disabled:opacity-50" style={{ background: 'var(--primary)', color: '#fff' }}>Export CSV</button>
+                      <div><h3 className="font-bold">Transaction ledger</h3><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Completed and pending financial activity · payout requests are managed in Wallet</p></div>
+                      <button type="button" onClick={exportStatements} disabled={!filteredStatementTransactions.length} className="organizer-finance-export organizer-statement-export rounded-full px-4 py-2.5 text-xs font-bold disabled:opacity-50"><Download size={14} /> Export CSV</button>
                     </div>
-                    <div className="border-b px-5 pt-4" style={{ borderColor: 'var(--border)' }}>
-                      <div className="organizer-finance-tabs" role="tablist" aria-label="Statement views">
-                        <button type="button" role="tab" aria-selected={statementView === 'activity'} onClick={() => setStatementView('activity')}>Organization statements <span>{transactions.length}</span></button>
-                        <button type="button" role="tab" aria-selected={statementView === 'payouts'} onClick={() => setStatementView('payouts')}>Payouts <span>{withdrawals.length}</span></button>
-                      </div>
-                    </div>
-
-                    {statementView === 'activity' ? <>
-                      <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--border)' }}>
-                        <input type="search" value={statementSearch} onChange={event => setStatementSearch(event.target.value)} placeholder="Search statements…" aria-label="Search statements" className="organizer-finance-search w-full rounded-xl px-4 py-2.5 text-sm sm:max-w-sm" />
+                    <>
+                      <div className="organizer-finance-tools flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <label className="organizer-statement-search w-full sm:max-w-sm">
+                          <Search size={16} aria-hidden="true" />
+                          <input type="search" value={statementSearch} onChange={event => setStatementSearch(event.target.value)} placeholder="Search statements…" aria-label="Search statements" />
+                        </label>
                         <div className="organizer-finance-filters" aria-label="Filter statement type">
                           {([['all', 'All activity'], ['payment', 'Payments'], ['fee', 'Fees'], ['refund', 'Refunds'], ['payout', 'Payouts']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={statementFilter === value} onClick={() => setStatementFilter(value)}>{label}</button>)}
                         </div>
                       </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full min-w-[760px] text-left text-sm">
-                          <thead><tr>{['Date', 'Description', 'Type', 'Amount', 'Status'].map(label => <th key={label} className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--muted-foreground)' }}>{label}</th>)}</tr></thead>
-                          <tbody>{filteredStatementTransactions.map(transaction => {
-                            const order = orders.find(item => item.id === transaction.order_id)
-                            const positive = transaction.type === 'payment'
-                            return <tr key={transaction.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                              <td className="whitespace-nowrap px-5 py-3 text-xs" style={{ color: 'var(--muted-foreground)' }}>{new Date(transaction.created_at).toLocaleDateString()}</td>
-                              <td className="px-5 py-3"><p className="text-sm font-semibold">{order?.events?.title ?? (transaction.type === 'payout' ? 'Wallet withdrawal' : `${transaction.type[0].toUpperCase()}${transaction.type.slice(1)} settlement`)}</p><p className="mt-0.5 font-mono text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{transaction.reference ?? transaction.id.slice(0, 12)}</p></td>
-                              <td className="px-5 py-3"><Badge label={transaction.type} color={STATUS_COLORS[transaction.type] ?? '#888'} /></td>
-                              <td className="whitespace-nowrap px-5 py-3 text-sm font-bold" style={{ color: positive ? 'var(--success)' : transaction.type === 'refund' ? 'var(--error)' : 'var(--foreground)' }}>{positive ? '+' : '−'}{formatPrice(transaction.amount)}</td>
-                              <td className="px-5 py-3"><Badge label={transaction.status} color={STATUS_COLORS[transaction.status === 'completed' ? 'completed_t' : transaction.status === 'failed' ? 'failed' : 'pending_t'] ?? '#888'} /></td>
-                            </tr>
-                          })}
-                          {filteredStatementTransactions.length === 0 && <tr><td colSpan={5} className="px-5 py-14 text-center"><p className="font-semibold">No statements found</p><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Adjust your search or filters, or wait for financial activity.</p></td></tr>}</tbody>
-                        </table>
-                      </div>
-                    </> : <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-                      {withdrawals.map(withdrawal => <div key={withdrawal.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div><p className="font-bold">{formatPrice(withdrawal.amount)}</p><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{withdrawal.payment_method === 'mobile_money' ? 'Mobile Money' : 'Bank transfer'} · {withdrawal.payment_reference}</p><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Requested {new Date(withdrawal.requested_at).toLocaleString()}</p></div>
-                        <Badge label={withdrawal.status} color={STATUS_COLORS[withdrawal.status] ?? '#888'} />
-                      </div>)}
-                      {withdrawals.length === 0 && <p className="px-5 py-14 text-center text-sm" style={{ color: 'var(--muted-foreground)' }}>No payout statements yet.</p>}
-                    </div>}
+                      {filteredStatementTransactions.length === 0 ? <div className="organizer-statement-empty"><span><ReceiptText size={19} /></span><strong>No statements found</strong><p>Adjust your search or filters, or wait for financial activity.</p></div> : <div className="organizer-statement-list">
+                        {filteredStatementTransactions.map(transaction => {
+                          const order = orders.find(item => item.id === transaction.order_id)
+                          const positive = transaction.type === 'payment'
+                          const title = order?.events?.title ?? (transaction.type === 'payout' ? 'Wallet withdrawal' : `${transaction.type[0].toUpperCase()}${transaction.type.slice(1)} settlement`)
+                          return <article key={transaction.id} className="organizer-statement-row">
+                            <span className={`organizer-statement-icon is-${transaction.type}`}>
+                              {transaction.type === 'payment' ? <ArrowDownLeft size={16} /> : transaction.type === 'payout' ? <ArrowUpRight size={16} /> : transaction.type === 'refund' ? <RotateCcw size={15} /> : <ReceiptText size={15} />}
+                            </span>
+                            <div className="organizer-statement-description"><strong>{title}</strong><span>{transaction.reference ?? transaction.id.slice(0, 12)}</span></div>
+                            <div className="organizer-statement-meta"><span className="organizer-statement-date">{new Date(transaction.created_at).toLocaleDateString()}</span><Badge label={transaction.type} color={STATUS_COLORS[transaction.type] ?? '#888'} /></div>
+                            <strong className={`organizer-statement-amount ${positive ? 'is-positive' : transaction.type === 'refund' ? 'is-refund' : ''}`}>{positive ? '+' : '−'}{formatPrice(transaction.amount)}</strong>
+                            <Badge label={transaction.status} color={STATUS_COLORS[transaction.status === 'completed' ? 'completed_t' : transaction.status === 'failed' ? 'failed' : 'pending_t'] ?? '#888'} />
+                          </article>
+                        })}
+                      </div>}
+                    </>
                   </section>
                 </div>
               )}
 
               {section === 'payouts' && isOwner && (
-                <div className="mx-auto max-w-5xl space-y-5">
+                <div className="organizer-finance-page organizer-wallet-page mx-auto max-w-7xl space-y-5">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--primary)' }}>Organizer finance</p>
-                      <h2 className="mt-1 text-2xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Wallet</h2>
-                      <p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>Track event earnings and request transfers to your Mobile Money number or bank account.</p>
+                    <div className="organizer-finance-heading">
+                      <span className="organizer-finance-heading-mark"><Wallet size={20} /></span>
+                      <div><p className="organizer-finance-eyebrow">Organizer finance</p>
+                      <h2 className="organizer-finance-title">Wallet</h2>
+                      <p className="organizer-finance-description">Manage your available earnings, request a payout, and follow its progress.</p></div>
                     </div>
-                    <button type="button" onClick={() => document.getElementById('wallet-withdrawal-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} className="shrink-0 rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>Request withdrawal ↓</button>
+                    <div className="organizer-finance-header-actions"><button type="button" className="organizer-finance-secondary-action" onClick={() => selectSection('transactions')}><ReceiptText size={14} /> View statements</button></div>
                   </div>
 
-                  <div className="organizer-wallet-balance rounded-2xl p-5 sm:p-6">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted-foreground)' }}>Available to withdraw</p>
-                        <p className="mt-2 text-3xl font-black sm:text-4xl" style={{ fontFamily: 'Outfit, sans-serif' }}>{formatPrice(availablePayoutBalance)}</p>
-                        <p className="mt-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>Pending transfers are reserved until processed or cancelled.</p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs sm:min-w-56">
-                        <div className="rounded-xl px-3 py-2" style={{ background: 'var(--muted)' }}><span style={{ color: 'var(--muted-foreground)' }}>Pending</span><strong className="mt-1 block">{withdrawals.filter(item => ['requested', 'processing'].includes(item.status)).length}</strong></div>
-                        <div className="rounded-xl px-3 py-2" style={{ background: 'var(--muted)' }}><span style={{ color: 'var(--muted-foreground)' }}>Settled</span><strong className="mt-1 block">{withdrawals.filter(item => item.status === 'paid').length}</strong></div>
-                      </div>
+                  <div className="organizer-wallet-dashboard-grid">
+                    <div className="organizer-wallet-overview-column">
+                      <section className="organizer-wallet-card">
+                        <div className="organizer-wallet-card-top"><span className="organizer-wallet-card-brand"><span>Q</span> QPassa wallet</span><Wallet size={18} /></div>
+                        <div className="organizer-wallet-card-balance"><small>Available balance</small><strong>{formatPrice(availablePayoutBalance)}</strong></div>
+                        <div className="organizer-wallet-card-bottom"><span>Organizer account</span><span>{organizer.name}</span></div>
+                      </section>
+                      <section className="organizer-wallet-summary-card">
+                        <div className="organizer-wallet-panel-heading"><div><p className="organizer-finance-eyebrow">Overview</p><h3>Earnings summary</h3></div><CircleDollarSign size={17} /></div>
+                        <div className="organizer-wallet-summary-list">
+                          {([
+                            ['Gross collection', walletEventBreakdown.reduce((sum, item) => sum + item.gross, 0), 'income'],
+                            ['Platform fees & commissions', walletEventBreakdown.reduce((sum, item) => sum + item.fees + item.agentFees, 0), 'deduction'],
+                            ['Refunds', walletEventBreakdown.reduce((sum, item) => sum + item.refunds, 0), 'deduction'],
+                            ['Net event earnings', walletEventBreakdown.reduce((sum, item) => sum + item.net, 0), 'total'],
+                          ] as const).map(([label, amount, kind]) => <div key={label} data-kind={kind}><span>{label}</span><strong>{kind === 'income' ? '+' : kind === 'deduction' ? '−' : ''}{formatPrice(amount)}</strong></div>)}
+                        </div>
+                      </section>
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-                    {([
-                      ['Gross collection', walletEventBreakdown.reduce((sum, item) => sum + item.gross, 0)],
-                      ['Platform fees', walletEventBreakdown.reduce((sum, item) => sum + item.fees, 0)],
-                      ['Refunds', walletEventBreakdown.reduce((sum, item) => sum + item.refunds, 0)],
-                      ['Net settled', walletEventBreakdown.reduce((sum, item) => sum + item.net, 0)],
-                    ] as const).map(([label, amount]) => <div key={label} className="organizer-finance-stat rounded-2xl p-4"><p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--muted-foreground)' }}>{label}</p><p className="mt-2 text-lg font-black">{formatPrice(amount)}</p></div>)}
-                  </div>
-
-                  <section className="organizer-finance-panel overflow-hidden rounded-2xl">
-                    <div className="border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}><h3 className="font-bold">Earnings breakdown</h3><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Confirmed ticket sales by event · after fees, refunds, and agent commissions</p></div>
-                    <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm">
-                      <thead><tr>{['Event', 'Orders', 'Gross collection', 'Fees & commissions', 'Refunds', 'Net settled'].map(label => <th key={label} className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--muted-foreground)' }}>{label}</th>)}</tr></thead>
-                      <tbody>{walletEventBreakdown.map(item => <tr key={item.id} className="border-t" style={{ borderColor: 'var(--border)' }}><td className="px-5 py-3 font-semibold">{item.title}</td><td className="px-5 py-3 text-xs">{item.orders}</td><td className="px-5 py-3 text-xs">{formatPrice(item.gross)}</td><td className="px-5 py-3 text-xs">{formatPrice(item.fees + item.agentFees)}</td><td className="px-5 py-3 text-xs">{formatPrice(item.refunds)}</td><td className="px-5 py-3 text-xs font-bold" style={{ color: 'var(--primary)' }}>{formatPrice(item.net)}</td></tr>)}
-                        {walletEventBreakdown.length === 0 && <tr><td colSpan={6} className="px-5 py-12 text-center text-sm" style={{ color: 'var(--muted-foreground)' }}>Event earnings will appear here after the first confirmed sale.</td></tr>}</tbody>
-                    </table></div>
-                  </section>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div id="wallet-withdrawal-form" className="organizer-finance-panel rounded-2xl p-5 sm:col-span-2">
-                      <div className="mb-4"><h3 className="font-bold">Request a payout</h3><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>The platform team reviews requests and updates their status after processing.</p></div>
+                    <section id="wallet-withdrawal-form" className="organizer-finance-panel organizer-wallet-request">
+                      <div className="organizer-wallet-panel-heading"><div><p className="organizer-finance-eyebrow">Withdraw earnings</p><h3>Send a payout</h3><p>Choose where your available funds should go.</p></div><span className="organizer-wallet-panel-heading-icon"><ArrowUpRight size={17} /></span></div>
                       {payoutNotice && <p role="status" className="organizer-dashboard-alert is-success mb-3 rounded-xl border px-3 py-2 text-xs">{payoutNotice}</p>}
-                      <div className="space-y-3">
+                      <div className="organizer-wallet-form">
                         <label className="block text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Amount (BIF)
-                          <input type="number" min="1" step="1" max={availablePayoutBalance} inputMode="numeric" value={payoutAmount} onChange={event => setPayoutAmount(event.target.value)} placeholder="Enter a whole amount" className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
+                          <input type="number" min="1" step="1" max={availablePayoutBalance} inputMode="numeric" value={payoutAmount} onChange={event => setPayoutAmount(event.target.value)} placeholder="Enter a whole amount" className="mt-1.5 w-full rounded-full border px-4 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
                         </label>
                         <label className="block text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Payment method
-                          <select value={payoutMethod} onChange={event => setPayoutMethod(event.target.value as 'mobile_money' | 'bank')} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
-                            <option value="mobile_money">Mobile Money</option>
-                            <option value="bank">Bank transfer</option>
+                          <select value={payoutMethod} onChange={event => setPayoutMethod(event.target.value as 'mobile_money' | 'bank')} className="mt-1.5 w-full rounded-full border px-4 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }}>
+                            <option value="mobile_money">Mobile Money</option><option value="bank">Bank transfer</option>
                           </select>
                         </label>
                         <label className="block text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{payoutMethod === 'mobile_money' ? 'Receiving phone number' : 'Bank account reference'}
-                          <input type="text" autoComplete="off" value={payoutReference} onChange={event => setPayoutReference(event.target.value)} placeholder={payoutMethod === 'mobile_money' ? '+257 79 000 000' : 'Account holder / account number'} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
+                          <input type="text" autoComplete="off" value={payoutReference} onChange={event => setPayoutReference(event.target.value)} placeholder={payoutMethod === 'mobile_money' ? '+257 79 000 000' : 'Account holder / account number'} className="mt-1.5 w-full rounded-full border px-4 py-2.5 text-sm outline-none" style={{ background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
                         </label>
-                        <button type="button" onClick={() => void submitPayoutRequest()} disabled={payoutSubmitting || !isOwner || availablePayoutBalance <= 0} className="w-full rounded-xl px-4 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50" style={{ background: 'var(--primary)', color: '#000' }}>
-                          {payoutSubmitting ? 'Submitting request…' : availablePayoutBalance <= 0 ? 'No available balance' : 'Submit payout request'}
+                        <p className="organizer-wallet-available-note">Available to send <strong>{formatPrice(availablePayoutBalance)}</strong></p>
+                        <button type="button" onClick={() => void submitPayoutRequest()} disabled={payoutSubmitting || !isOwner || availablePayoutBalance <= 0} className="organizer-finance-primary-action w-full rounded-full px-4 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50" style={{ background: 'var(--primary)', color: '#000' }}>
+                          {payoutSubmitting ? 'Submitting request…' : availablePayoutBalance <= 0 ? 'No available balance' : <><ArrowUpRight size={15} /> Submit payout request</>}
                         </button>
+                        <p className="organizer-wallet-form-note">Payout requests are reviewed by the platform team before transfer.</p>
                       </div>
-                    </div>
+                    </section>
+
+                    <section className="organizer-finance-panel organizer-wallet-history">
+                      <div className="organizer-wallet-panel-heading"><div><p className="organizer-finance-eyebrow">Transfers</p><h3>Payout activity</h3><p>{withdrawals.length.toLocaleString()} request{withdrawals.length === 1 ? '' : 's'} · {withdrawals.filter(item => ['requested', 'processing'].includes(item.status)).length} in progress</p></div><span className="organizer-wallet-panel-heading-icon"><ReceiptText size={17} /></span></div>
+                      {withdrawals.length === 0 ? <div className="organizer-wallet-empty"><span><Wallet size={18} /></span><p>No payouts yet</p><small>Your payout requests and their statuses will show here.</small></div> : <div className="organizer-wallet-payout-list">
+                        {withdrawals.map(withdrawal => <article key={withdrawal.id} className="organizer-wallet-payout-item">
+                          <span className="organizer-wallet-payout-icon"><ArrowUpRight size={15} /></span>
+                          <div className="organizer-wallet-payout-copy"><div><strong>{formatPrice(withdrawal.amount)}</strong><Badge label={withdrawal.status} color={STATUS_COLORS[withdrawal.status] ?? '#888'} /></div><p>{withdrawal.payment_method === 'mobile_money' ? 'Mobile Money' : 'Bank transfer'} · {withdrawal.payment_reference}</p><small>{new Date(withdrawal.requested_at).toLocaleDateString()}{withdrawal.note ? ` · ${withdrawal.note}` : ''}</small></div>
+                          {withdrawal.status === 'requested' && <button type="button" onClick={() => void cancelPayoutRequest(withdrawal)} className="organizer-wallet-cancel">Cancel</button>}
+                        </article>)}
+                      </div>}
+                      <button type="button" className="organizer-wallet-statements-link" onClick={() => selectSection('transactions')}>Open full statements <ArrowUpRight size={14} /></button>
+                    </section>
                   </div>
 
-                  <div className="overflow-hidden rounded-2xl border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-                    <div className="border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}>
-                      <h3 className="font-bold">Payout request history</h3>
-                      <p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{withdrawals.length.toLocaleString()} request{withdrawals.length === 1 ? '' : 's'} · updated {lastUpdated?.toLocaleTimeString() ?? 'loading'}</p>
-                    </div>
-                    {withdrawals.length === 0 ? <p className="px-5 py-12 text-center text-sm" style={{ color: 'var(--muted-foreground)' }}>No payout requests yet. Your submitted requests will appear here.</p> : <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-                      {withdrawals.map(withdrawal => <div key={withdrawal.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2"><p className="font-bold">{formatPrice(withdrawal.amount)}</p><Badge label={withdrawal.status} color={STATUS_COLORS[withdrawal.status] ?? '#888'} /></div>
-                          <p className="mt-1 text-xs capitalize" style={{ color: 'var(--muted-foreground)' }}>{withdrawal.payment_method === 'mobile_money' ? 'Mobile Money' : 'Bank transfer'} · {withdrawal.payment_reference}</p>
-                          <p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Requested {new Date(withdrawal.requested_at).toLocaleString()}{withdrawal.note ? ` · ${withdrawal.note}` : ''}</p>
-                        </div>
-                        {withdrawal.status === 'requested' && <button type="button" onClick={() => void cancelPayoutRequest(withdrawal)} className="self-start rounded-lg px-3 py-2 text-xs font-bold sm:self-auto" style={{ background: 'rgba(239,68,68,.1)', color: '#fca5a5' }}>Cancel request</button>}
-                      </div>)}
+                  <section className="organizer-finance-panel organizer-wallet-earnings overflow-hidden rounded-2xl">
+                    <div className="border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}><div className="organizer-wallet-panel-heading"><div><p className="organizer-finance-eyebrow">By event</p><h3>Earnings breakdown</h3><p>Confirmed ticket sales after fees, refunds, and agent commissions.</p></div><ChartNoAxesCombined size={17} /></div></div>
+                    {walletEventBreakdown.length === 0 ? <div className="organizer-wallet-events-empty"><span><TicketCheck size={18} /></span><strong>No event earnings yet</strong><p>Confirmed ticket sales will appear here, broken down by event.</p></div> : <div className="organizer-wallet-event-list">
+                      {walletEventBreakdown.map((item, index) => <article key={item.id} className="organizer-wallet-event-row">
+                        <div className="organizer-wallet-event-heading"><span className="organizer-wallet-event-index">{String(index + 1).padStart(2, '0')}</span><div className="organizer-wallet-event-name"><strong>{item.title}</strong><small>{item.orders} confirmed order{item.orders === 1 ? '' : 's'}</small></div><div className="organizer-wallet-event-net"><small>Net settled</small><strong>{formatPrice(item.net)}</strong></div></div>
+                        <div className="organizer-wallet-event-metrics"><div><small>Gross collection</small><strong>{formatPrice(item.gross)}</strong></div><div><small>Fees &amp; commissions</small><strong>−{formatPrice(item.fees + item.agentFees)}</strong></div><div><small>Refunds</small><strong>−{formatPrice(item.refunds)}</strong></div></div>
+                        <div className="organizer-wallet-event-track" role="img" aria-label={`${item.gross ? Math.round(item.net / item.gross * 100) : 0}% net of gross collection`}><span style={{ width: `${item.gross ? Math.min(100, Math.max(0, item.net / item.gross * 100)) : 0}%` }} /></div>
+                      </article>)}
                     </div>}
-                  </div>
+                  </section>
                 </div>
               )}
           </>
@@ -1899,8 +1906,6 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
       </main>
       </div>
 
-      {/* ── CREATE EVENT MODAL ── */}
-      {(showNewEvent || editingEvent) && <CreateEventModal orgId={orgId!} event={editingEvent} onClose={() => { setShowNewEvent(false); setEditingEvent(null) }} onCreated={() => { setShowNewEvent(false); setEditingEvent(null); load() }} />}
       {showInviteMember && <InviteMemberModal orgId={orgId!} roles={isOwner ? roles : []} onClose={() => setShowInviteMember(false)} onInvited={() => { setShowInviteMember(false); load() }} />}
       {showInviteAgent && <InviteAgentModal orgId={orgId!} events={events} onClose={() => setShowInviteAgent(false)} onInvited={() => { setShowInviteAgent(false); load() }} />}
       {editingAgentAssignment && <EditAgentAssignmentModal assignment={editingAgentAssignment} events={events} onClose={() => setEditingAgentAssignment(null)} onSaved={() => { setEditingAgentAssignment(null); load() }} />}
@@ -1908,12 +1913,13 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   )
 }
 
-// ── Modals ──
+// ── Event setup page and workspace dialogs ──
 
 type EventTierForm = { id?: string; name: string; price: string; quantity: string; description: string; ticket_type: 'consumable' | 'non_consumable'; consumable_amount: string; extra_info: string; expires_at: string; group_size: string; show_optional_details: boolean; sold: number }
 
-function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string; event?: Event | null; onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState(() => ({ title: event?.title ?? '', category: event?.category ?? 'Music', date: event?.date ?? '', end_date: event?.end_date ?? '', time: event?.time ?? '18:00', end_time: event?.end_time ?? '', venue: event?.venue ?? '', venue_latitude: event?.venue_latitude ?? null as number | null, venue_longitude: event?.venue_longitude ?? null as number | null, city: event?.city ?? 'Bujumbura', description: event?.description ?? '', capacity: String(event?.capacity ?? 500), cover_image: event?.cover_image ?? '', tags: event?.tags?.join(', ') ?? '', status: event?.status ?? 'draft', refund_policy: event?.refund_policy ?? 'Tickets are non-refundable', entry_policy: event?.entry_policy ?? 'Valid ID required at entry' }))
+function CreateEventPage({ orgId, event, onClose, onCreated }: { orgId: string; event?: Event | null; onClose: () => void; onCreated: () => void }) {
+  const [step, setStep] = useState(1)
+  const [form, setForm] = useState(() => ({ title: event?.title ?? '', category: event?.category ?? 'Music', date: event?.date ?? '', end_date: event?.end_date ?? '', time: event?.time ?? '18:00', end_time: event?.end_time ?? '', venue: event?.venue ?? '', venue_latitude: event?.venue_latitude ?? null as number | null, venue_longitude: event?.venue_longitude ?? null as number | null, city: event?.city ?? 'Bujumbura', description: event?.description ?? '', capacity: String(event?.capacity ?? 500), cover_image: event?.cover_image ?? '', tags: event?.tags?.join(', ') ?? '', status: event?.status ?? 'draft', refund_policy: event?.refund_policy ?? 'Tickets are non-refundable', entry_policy: event?.entry_policy ?? 'Valid ID required at entry', terms_and_conditions: event?.terms_and_conditions ?? 'By purchasing a ticket, you agree to attend the event and accept the organizer’s policies.' }))
   const [venueSearch, setVenueSearch] = useState(event?.venue ?? '')
   const [venueResults, setVenueResults] = useState<Array<{ display_name: string; lat: string; lon: string; class?: string; type?: string; address?: { city?: string; town?: string; village?: string } }>>([])
   const [venueSearching, setVenueSearching] = useState(false)
@@ -1925,6 +1931,48 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
   const endDateIsBeforeStart = Boolean(form.end_date && form.date && form.end_date < form.date)
   const endTimeIsBeforeStart = Boolean(form.end_time && form.time && (!form.end_date || form.end_date === form.date) && form.end_time.slice(0, 5) <= form.time.slice(0, 5))
   const invalidEventEnd = endDateIsBeforeStart || endTimeIsBeforeStart
+
+  const validateEventDetails = () => {
+    const capacity = Number.parseInt(form.capacity, 10)
+    if (!form.title.trim() || !form.date || !form.venue.trim()) { setError('Event title, date, and venue are required.'); return false }
+    if (endDateIsBeforeStart) { setError('Event end date must be on or after the start date.'); return false }
+    if (endTimeIsBeforeStart) { setError('When the event ends on its start date, the end time must be later than the start time.'); return false }
+    if (!Number.isInteger(capacity) || capacity < 1) { setError('Event capacity must be a positive whole number.'); return false }
+    setError('')
+    return true
+  }
+
+  const validateTicketSetup = () => {
+    const capacity = Number.parseInt(form.capacity, 10)
+    if (!tiers.length) { setError('Add at least one ticket tier.'); return false }
+    const normalizedTierNames = new Set<string>()
+    let totalTicketCapacity = 0
+    for (const tier of tiers) {
+      const tierName = tier.name.trim()
+      const price = Number.parseInt(tier.price, 10)
+      const quantity = Number.parseInt(tier.quantity, 10)
+      const parsedGroupSize = Number.parseInt(tier.group_size, 10)
+      const groupSize = parsedGroupSize || 1
+      const consumableAmount = Number.parseInt(tier.consumable_amount, 10)
+      if (!tierName) { setError('Every ticket tier needs a name.'); return false }
+      if (normalizedTierNames.has(tierName.toLowerCase())) { setError('Ticket tier names must be unique.'); return false }
+      if (!Number.isInteger(price) || price < 0) { setError(`Enter a valid price for ${tierName}.`); return false }
+      if (!Number.isInteger(quantity) || quantity < 1 || quantity < tier.sold) { setError(`${tierName} quantity must be at least ${tier.sold} and greater than zero.`); return false }
+      if (tier.show_optional_details && tier.group_size && (!Number.isInteger(parsedGroupSize) || parsedGroupSize < 1)) { setError(`Group size for ${tierName} must be at least 1.`); return false }
+      if (tier.ticket_type === 'consumable' && (!Number.isInteger(consumableAmount) || consumableAmount < 1)) { setError(`Enter the consumable amount for ${tierName}.`); return false }
+      normalizedTierNames.add(tierName.toLowerCase())
+      totalTicketCapacity += quantity * groupSize
+    }
+    if (totalTicketCapacity > capacity) { setError('Total ticket capacity cannot exceed the event capacity.'); return false }
+    setError('')
+    return true
+  }
+
+  const goToNextStep = () => {
+    if (step === 1 && !validateEventDetails()) return
+    if (step === 2 && !validateTicketSetup()) return
+    setStep(current => Math.min(3, current + 1))
+  }
 
   const createCoverDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
@@ -2034,6 +2082,7 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
       status: form.status,
       refund_policy: form.refund_policy,
       entry_policy: form.entry_policy,
+      terms_and_conditions: form.terms_and_conditions,
     }
     const eventQuery = event
       ? supabase.from('events').update(eventPayload).eq('id', event.id).select().single()
@@ -2075,6 +2124,18 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
   }
 
   const f = (key: string, val: string) => setForm(p => ({ ...p, [key]: val }))
+
+  const tagSuggestions = ['Live music', 'Outdoor', 'VIP', 'Food & drinks', 'Networking', 'Festival', 'Workshop', 'DJ set', 'Comedy', 'Fashion', 'Cultural', 'Meetup']
+  const activeTags = new Set(form.tags.split(',').map(tag => tag.trim()).filter(Boolean))
+  const toggleTagSuggestion = (tag: string) => {
+    const nextTags = Array.from(activeTags)
+    if (nextTags.includes(tag)) {
+      nextTags.splice(nextTags.indexOf(tag), 1)
+    } else {
+      nextTags.push(tag)
+    }
+    f('tags', nextTags.join(', '))
+  }
 
   const searchVenues = async (value: string) => {
     setVenueSearch(value)
@@ -2123,38 +2184,49 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)' }}>
-      <div className="organizer-modal dashboard-form-modal w-full max-w-lg rounded-2xl overflow-hidden overflow-y-auto" style={{ background: 'var(--card)', border: '1px solid var(--border)', maxHeight: '90vh' }}>
-        <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-          <h2 className="font-black text-lg" style={{ fontFamily: 'Outfit, sans-serif' }}>{event ? 'Edit Event' : 'New Event'}</h2>
-          <button onClick={onClose} className="text-xl" style={{ color: 'var(--muted-foreground)' }}>✕</button>
+    <section className="organizer-event-wizard-page">
+      <div className="organizer-modal dashboard-form-modal organizer-event-wizard w-full overflow-hidden" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+        <div className="organizer-event-wizard-header border-b px-5 py-4 sm:px-8" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+          <div className="flex items-start justify-between gap-4">
+            <div><p className="mb-1 text-[10px] font-bold uppercase tracking-[.18em]" style={{ color: 'var(--primary)' }}>{event ? 'Manage event' : 'Event setup'}</p><h2 className="font-black text-xl sm:text-2xl" style={{ fontFamily: 'Outfit, sans-serif' }}>{event ? 'Edit event' : 'Create an event'}</h2></div>
+            <button type="button" onClick={onClose} className="organizer-event-wizard-exit"><ChevronLeft size={15} />Back to events</button>
+          </div>
+          <ol className="organizer-event-wizard-steps" aria-label="Event setup progress">
+            {[['Event details', '1'], ['Set up tickets', '2'], ['Review', '3']].map(([label, number], index) => <li key={label} data-state={step === index + 1 ? 'current' : step > index + 1 ? 'complete' : 'upcoming'}>
+              <span>{step > index + 1 ? <CheckIcon size={14} /> : number}</span><b>{label}</b>
+            </li>)}
+          </ol>
+          <div className="organizer-event-wizard-progress" aria-hidden="true"><i style={{ width: `${((step - 1) / 2) * 100}%` }} /></div>
         </div>
-        <div className="p-6 space-y-4">
+        <div className="organizer-event-wizard-scroll">
+        <div className={`organizer-event-wizard-content ${step === 1 ? 'is-details-step' : step === 2 ? 'is-ticket-step' : 'is-review-step'}`}>
           {error && <p className="rounded-lg px-3 py-2 text-xs" style={{ background: '#3a1717', color: '#fecaca' }}>{error}</p>}
+          {step === 1 && <>
+          <div className="organizer-event-wizard-section-heading"><span>01</span><div><h3>Tell us about your event</h3><p>Share the essential information attendees need to know.</p></div></div>
           {[
             { label: 'Event title *', key: 'title', placeholder: 'Bujumbura Summer Fest' },
           ].map(({ label, key, placeholder }) => (
-            <div key={key}>
+            <div key={key} className="organizer-event-field organizer-event-field-title">
               <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>{label}</label>
               <input value={String(form[key as keyof typeof form])} onChange={e => f(key, e.target.value)} placeholder={placeholder}
                 className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} />
             </div>
           ))}
-          <div>
+          <div className="organizer-event-field organizer-event-field-venue">
             <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Venue name *</label>
             <input value={form.venue} onChange={event => f('venue', event.target.value)} placeholder="Stade Intwari" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} />
             <p className="mt-1 text-[11px]" style={{ color: 'var(--muted-foreground)' }}>This is the venue name attendees will see.</p>
           </div>
-          <div className="relative">
+          <div className="organizer-event-field organizer-event-field-map relative">
             <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Map location</label>
             <input value={venueSearch} onChange={event => void searchVenues(event.target.value)} placeholder="Search for the venue on the map" className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} />
             <p className="mt-1 text-[11px]" style={{ color: 'var(--muted-foreground)' }}>{venueSearching ? 'Searching venues...' : form.venue_latitude ? 'Map location selected.' : 'Optional: search for a bar, hotel, school, restaurant, stadium, or other venue.'}</p>
             {venueResults.length > 0 && <div className="absolute inset-x-0 top-full z-10 mt-2 overflow-hidden rounded-xl border shadow-2xl" style={{ background: '#1a1d1d', borderColor: 'var(--border)' }}>{venueResults.map(result => <button key={`${result.lat}-${result.lon}`} type="button" onClick={() => selectVenue(result)} className="block w-full border-b px-3 py-2.5 text-left text-xs last:border-0 hover:bg-white/5" style={{ borderColor: 'var(--border)' }}>{result.display_name}</button>)}</div>}
             {form.venue_latitude !== null && form.venue_longitude !== null && <iframe title="Selected venue map" className="mt-3 h-40 w-full rounded-xl border" style={{ borderColor: 'var(--border)' }} src={`https://www.openstreetmap.org/export/embed.html?bbox=${form.venue_longitude - 0.01}%2C${form.venue_latitude - 0.01}%2C${form.venue_longitude + 0.01}%2C${form.venue_latitude + 0.01}&layer=mapnik&marker=${form.venue_latitude}%2C${form.venue_longitude}`} />}
           </div>
-          <div>
+          <div className="organizer-event-field organizer-event-field-cover">
             <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Cover image</label>
-            <div className="rounded-xl p-3 space-y-3" style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}>
+            <div className="organizer-event-cover-card rounded-xl p-3 space-y-3">
               {coverPreview && <img src={coverPreview} alt="Cover preview" className="w-full h-36 rounded-lg object-cover" />}
               <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={e => handleCoverFile(e.target.files?.[0])}
                 className="w-full text-xs" style={{ color: 'var(--muted-foreground)' }} />
@@ -2163,7 +2235,7 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
                 className="w-full px-3 py-2.5 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} />}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="organizer-event-field-grid grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Date *</label>
               <input type="date" value={form.date} onChange={e => f('date', e.target.value)}
@@ -2187,13 +2259,30 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
                 : <p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Events can span multiple days.</p>}
             </div>
           </div>
-          <div>
+          <div className="organizer-event-field organizer-event-field-tags">
             <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Tags / lineup</label>
-            <input value={form.tags} onChange={e => f('tags', e.target.value)} placeholder="DJ, Live music, Afrobeats"
-              className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} />
-            <p className="text-[11px] mt-1" style={{ color: 'var(--muted-foreground)' }}>Separate tags with commas. They appear as the event lineup.</p>
+            <div className="organizer-event-tag-card">
+              <input value={form.tags} onChange={e => f('tags', e.target.value)} placeholder="DJ, Live music, Afrobeats"
+                className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} />
+              <div className="organizer-event-tag-suggestions">
+                {tagSuggestions.map(tag => {
+                  const selected = activeTags.has(tag)
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleTagSuggestion(tag)}
+                      className={`organizer-event-tag-suggestion${selected ? ' is-selected' : ''}`}
+                    >
+                      {tag}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            <p className="text-[11px] mt-1" style={{ color: 'var(--muted-foreground)' }}>Separate tags with commas or tap a suggestion. They appear as the event lineup.</p>
           </div>
-          <div>
+          <div className="organizer-event-field organizer-event-field-status">
             <div>
               <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Publication status</label>
               <select value={form.status} onChange={e => f('status', e.target.value)}
@@ -2202,7 +2291,7 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="organizer-event-field-grid organizer-event-field-category grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Category</label>
               <select value={form.category} onChange={e => f('category', e.target.value)}
@@ -2216,24 +2305,28 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
                 className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} />
             </div>
           </div>
-          <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Description</label>
-            <textarea value={form.description} onChange={e => f('description', e.target.value)} rows={3}
-              className="w-full px-4 py-2.5 rounded-xl text-sm outline-none resize-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} />
+          <div className="organizer-event-field organizer-event-field-description">
+            <RichTextEditor id="event-description" label="Describe Your Event" value={form.description} onChange={value => f('description', value)} placeholder="Write a brief description of your event" maxLength={500} />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div><label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Refund policy</label><input value={form.refund_policy} onChange={e => f('refund_policy', e.target.value)} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} /></div>
-            <div><label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--muted-foreground)' }}>Entry policy</label><input value={form.entry_policy} onChange={e => f('entry_policy', e.target.value)} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} /></div>
+          <div className="organizer-event-field-grid organizer-event-policy-grid grid grid-cols-1 gap-3">
+            <div className="organizer-policy-field"><RichTextEditor id="event-refund-policy" label="Refund policy" value={form.refund_policy} onChange={value => f('refund_policy', value)} placeholder="Describe your refund policy" maxLength={1000} /></div>
+            <div className="organizer-policy-field"><RichTextEditor id="event-entry-policy" label="Entry policy" value={form.entry_policy} onChange={value => f('entry_policy', value)} placeholder="Describe entry requirements for attendees" maxLength={1000} /></div>
+            <div className="organizer-policy-field organizer-terms-field"><RichTextEditor id="event-terms" label="Terms & conditions" value={form.terms_and_conditions} onChange={value => f('terms_and_conditions', value)} placeholder="Add the terms and conditions for your event" maxLength={2000} /></div>
           </div>
+          </>}
 
+          {step === 2 && <>
+          <div className="organizer-event-wizard-section-heading"><span>02</span><div><h3>Set up your tickets</h3><p>Add ticket options, prices and quantities. Your total inventory must fit the event capacity.</p></div></div>
+          <div className="organizer-event-wizard-capacity"><span className="organizer-event-wizard-capacity-icon"><TicketCheck size={17} /></span><span>Event capacity</span><strong>{(Number.parseInt(form.capacity, 10) || 0).toLocaleString()}</strong><small>tickets available across all ticket types</small></div>
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Ticket Tiers</label>
-              <button onClick={() => setTiers(t => [...t, { name: 'VIP', price: '75000', quantity: '100', description: '', ticket_type: 'non_consumable', consumable_amount: '', extra_info: '', expires_at: '', group_size: '1', show_optional_details: false, sold: 0 }])}
-                className="text-xs font-bold" style={{ color: 'var(--primary)' }}>+ Add tier</button>
+              <button type="button" className="organizer-event-add-tier" onClick={() => setTiers(t => [...t, { name: 'VIP', price: '75000', quantity: '100', description: '', ticket_type: 'non_consumable', consumable_amount: '', extra_info: '', expires_at: '', group_size: '1', show_optional_details: false, sold: 0 }])}>
+                <Plus size={14} /> Add ticket tier
+              </button>
             </div>
             {tiers.map((tier, i) => (
-              <div key={i} className="mb-3 rounded-xl p-3" style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}>
+              <div key={i} className="organizer-event-wizard-tier mb-3 rounded-xl p-3" style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
                 <input placeholder="Name" value={tier.name} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
                   className="px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} />
@@ -2241,7 +2334,7 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
                   className="min-w-0 flex-1 px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} /><label className="flex shrink-0 items-center gap-1 text-[11px]" style={{ color: 'var(--muted-foreground)' }}><input type="checkbox" checked={tier.price === '0'} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, price: e.target.checked ? '0' : '30000' } : x))} /> Free</label></div>
                 <input placeholder="Qty" value={tier.quantity} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, quantity: e.target.value } : x))}
                   className="px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} />
-                <button onClick={() => setTiers(t => t.filter((_, j) => j !== i))} className="text-xs" style={{ color: '#ef4444' }}>✕</button>
+                <button type="button" onClick={() => setTiers(t => t.filter((_, j) => j !== i))} className="organizer-event-remove-tier" aria-label={`Remove ${tier.name || 'ticket'} tier`} title="Remove ticket tier"><XIcon size={15} /></button>
                 </div>
                 <input placeholder="Ticket description" value={tier.description} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, description: e.target.value } : x))}
                   className="mb-2 w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} />
@@ -2260,13 +2353,56 @@ function CreateEventModal({ orgId, event, onClose, onCreated }: { orgId: string;
               </div>
             ))}
           </div>
+          </>}
 
-          <button onClick={handleSubmit} disabled={saving || invalidEventEnd} className="w-full py-3.5 rounded-xl font-black disabled:cursor-not-allowed" style={{ background: 'var(--primary)', color: '#000', opacity: saving || invalidEventEnd ? 0.55 : 1 }}>
-            {saving ? (event ? 'Saving...' : 'Creating...') : event ? 'Save event changes' : 'Create Event (Draft)'}
-          </button>
+          {step === 3 && <>
+            <div className="organizer-event-wizard-section-heading"><span>03</span><div><h3>Review your event</h3><p>Check the details and choose whether to save as a draft or publish.</p></div></div>
+            <div className="organizer-event-review-layout">
+              <section className="organizer-event-review-main">
+                <div className="organizer-event-review-cover" style={{ backgroundImage: (coverPreview || form.cover_image) ? `linear-gradient(0deg, rgba(9,12,16,.9), rgba(9,12,16,.18) 85%), url(${coverPreview || form.cover_image})` : undefined }}>
+                  <span>{form.category}</span><h3>{form.title.trim() || 'Untitled event'}</h3>
+                  <p>{form.date ? formatLocaleDate(`${form.date}T12:00:00`, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'Date to be announced'} · {form.time || 'Time TBA'}</p>
+                  <small>{form.venue || 'Venue to be announced'}{form.city ? ` · ${form.city}` : ''}</small>
+                </div>
+                <div className="organizer-event-review-card">
+                  <h4>Event details</h4>
+                  <dl>
+                    <div><dt>Date and time</dt><dd>{form.date ? formatLocaleDate(`${form.date}T12:00:00`, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'Date not set'} · {form.time || 'Time TBA'}{form.end_date ? ` – ${formatLocaleDate(`${form.end_date}T12:00:00`, { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}{form.end_time ? `, ${form.end_time}` : ''}</dd></div>
+                    <div><dt>Venue</dt><dd>{form.venue || 'Venue not set'}{form.city ? ` · ${form.city}` : ''}</dd></div>
+                    <div><dt>Category · capacity</dt><dd>{form.category} · {(Number.parseInt(form.capacity, 10) || 0).toLocaleString()} people</dd></div>
+                    {form.tags.trim() && <div><dt>Tags / lineup</dt><dd>{form.tags}</dd></div>}
+                    {form.description.trim() && <div><dt>Description</dt><dd><RichTextContent value={form.description} /></dd></div>}
+                  </dl>
+                </div>
+                <div className="organizer-event-review-card">
+                  <h4>Policies</h4>
+                  <dl><div><dt>Refund policy</dt><dd><RichTextContent value={form.refund_policy || 'Not specified'} /></dd></div><div><dt>Entry policy</dt><dd><RichTextContent value={form.entry_policy || 'Not specified'} /></dd></div><div><dt>Terms &amp; conditions</dt><dd><RichTextContent value={form.terms_and_conditions || 'Not specified'} /></dd></div></dl>
+                </div>
+              </section>
+              <section className="organizer-event-review-tickets">
+                <div className="organizer-event-review-tickets-heading"><div><h4>Ticket types</h4><p>{tiers.length} ticket {tiers.length === 1 ? 'type' : 'types'} · {tiers.reduce((total, tier) => total + ((Number.parseInt(tier.quantity, 10) || 0) * (Number.parseInt(tier.group_size, 10) || 1)), 0).toLocaleString()} total tickets</p></div><button type="button" onClick={() => setStep(2)}>Edit</button></div>
+                {tiers.map((tier, index) => <article className="organizer-event-review-ticket" key={`${tier.id ?? tier.name}-${index}`}><div><strong>{tier.name || `Ticket type ${index + 1}`}</strong><small>{tier.ticket_type === 'consumable' ? `Consumable · ${tier.consumable_amount || 0} included` : 'Standard entry'}{(Number.parseInt(tier.group_size, 10) || 1) > 1 ? ` · group of ${tier.group_size}` : ''}</small>{tier.description && <small>{tier.description}</small>}</div><div><b>{Number.parseInt(tier.price, 10) === 0 ? 'Free' : `${(Number.parseInt(tier.price, 10) || 0).toLocaleString()} BIF`}</b><small>{(Number.parseInt(tier.quantity, 10) || 0).toLocaleString()} available</small></div></article>)}
+              </section>
+            </div>
+            <div className="organizer-event-review-publish">
+              <label htmlFor="event-publication-status">When you confirm</label>
+              <select id="event-publication-status" value={form.status} onChange={e => f('status', e.target.value)}>
+                <option value="draft">Save as draft — only you can see it</option><option value="published">Publish — make it visible to attendees</option>
+                {event && <><option value="cancelled">Mark as cancelled</option><option value="completed">Mark as completed</option></>}
+              </select>
+            </div>
+          </>}
         </div>
+        </div>
+        <footer className="organizer-event-wizard-footer">
+          <button type="button" onClick={step === 1 ? onClose : () => { setError(''); setStep(current => Math.max(1, current - 1)) }} disabled={saving} className="organizer-event-wizard-back">{step === 1 ? 'Back to events' : 'Back'}</button>
+          <span>Step {step} of 3</span>
+          {step < 3
+            ? <button type="button" onClick={goToNextStep} className="organizer-event-wizard-next">Continue <ArrowRightIcon size={15} /></button>
+            : <button type="button" onClick={handleSubmit} disabled={saving || invalidEventEnd} className="organizer-event-wizard-next" style={{ opacity: saving || invalidEventEnd ? 0.55 : 1 }}>{saving ? (event ? 'Saving…' : 'Creating…') : event ? 'Confirm changes' : form.status === 'published' ? 'Confirm & publish' : 'Confirm & save draft'} <CheckIcon size={15} /></button>}
+        </footer>
       </div>
-    </div>
+    </section>
   )
 }
 

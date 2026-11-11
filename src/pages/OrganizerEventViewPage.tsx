@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { sendOrderTicketEmails } from '../lib/ticketEmail'
 import CheckInPanel from './CheckInPage'
 import { currentLocale, formatLocaleDate } from '../lib/locale'
+import { RichTextContent } from '../components/RichTextEditor'
 
 type Props = {
   event: Event | null
@@ -214,12 +215,12 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
 
   return <>
   <div className="organizer-event-view-page mx-auto w-full max-w-6xl space-y-5 pb-10">
-    <div className="organizer-event-view-toolbar flex flex-wrap items-center justify-between gap-3">
-      <button type="button" onClick={onBack} aria-label="Back to all events" title="Back to all events" className="organizer-event-view-icon-button flex h-10 w-10 items-center justify-center rounded-xl border transition hover:bg-white/5" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={18} /></button>
-      <div className="flex flex-wrap gap-2">
-        {event.status === 'published' && <button type="button" onClick={() => navigate('event-detail', event)} aria-label="Preview public event page" title="Preview public page" className="organizer-event-view-icon-button flex h-10 w-10 items-center justify-center rounded-xl border transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.04)', color: 'var(--foreground)' }}><EyeIcon size={17} /></button>}
-        {canCheckIn && event.status === 'published' && <button type="button" onClick={() => setCheckInOpen(true)} aria-label="Check in guests" title="Check in guests" className="organizer-event-view-icon-button flex h-10 w-10 items-center justify-center rounded-xl border transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.04)', color: 'var(--foreground)' }}><QrCodeIcon size={17} /></button>}
-        <button type="button" onClick={() => onEdit(event)} aria-label="Edit event and ticket tiers" title="Edit event and ticket tiers" className="organizer-event-view-edit inline-flex h-10 items-center justify-center gap-2 rounded-full px-4 text-xs font-bold transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" style={{ background: 'var(--primary)', color: '#111' }}><EditIcon size={15} /> Edit event</button>
+    <div className="organizer-event-view-toolbar">
+      <button type="button" onClick={onBack} aria-label="Back to all events" title="Back to all events" className="organizer-event-view-icon-button organizer-event-view-action-button" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={18} /></button>
+      <div className="organizer-event-view-actions">
+        {event.status === 'published' && <button type="button" onClick={() => navigate('event-detail', event)} aria-label="Preview public event page" title="Preview public page" className="organizer-event-view-icon-button organizer-event-view-action-button" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.04)', color: 'var(--foreground)' }}><EyeIcon size={17} /></button>}
+        {canCheckIn && event.status === 'published' && <button type="button" onClick={() => setCheckInOpen(true)} aria-label="Check in guests" title="Check in guests" className="organizer-event-view-icon-button organizer-event-view-action-button" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.04)', color: 'var(--foreground)' }}><QrCodeIcon size={17} /></button>}
+        <button type="button" onClick={() => onEdit(event)} aria-label="Edit event and ticket tiers" title="Edit event and ticket tiers" className="organizer-event-view-icon-button organizer-event-view-action-button is-primary" style={{ background: 'var(--primary)', color: '#111' }}><EditIcon size={17} /></button>
       </div>
     </div>
 
@@ -317,7 +318,7 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
             <Detail Icon={MapPinIcon} label="Venue" value={`${event.venue}${event.city ? `, ${event.city}` : ''}`} />
             <Detail Icon={UsersIcon} label="Capacity" value={`${event.capacity.toLocaleString()} guests`} />
           </div>
-          {event.description && <div className="mt-5 border-t pt-5" style={{ borderColor: 'var(--border)' }}><h3 className="text-sm font-bold">About this event</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-6" style={{ color: 'var(--muted-foreground)' }}>{event.description}</p></div>}
+          {event.description && <div className="mt-5 border-t pt-5" style={{ borderColor: 'var(--border)' }}><h3 className="text-sm font-bold">About this event</h3><RichTextContent value={event.description} className="mt-2 text-sm leading-6" /></div>}
           {!!eventTags.length && <div className="mt-5 flex flex-wrap gap-2">{eventTags.map(tag => <span key={tag} className="rounded-full border px-3 py-1 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>#{tag}</span>)}</div>}
         </section>
 
@@ -346,7 +347,7 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
 
         <section className="organizer-event-view-panel organizer-event-view-policies rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
           <p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Entry information</p><h2 className="mt-1 text-lg font-bold">Policies</h2>
-          <div className="mt-4 space-y-3"><div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,.03)' }}><p className="text-xs font-bold">Refund policy</p><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>{event.refund_policy || 'Tickets are non-refundable'}</p></div><div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,.03)' }}><p className="text-xs font-bold">Entry policy</p><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>{event.entry_policy || 'Valid ID required at entry'}</p></div></div>
+          <div className="mt-4 space-y-3"><div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,.03)' }}><p className="text-xs font-bold">Refund policy</p><RichTextContent value={event.refund_policy || 'Tickets are non-refundable'} className="mt-1 text-sm" /></div><div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,.03)' }}><p className="text-xs font-bold">Entry policy</p><RichTextContent value={event.entry_policy || 'Valid ID required at entry'} className="mt-1 text-sm" /></div>{event.terms_and_conditions && <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,.03)' }}><p className="text-xs font-bold">Terms &amp; conditions</p><RichTextContent value={event.terms_and_conditions} className="mt-1 text-sm" /></div>}</div>
         </section>
 
         <section className="organizer-event-view-panel rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>

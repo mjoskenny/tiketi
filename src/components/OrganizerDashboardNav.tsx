@@ -192,6 +192,10 @@ export default function OrganizerDashboardNav({
           <button type="button" className="qpassa-workspace-menu-button" aria-label={isOpen ? 'Close sidebar' : 'Open sidebar'} onClick={onToggle}>
             {isOpen ? <X size={19} strokeWidth={1.8} /> : <Menu size={19} strokeWidth={1.8} />}
           </button>
+          <span className="qpassa-workspace-mobile-brand" aria-label="QPassa">
+            <span className="qpassa-workspace-mobile-brand-mark" aria-hidden="true">Q</span>
+            <strong>QPassa</strong>
+          </span>
           <div className="qpassa-workspace-header-title">
             <strong>{greeting}, {firstName}</strong>
             <span>{navItems.find(item => item.key === currentSection)?.label ?? 'Dashboard'} · {organizationName}</span>
