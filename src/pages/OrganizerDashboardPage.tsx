@@ -13,10 +13,13 @@ import { currentLocale, formatLocaleDate } from '../lib/locale'
 import StatusBadge from '../components/StatusBadge'
 import OrganizerDashboardNav from '../components/OrganizerDashboardNav'
 import RichTextEditor, { RichTextContent } from '../components/RichTextEditor'
-import { ArrowDownLeft, ArrowUpRight, Bell, CalendarDays, CalendarPlus, ChartNoAxesCombined, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardList, Download, Filter, Heart, LayoutDashboard, MapPin, MoreHorizontal, Plus, ReceiptText, RotateCcw, Search, Settings, Shield, Tag, TicketCheck, UserRound, UsersRound, Wallet, type LucideIcon } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, Bell, Building2, CalendarDays, CalendarPlus, ChartNoAxesCombined, ChevronLeft, ChevronRight, CircleDollarSign, ClipboardList, Download, Filter, Heart, LayoutDashboard, MapPin, MoreHorizontal, Plus, ReceiptText, RotateCcw, Search, Settings, Shield, Tag, TicketCheck, UserRound, UsersRound, Wallet, type LucideIcon } from 'lucide-react'
 
 type Section = 'overview' | 'analytics' | 'events' | 'orders' | 'customers' | 'followers' | 'members' | 'settings' | 'subscriptions' | 'transactions' | 'payouts' | 'refunds' | 'notifications'
 type AnalyticsRange = 'all' | 'day' | 'week' | 'month' | 'year' | 'custom'
+type OrdersPeriod = 'all' | 'day' | 'week' | 'month'
+type OrdersStatusFilter = 'all' | 'confirmed' | 'pending' | 'cancelled' | 'refunded'
+type OrganizerSettingsTab = 'workspace' | 'roles' | 'notifications' | 'security'
 type StatementFilter = 'all' | 'payment' | 'fee' | 'refund' | 'payout'
 type TeamTab = 'users' | 'invitations'
 type NotificationFilter = 'all' | 'unread' | 'events' | 'sales' | 'followers' | 'team'
@@ -117,6 +120,20 @@ const STATUS_COLORS: Record<string, string> = {
   payment: 'var(--primary)', refund: '#ef4444', payout: 'var(--accent)', fee: '#888',
 }
 
+const ORGANIZER_PERMISSION_ROWS = [
+  { key: 'analytics', label: 'Analytics', detail: 'View sales, revenue, and performance reports' },
+  { key: 'events', label: 'Events', detail: 'Create and manage event listings' },
+  { key: 'orders', label: 'Orders', detail: 'Review ticket purchases and order details' },
+  { key: 'customers', label: 'Customers', detail: 'View customer records and purchase history' },
+  { key: 'checkin', label: 'Check-in', detail: 'Validate tickets and manage door access' },
+  { key: 'members', label: 'Team members', detail: 'View and manage workspace collaborators' },
+  { key: 'roles', label: 'Roles & settings', detail: 'Review access roles and workspace settings' },
+  { key: 'transactions', label: 'Statements', detail: 'View financial ledger entries' },
+  { key: 'payouts', label: 'Wallet & payouts', detail: 'View or manage organizer withdrawals' },
+  { key: 'refunds', label: 'Refund requests', detail: 'Review customer refund requests' },
+  { key: 'notifications', label: 'Notifications', detail: 'Access organizer activity updates' },
+] as const
+
 const Badge = StatusBadge
 
 function StatCard({ Icon, label, value, sub, color = 'var(--foreground)' }: { Icon: React.FC<{ size?: number }>; label: string; value: string; sub?: string; color?: string }) {
@@ -199,6 +216,51 @@ function EventPerformanceChart({ events, performance }: { events: Event[]; perfo
   )
 }
 
+function TicketSalesByEventChart({ events, performance }: { events: Event[]; performance: Map<string, { tickets: number; revenue: number }> }) {
+  const eventTitles = new Map(events.map(event => [event.id, event.title]))
+  const data = [...performance.entries()].map(([eventId, result]) => ({
+    id: eventId,
+    title: eventTitles.get(eventId) ?? 'Unknown event',
+    tickets: result.tickets,
+  })).sort((left, right) => right.tickets - left.tickets).slice(0, 5)
+  const max = Math.max(...data.map(event => event.tickets), 1)
+
+  return <div className="organizer-analytics-metric-list">
+    {data.map(event => <div className="organizer-analytics-metric-row" key={event.id}>
+      <div className="organizer-analytics-metric-heading"><span>{event.title}</span><strong>{event.tickets.toLocaleString()} tickets</strong></div>
+      <div className="organizer-analytics-metric-track"><i style={{ width: `${event.tickets ? Math.max(event.tickets / max * 100, 4) : 0}%` }} /></div>
+    </div>)}
+    {data.length === 0 && <p className="organizer-analytics-chart-empty">Confirmed ticket sales will appear here.</p>}
+  </div>
+}
+
+function RevenueBreakdownChart({ items }: { items: Array<{ label: string; amount: number }> }) {
+  const max = Math.max(...items.map(item => item.amount), 1)
+  return <div className="organizer-analytics-metric-list">
+    {items.map(item => <div className="organizer-analytics-metric-row" key={item.label}>
+      <div className="organizer-analytics-metric-heading"><span>{item.label}</span><strong>{formatPrice(item.amount)}</strong></div>
+      <div className="organizer-analytics-metric-track"><i style={{ width: `${item.amount ? Math.max(item.amount / max * 100, 4) : 0}%` }} /></div>
+    </div>)}
+  </div>
+}
+
+function PaymentMethodChart({ orders }: { orders: Order[] }) {
+  const data = [...orders.reduce((counts, order) => {
+    const method = order.payment_method?.replace(/_/g, ' ') || 'Not specified'
+    counts.set(method, (counts.get(method) ?? 0) + 1)
+    return counts
+  }, new Map<string, number>())].map(([method, count]) => ({ method, count }))
+    .sort((left, right) => right.count - left.count)
+  const max = Math.max(...data.map(item => item.count), 1)
+  return <div className="organizer-analytics-metric-list">
+    {data.map(item => <div className="organizer-analytics-metric-row" key={item.method}>
+      <div className="organizer-analytics-metric-heading"><span className="capitalize">{item.method}</span><strong>{item.count.toLocaleString()} orders</strong></div>
+      <div className="organizer-analytics-metric-track"><i style={{ width: `${item.count ? Math.max(item.count / max * 100, 4) : 0}%` }} /></div>
+    </div>)}
+    {data.length === 0 && <p className="organizer-analytics-chart-empty">Confirmed orders will appear here.</p>}
+  </div>
+}
+
 export default function OrganizerDashboardPage({ navigate }: Props) {
   const { user, profile, organizer, organizerOptions, switchOrganizer, teamMembership } = useAuth()
   const [section, setSection] = useState<Section>(() => sectionFromPath(window.location.pathname))
@@ -243,6 +305,20 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const [notificationFilter, setNotificationFilter] = useState<NotificationFilter>('all')
   const [statementFilter, setStatementFilter] = useState<StatementFilter>('all')
   const [statementSearch, setStatementSearch] = useState('')
+  const [ordersSearch, setOrdersSearch] = useState('')
+  const [ordersStatusFilter, setOrdersStatusFilter] = useState<OrdersStatusFilter>('all')
+  const [ordersPeriod, setOrdersPeriod] = useState<OrdersPeriod>('all')
+  const [customersSearch, setCustomersSearch] = useState('')
+  const [customersPeriod, setCustomersPeriod] = useState<OrdersPeriod>('all')
+  const [organizerSettingsTab, setOrganizerSettingsTab] = useState<OrganizerSettingsTab>('roles')
+  const [organizerSettingsPreferences, setOrganizerSettingsPreferences] = useState<Record<string, boolean>>({ email_notifications: true, event_reminders: true, promotions: false, nearby_events: true })
+  const [organizerPreferenceSaving, setOrganizerPreferenceSaving] = useState<string | null>(null)
+  const [securityPassword, setSecurityPassword] = useState({ password: '', confirm: '' })
+  const [securityPasswordSaving, setSecurityPasswordSaving] = useState(false)
+  const [securityNotice, setSecurityNotice] = useState('')
+  const [organizerDetailsDraft, setOrganizerDetailsDraft] = useState({ name: organizer?.name ?? '', city: organizer?.city ?? '', website: organizer?.website ?? '', phone: organizer?.phone ?? '' })
+  const [organizerDetailsSaving, setOrganizerDetailsSaving] = useState(false)
+  const [organizerDetailsNotice, setOrganizerDetailsNotice] = useState('')
   const [dashboardSearch, setDashboardSearch] = useState('')
   const [eventsFilter, setEventsFilter] = useState<EventsFilter>('all')
   const [eventsSearch, setEventsSearch] = useState('')
@@ -250,6 +326,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const [openEventMenu, setOpenEventMenu] = useState<string | null>(null)
   const [teamTab, setTeamTab] = useState<TeamTab>('users')
   const [teamSearch, setTeamSearch] = useState('')
+  const [followersSearch, setFollowersSearch] = useState('')
   const [payoutAmount, setPayoutAmount] = useState('')
   const [payoutMethod, setPayoutMethod] = useState<'mobile_money' | 'bank'>('mobile_money')
   const [payoutReference, setPayoutReference] = useState('')
@@ -335,6 +412,14 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   }, [organizer?.id, organizer?.verification_status, organizer?.verified])
 
   useEffect(() => {
+    setOrganizerSettingsPreferences({ email_notifications: true, event_reminders: true, promotions: false, nearby_events: true, ...(profile?.preferences ?? {}) })
+  }, [profile?.id, profile?.preferences])
+
+  useEffect(() => {
+    setOrganizerDetailsDraft({ name: organizer?.name ?? '', city: organizer?.city ?? '', website: organizer?.website ?? '', phone: organizer?.phone ?? '' })
+  }, [organizer?.id, organizer?.name, organizer?.city, organizer?.website, organizer?.phone])
+
+  useEffect(() => {
     if (!orgId) return
     const channel = supabase.channel(`organizer-verification:${orgId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'organizers', filter: `id=eq.${orgId}` }, payload => {
@@ -411,6 +496,53 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     } finally {
       setVerificationSubmitting(false)
     }
+  }
+
+  const updateOrganizerSettingsPreference = async (key: string) => {
+    if (!profile?.id) return
+    const previousValue = organizerSettingsPreferences[key] === true
+    const nextPreferences = { ...organizerSettingsPreferences, [key]: !previousValue }
+    setOrganizerSettingsPreferences(nextPreferences)
+    setOrganizerPreferenceSaving(key)
+    setActionError('')
+    const { error } = await supabase.from('profiles').update({ preferences: nextPreferences }).eq('id', profile.id)
+    if (error) {
+      setOrganizerSettingsPreferences(current => ({ ...current, [key]: previousValue }))
+      setActionError(error.message)
+    }
+    setOrganizerPreferenceSaving(null)
+  }
+
+  const updateAccountPassword = async () => {
+    setSecurityNotice('')
+    setActionError('')
+    if (securityPassword.password.length < 8) { setActionError('Choose a password with at least 8 characters.'); return }
+    if (securityPassword.password !== securityPassword.confirm) { setActionError('The passwords do not match.'); return }
+    setSecurityPasswordSaving(true)
+    const { error } = await supabase.auth.updateUser({ password: securityPassword.password })
+    setSecurityPasswordSaving(false)
+    if (error) { setActionError(error.message); return }
+    setSecurityPassword({ password: '', confirm: '' })
+    setSecurityNotice('Your password has been updated.')
+  }
+
+  const saveOrganizerDetails = async () => {
+    if (!organizer?.id || !isOwner) return
+    const name = organizerDetailsDraft.name.trim()
+    if (!name) { setActionError('Organization name is required.'); return }
+    setActionError('')
+    setOrganizerDetailsNotice('')
+    setOrganizerDetailsSaving(true)
+    const { error } = await supabase.from('organizers').update({
+      name,
+      city: organizerDetailsDraft.city.trim(),
+      website: organizerDetailsDraft.website.trim() || null,
+      phone: organizerDetailsDraft.phone.trim() || null,
+    }).eq('id', organizer.id)
+    setOrganizerDetailsSaving(false)
+    if (error) { setActionError(error.message); return }
+    setOrganizerDetailsNotice('Organization profile saved.')
+    await load()
   }
 
   const load = useCallback(async () => {
@@ -576,7 +708,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
       ? `${analyticsStart || analyticsEnd} to ${analyticsEnd || analyticsStart}`
       : 'Select dates'
     : analyticsRange === 'all' ? 'All time' : analyticsRange.charAt(0).toUpperCase() + analyticsRange.slice(1)
-  const filteredOrders = orders.filter(order => {
+  const visibleOrders = orders.filter(order => {
     const createdAt = new Date(order.created_at)
     return createdAt >= rangeStart && createdAt <= rangeEnd
   })
@@ -584,6 +716,46 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     counts[order.status] += 1
     return counts
   }, { confirmed: 0, pending: 0, cancelled: 0, refunded: 0 })
+  const orderPeriodStart = (() => {
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    if (ordersPeriod === 'day') return start
+    if (ordersPeriod === 'week') {
+      start.setDate(start.getDate() - ((start.getDay() + 6) % 7))
+      return start
+    }
+    if (ordersPeriod === 'month') start.setDate(1)
+    return ordersPeriod === 'all' ? null : start
+  })()
+  const filteredOrders = orders.filter(order => {
+    const matchesStatus = ordersStatusFilter === 'all' || order.status === ordersStatusFilter
+    const createdAt = new Date(order.created_at)
+    const matchesPeriod = !orderPeriodStart || createdAt >= orderPeriodStart
+    const searchText = `${order.id} ${(order as any).holder_name ?? ''} ${(order as any).holder_email ?? ''} ${(order as any).profiles?.full_name ?? ''} ${(order as any).profiles?.email ?? ''} ${(order as any).events?.title ?? ''} ${order.payment_method ?? ''} ${order.status}`.toLowerCase()
+    const matchesSearch = !ordersSearch.trim() || searchText.includes(ordersSearch.trim().toLowerCase())
+    return matchesStatus && matchesPeriod && matchesSearch
+  })
+  const customerPeriodStart = (() => {
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    if (customersPeriod === 'day') return start
+    if (customersPeriod === 'week') {
+      start.setDate(start.getDate() - ((start.getDay() + 6) % 7))
+      return start
+    }
+    if (customersPeriod === 'month') start.setDate(1)
+    return customersPeriod === 'all' ? null : start
+  })()
+  const visibleCustomers = customers.filter(customer => {
+    const searchText = `${customer.full_name ?? ''} ${customer.email ?? ''} ${customer.phone ?? ''}`.toLowerCase()
+    const matchesSearch = !customersSearch.trim() || searchText.includes(customersSearch.trim().toLowerCase())
+    const matchesPeriod = !customerPeriodStart || new Date(customer.created_at) >= customerPeriodStart
+    return matchesSearch && matchesPeriod
+  })
+  const visibleTeamMembers = members
+    .filter(member => teamTab === 'invitations' ? member.status === 'pending' : member.status !== 'pending')
+    .filter(member => `${(member as any).profiles?.full_name ?? ''} ${(member as any).profiles?.email ?? ''}`.toLowerCase().includes(teamSearch.trim().toLowerCase()))
+  const visibleFollowers = followers.filter(follower => `${follower.profiles?.full_name ?? ''} ${follower.profiles?.username ?? ''}`.toLowerCase().includes(followersSearch.trim().toLowerCase()))
 
   // Keep every KPI on the same confirmed, net-sales basis as the revenue chart.
   const confirmedOrders = filteredOrders.filter(order => order.status === 'confirmed')
@@ -881,6 +1053,54 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     URL.revokeObjectURL(url)
   }
 
+  const exportOrders = () => {
+    const rows = visibleOrders.map(order => {
+      const event = events.find(item => item.id === order.event_id)
+      const tierNames = new Map((event?.ticket_tiers ?? []).map(tier => [tier.id, tier.name]))
+      const ticketCount = order.order_items?.reduce((sum, item) => sum + item.quantity, 0) || agentOrderMeta[order.id]?.quantity || 0
+      const tiers = [...new Set((order.order_items ?? []).map(item => tierNames.get(item.ticket_tier_id) ?? 'Unknown tier'))]
+      return [
+        order.id,
+        (order as any).holder_name ?? (order as any).profiles?.full_name ?? '',
+        (order as any).holder_email ?? (order as any).profiles?.email ?? '',
+        (order as any).events?.title ?? '',
+        ticketCount,
+        tiers.join('; '),
+        agentOrderMeta[order.id]?.profiles?.full_name ?? (agentOrderMeta[order.id] ? 'Agent sale' : 'Customer checkout'),
+        agentOrderMeta[order.id]?.payment_mode ?? order.payment_method ?? '',
+        order.total,
+        order.status,
+        order.created_at,
+      ]
+    })
+    const csv = [['Order ID', 'Customer', 'Email', 'Event', 'Ticket count', 'Ticket tiers', 'Source', 'Payment method', 'Total', 'Status', 'Created'], ...rows].map(row => row.map(value => {
+      const text = String(value)
+      const safeText = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text
+      return `"${safeText.replace(/"/g, '""')}"`
+    }).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `qpassa-orders-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const exportCustomers = () => {
+    const rows = visibleCustomers.map(customer => [customer.full_name ?? '', customer.email ?? '', customer.phone ?? '', customer.total_orders, customer.total_spent, customer.created_at])
+    const csv = [['Customer', 'Email', 'Phone', 'Orders', 'Total spent', 'Joined'], ...rows].map(row => row.map(value => {
+      const text = String(value)
+      const safeText = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text
+      return `"${safeText.replace(/"/g, '""')}"`
+    }).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `qpassa-customers-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   const submitPayoutRequest = async () => {
     setPayoutNotice('')
     setActionError('')
@@ -994,7 +1214,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   })
   const overviewCalendarEventDays = new Set(events.map(event => event.date.slice(0, 10)))
   const overviewCalendarUpcomingEvents = events
-    .filter(event => event.status === 'published' && event.date.slice(0, 10) >= localDateKey(new Date()))
+    .filter(event => event.status === 'published' && event.date.slice(0, 10) === overviewCalendarDate)
     .sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime())
   const nextPublishedEvent = events
     .filter(event => event.status === 'published')
@@ -1142,17 +1362,32 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
             <div className="organizer-overview-feature-grid">
               <div className="organizer-overview-feature-left">
-              <button type="button" className="organizer-overview-featured-event" onClick={() => nextPublishedEvent ? openEventView(nextPublishedEvent) : openCreateEvent()}>
-                <span className="organizer-overview-event-art">
-                  {nextPublishedEvent?.cover_image ? <img src={nextPublishedEvent.cover_image} alt="" /> : <span className="organizer-overview-art-mark"><TicketCheck size={38} strokeWidth={1.5} /></span>}
+              <section className="organizer-overview-wallet-banner" aria-label="Wallet overview">
+                <div className="organizer-overview-wallet-top">
+                  <span className="organizer-overview-wallet-brand"><span className="organizer-overview-wallet-mark">Q</span><span>QPassa wallet</span></span>
+                  <Wallet size={19} strokeWidth={1.7} aria-hidden="true" />
+                </div>
+                <div className="organizer-overview-wallet-balance">
+                  <small>Available balance</small>
+                  <strong>{isOwner ? formatPrice(availablePayoutBalance) : 'Owner-managed'}</strong>
+                </div>
+                <div className="organizer-overview-wallet-footer">
+                  <span>{isOwner ? 'Ready for your next payout' : 'Wallet access is managed by the owner'}</span>
+                  {isOwner && <button type="button" onClick={() => selectSection('payouts')} className="organizer-overview-wallet-action">Open wallet <ArrowUpRight size={15} /></button>}
+                </div>
+              </section>
+
+              <button
+                type="button"
+                className="organizer-overview-next-event-banner"
+                onClick={() => nextPublishedEvent ? openEventView(nextPublishedEvent) : openCreateEvent()}
+              >
+                {nextPublishedEvent?.cover_image && <img className="organizer-overview-next-event-cover" src={nextPublishedEvent.cover_image} alt="" />}
+                <span className="organizer-overview-next-event-copy">
+                  <strong>{nextPublishedEvent?.title ?? 'Make your next event happen'}</strong>
+                  <small>{nextPublishedEvent ? `${new Date(nextPublishedEvent.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${nextPublishedEvent.venue}` : 'Create an event and start selling tickets.'}</small>
                 </span>
-                <span className="organizer-overview-event-copy">
-                  <span className="organizer-overview-card-kicker"><span className="organizer-live-dot" /> {nextPublishedEvent ? 'UP NEXT · PUBLISHED EVENT' : 'YOUR EVENT WORKSPACE'}</span>
-                  <strong>{nextPublishedEvent?.title ?? 'Your next big moment starts here'}</strong>
-                  <span>{nextPublishedEvent ? `${new Date(nextPublishedEvent.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${nextPublishedEvent.venue}` : 'Build an event page and start selling tickets.'}</span>
-                  <span className="organizer-overview-progress"><i style={{ width: `${nextPublishedEvent?.capacity ? `${Math.min(100, Math.round(((nextPublishedEvent.ticket_tiers?.reduce((sold, tier) => sold + tier.sold, 0) ?? 0) / nextPublishedEvent.capacity) * 100))}%` : '0%'}` }} /></span>
-                  <span className="organizer-overview-event-action">{nextPublishedEvent ? 'Open event' : 'Create your first event'} <ArrowUpRight size={16} /></span>
-                </span>
+                <span className="organizer-overview-next-event-action">{nextPublishedEvent ? 'View event' : 'Create event'} <ArrowUpRight size={15} /></span>
               </button>
 
               <section className="organizer-overview-quick-actions" aria-label="Quick actions">
@@ -1199,10 +1434,17 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                 </div>
                 <div className="organizer-overview-calendar-agenda">
                   <strong>Upcoming events</strong>
-                  {overviewCalendarUpcomingEvents.length ? <>
-                    {overviewCalendarUpcomingEvents.slice(0, 3).map(event => <button key={event.id} type="button" onClick={() => openEventView(event)}><span><strong>{event.title}</strong><small>{new Date(`${event.date.slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</small></span><ArrowUpRight size={13} /></button>)}
-                    {overviewCalendarUpcomingEvents.length > 3 && <button type="button" className="organizer-overview-calendar-see-more" onClick={() => selectSection('events')}>See more <ArrowUpRight size={13} /></button>}
-                  </> : <span>No upcoming events</span>}
+                  {overviewCalendarUpcomingEvents.length ? (
+                    overviewCalendarUpcomingEvents.slice(0, 1).map(event => (
+                      <button key={event.id} type="button" onClick={() => openEventView(event)}>
+                        <span>
+                          <strong>{event.title}</strong>
+                          <small>{new Date(`${event.date.slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</small>
+                        </span>
+                        <ArrowUpRight size={13} />
+                      </button>
+                    ))
+                  ) : <span>No upcoming events</span>}
                 </div>
               </section>
               </div>
@@ -1210,11 +1452,11 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
             <div className="organizer-overview-bottom-grid">
               <section className="organizer-overview-panel">
-                <div className="organizer-overview-panel-heading"><div><p className="organizer-overview-card-kicker">YOUR WORKSPACE</p><h3>Pick up where you left off</h3></div><button type="button" onClick={() => selectSection('events')} aria-label="View all events"><ArrowUpRight size={17} /></button></div>
-                {events.slice(0, 3).length ? <div className="organizer-overview-event-list">{events.slice(0, 3).map(event => <button key={event.id} type="button" onClick={() => openEventView(event)}><span className="organizer-overview-event-thumb">{event.cover_image ? <img src={event.cover_image} alt="" /> : <CalendarDays size={18} />}</span><span className="min-w-0 flex-1"><strong>{event.title}</strong><small>{new Date(event.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} · {event.venue}</small></span><Badge label={event.status} color={STATUS_COLORS[event.status] ?? '#888'} /><ChevronRight size={15} /></button>)}</div> : <div className="organizer-overview-empty"><p>No events yet—your first one can start today.</p><button type="button" onClick={openCreateEvent}>Create event <Plus size={15} /></button></div>}
+                <div className="organizer-overview-panel-heading"><div><p className="organizer-overview-card-kicker">YOUR WORKSPACE</p><h4>Pick up where you left off</h4></div><button type="button" onClick={() => selectSection('events')} aria-label="View all events"><ArrowUpRight size={17} /></button></div>
+                {events.slice(0, 3).length ? <div className="organizer-overview-event-list">{events.slice(0, 3).map(event => <button key={event.id} type="button" onClick={() => openEventView(event)}><span className="organizer-overview-event-thumb">{event.cover_image ? <img src={event.cover_image} alt="" /> : <CalendarDays size={18} />}</span><span className="min-w-0 flex-1"><strong>{event.title}</strong><small>{new Date(event.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} · {event.venue}</small></span><Badge className="organizer-overview-list-badge" label={event.status} color={STATUS_COLORS[event.status] ?? '#888'} /><ChevronRight size={15} /></button>)}</div> : <div className="organizer-overview-empty"><p>No events yet—your first one can start today.</p><button type="button" onClick={openCreateEvent}>Create event <Plus size={15} /></button></div>}
               </section>
               {canViewOverviewOrders && <section className="organizer-overview-panel organizer-overview-orders-panel">
-                <div className="organizer-overview-panel-heading"><div><p className="organizer-overview-card-kicker">RECENT ACTIVITY</p><h3>Latest orders</h3></div><button type="button" onClick={() => selectSection('orders')} aria-label="View all orders"><ArrowUpRight size={17} /></button></div>
+                <div className="organizer-overview-panel-heading"><div><p className="organizer-overview-card-kicker">RECENT ACTIVITY</p><h4>Latest orders</h4></div><button type="button" onClick={() => selectSection('orders')} aria-label="View all orders"><ArrowUpRight size={17} /></button></div>
                 {orders.slice(0, 3).length ? <div className="organizer-overview-order-list">{orders.slice(0, 3).map(order => <button type="button" key={order.id} onClick={() => { selectSection('orders'); setSelectedOrder(order) }}><span className="organizer-overview-order-icon"><TicketCheck size={16} /></span><span className="min-w-0 flex-1"><strong>{(order as any).profiles?.full_name ?? 'Ticket buyer'}</strong><small>{(order as any).events?.title ?? 'Event ticket'} · {new Date(order.created_at).toLocaleDateString()}</small></span><span className="organizer-overview-order-total">{formatPrice(order.total)}</span></button>)}</div> : <div className="organizer-overview-empty"><p>New ticket orders will show up here.</p><button type="button" onClick={() => selectSection('events')}>Explore events <ArrowUpRight size={15} /></button></div>}
               </section>}
             </div>
@@ -1223,48 +1465,48 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
           <>
               {/* ── ANALYTICS / OVERVIEW ── */}
               {section === 'analytics' && (
-                <div className="space-y-6">
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3" style={{ borderColor: 'var(--border)' }}>
-                    <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Analytics range</p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="organizer-dashboard-filter-group organizer-overview-filter-group flex flex-wrap items-center gap-1 rounded-xl border p-1" aria-label="Analytics date range">
-                        {(['all', 'day', 'week', 'month', 'year', 'custom'] as AnalyticsRange[]).map(range => (
-                          <button key={range} onClick={() => setAnalyticsRange(range)} className="organizer-dashboard-filter-button rounded-lg border px-3 py-2 text-xs font-bold capitalize transition-colors" aria-pressed={analyticsRange === range} style={{ background: analyticsRange === range ? 'rgba(255,255,255,0.12)' : 'transparent', borderColor: analyticsRange === range ? 'rgba(255,255,255,0.28)' : 'transparent', color: analyticsRange === range ? 'var(--foreground)' : 'var(--muted-foreground)' }}>{range === 'custom' ? 'Select dates' : range === 'all' ? 'All time' : range}</button>
+                <div className="organizer-analytics-page space-y-6">
+                  <header className="organizer-analytics-page-heading">
+                    <div className="organizer-analytics-title-block">
+                      <h3>Analytics</h3>
+                    </div>
+                    <div className="organizer-analytics-header-controls">
+                      <div className="organizer-analytics-header-ranges" role="group" aria-label="Analytics date range">
+                        {([['day', 'Today'], ['week', 'Week'], ['month', 'Month'], ['year', 'Year'], ['all', 'All time']] as const).map(([range, label]) => (
+                          <button key={range} type="button" onClick={() => setAnalyticsRange(range)} aria-pressed={analyticsRange === range}>{label}</button>
                         ))}
                       </div>
-                      {(analyticsRange === 'day' || analyticsRange === 'month') && (
-                        <div className="organizer-dashboard-filter-group organizer-overview-filter-group flex flex-wrap items-center gap-1 rounded-xl border p-1" aria-label="Analytics interval">
-                          {(analyticsRange === 'day' ? [1, 2, 4, 6, 12] : [1, 2, 4]).map(option => {
-                            const value = analyticsRange === 'day' ? analyticsDayInterval : analyticsMonthInterval
-                            const label = `${option}${analyticsRange === 'day' ? 'h' : 'w'}`
-                            const active = value === option
-                            return (
-                              <button key={label} onClick={() => analyticsRange === 'day' ? setAnalyticsDayInterval(option) : setAnalyticsMonthInterval(option)} className="organizer-dashboard-filter-button rounded-lg border px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide transition-colors" aria-pressed={active} style={{ background: active ? 'rgba(255,255,255,0.12)' : 'transparent', borderColor: active ? 'rgba(255,255,255,0.28)' : 'transparent', color: active ? 'var(--foreground)' : 'var(--muted-foreground)' }}>{label}</button>
-                            )
-                          })}
-                        </div>
-                      )}
+                      {(analyticsRange === 'day' || analyticsRange === 'month') && <div className="organizer-analytics-header-intervals" role="group" aria-label="Analytics interval">
+                        {(analyticsRange === 'day' ? [1, 2, 4, 6, 12] : [1, 2, 4]).map(option => {
+                          const value = analyticsRange === 'day' ? analyticsDayInterval : analyticsMonthInterval
+                          const active = value === option
+                          return <button key={option} type="button" onClick={() => analyticsRange === 'day' ? setAnalyticsDayInterval(option) : setAnalyticsMonthInterval(option)} aria-pressed={active}>{analyticsRange === 'day' ? `${option}h` : `${option}w`}</button>
+                        })}
+                      </div>}
+                      <button type="button" className="organizer-analytics-date-trigger" onClick={() => { setAnalyticsStart(localDateKey(rangeStart)); setAnalyticsEnd(localDateKey(rangeEnd)); setAnalyticsRange('custom') }} aria-label="Choose a custom analytics date range">
+                        <CalendarDays size={14} aria-hidden="true" />
+                        <span>{analyticsRange === 'custom' && analyticsStart && analyticsEnd ? `${new Date(`${analyticsStart}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} – ${new Date(`${analyticsEnd}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}` : 'Select dates'}</span>
+                      </button>
                     </div>
-                    {analyticsRange === 'custom' && <div className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--muted-foreground)' }}><label>From<input type="date" value={analyticsStart} onChange={event => setAnalyticsStart(event.target.value)} className="ml-1 rounded-lg border px-2 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.035)', borderColor: 'rgba(255,255,255,0.14)', color: 'var(--foreground)', backdropFilter: 'blur(18px)' }} /></label><label>To<input type="date" value={analyticsEnd} onChange={event => setAnalyticsEnd(event.target.value)} className="ml-1 rounded-lg border px-2 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.035)', borderColor: 'rgba(255,255,255,0.14)', color: 'var(--foreground)', backdropFilter: 'blur(18px)' }} /></label></div>}
-                  </div>
-                  {verificationStatus !== 'verified' && <div className="flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                  </header>
+                  {analyticsRange === 'custom' && <div className="organizer-analytics-detail-controls"><div className="organizer-analytics-custom-dates" style={{ color: 'var(--muted-foreground)' }}><label><span>From</span><input type="date" value={analyticsStart} onChange={event => setAnalyticsStart(event.target.value)} /></label><label><span>To</span><input type="date" value={analyticsEnd} onChange={event => setAnalyticsEnd(event.target.value)} /></label></div></div>}
+                  {verificationStatus !== 'verified' && <div className="organizer-analytics-verification flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
                     <div><p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Organizer verification</p><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>{verificationStatus === 'verified' ? 'Your organizer profile is verified.' : verificationStatus === 'pending' ? 'Your verification request is awaiting review.' : 'Verify your profile to show a trusted badge on organizer cards and profiles.'}</p></div>
                     <button onClick={requestVerification} disabled={!isOwner || verificationStatus !== 'unverified' || verificationSubmitting} className="rounded-xl px-4 py-2.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-60" style={{ background: verificationStatus === 'unverified' && isOwner ? 'var(--primary)' : 'var(--muted)', color: verificationStatus === 'unverified' && isOwner ? '#000' : 'var(--muted-foreground)' }}>{verificationStatus === 'verified' ? 'Verified' : verificationStatus === 'pending' ? 'Pending review' : verificationSubmitting ? 'Submitting…' : isOwner ? 'Request verification' : 'Owner only'}</button>
                   </div>}
                   {/* KPI grid */}
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <StatCard Icon={TicketIcon} label="Tickets Sold" value={totalTicketsSold.toLocaleString()} />
-                    <StatCard Icon={DollarSignIcon} label="Net Ticket Revenue" value={formatPrice(totalRevenue)} sub={`Ticket subtotal − ${formatPrice(totalPlatformCommission)} fees − ${formatPrice(totalAgentCommission)} agent commissions − ${formatPrice(totalProcessedRefunds)} refunds`} />
-                    <StatCard Icon={CalendarIcon} label="Published Events" value={publishedEvents.toString()} />
-                    <StatCard Icon={UsersIcon} label="Customers" value={customers.length.toString()}
-                      sub={`Avg order: ${avgOrderValue > 0 ? formatPrice(avgOrderValue) : '—'}`} />
+                  <div className="organizer-analytics-stat-grid grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <article className="organizer-overview-stat organizer-analytics-stat"><span className="organizer-overview-stat-icon"><ClipboardList size={17} strokeWidth={1.8} /></span><small>Confirmed orders</small><strong>{confirmedOrders.length.toLocaleString()}</strong><span>Within {analyticsRangeLabel.toLowerCase()}</span></article>
+                    <article className="organizer-overview-stat organizer-analytics-stat"><span className="organizer-overview-stat-icon"><CircleDollarSign size={17} strokeWidth={1.8} /></span><small>Average order value</small><strong>{avgOrderValue > 0 ? formatPrice(avgOrderValue) : '—'}</strong><span>Net confirmed ticket sales</span></article>
+                    <article className="organizer-overview-stat organizer-analytics-stat"><span className="organizer-overview-stat-icon"><ReceiptText size={17} strokeWidth={1.8} /></span><small>Platform fees</small><strong>{formatPrice(totalPlatformCommission)}</strong><span>From confirmed orders</span></article>
+                    <article className="organizer-overview-stat organizer-analytics-stat"><span className="organizer-overview-stat-icon"><RotateCcw size={17} strokeWidth={1.8} /></span><small>Processed refunds</small><strong>{formatPrice(totalProcessedRefunds)}</strong><span>For this date range</span></article>
                   </div>
 
                   {/* Chart + recent */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                  <div className="organizer-analytics-chart-grid grid grid-cols-1 lg:grid-cols-3 gap-5">
                     {/* Revenue chart */}
-                    <div className="lg:col-span-2 rounded-2xl p-5" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                      <div className="mb-5 flex items-start justify-between gap-3">
+                    <div className="organizer-analytics-surface organizer-analytics-revenue-card lg:col-span-2 rounded-2xl p-5" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                      <div className="organizer-analytics-card-heading mb-5 flex items-start justify-between gap-3">
                         <div><h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Revenue by period</h2><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{analyticsRangeLabel} · confirmed sales · updated {lastUpdated?.toLocaleTimeString() ?? 'loading'}</p></div>
                         <div className="text-right"><p className="text-sm font-bold" style={{ color: 'var(--primary)' }}>{formatPrice(totalRevenue)}</p><p className="text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{filteredOrders.filter(o => o.status === 'confirmed').length} orders</p></div>
                       </div>
@@ -1280,8 +1522,8 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                     </div>
 
                     {/* Ticket activity chart */}
-                    <div className="rounded-2xl p-5" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                      <div className="mb-5 flex items-start justify-between gap-3">
+                    <div className="organizer-analytics-surface organizer-analytics-orders-card rounded-2xl p-5" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                      <div className="organizer-analytics-card-heading mb-5 flex items-start justify-between gap-3">
                         <div><h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Orders by period</h2><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{analyticsRangeLabel} · confirmed net sales</p></div>
                         <p className="text-sm font-bold" style={{ color: 'var(--accent)' }}>{confirmedOrders.length}</p>
                       </div>
@@ -1296,41 +1538,19 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                       </div>
                     </div>
 
-                    {/* Recent orders */}
-                    <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                      <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: 'var(--border)' }}>
-                        <h2 className="font-bold text-sm" style={{ fontFamily: 'Outfit, sans-serif' }}>Recent Orders</h2>
-                        <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--accent)' }} />
-                      </div>
-                      <div className="overflow-y-auto" style={{ maxHeight: 200 }}>
-                        {orders.slice(0, 8).map(o => (
-                          <div key={o.id} className="flex items-center justify-between px-5 py-3 border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold truncate">{(o as any).profiles?.full_name ?? 'Customer'}</p>
-                              <p className="text-xs truncate" style={{ color: 'var(--muted-foreground)' }}>{(o as any).events?.title ?? '—'}</p>
-                            </div>
-                            <div className="text-right flex-shrink-0 ml-3">
-                              <p className="text-xs font-bold" style={{ color: 'var(--primary)' }}>{formatPrice(o.total)}</p>
-                              <Badge label={o.status} color={STATUS_COLORS[o.status] ?? '#888'} />
-                            </div>
-                          </div>
-                        ))}
-                        {orders.length === 0 && <p className="text-xs text-center py-8" style={{ color: 'var(--muted-foreground)' }}>No orders yet</p>}
-                      </div>
-                    </div>
                   </div>
 
                   {/* Additional analytics */}
-                  <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
-                    <div className="xl:col-span-3 overflow-x-auto rounded-2xl p-5" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                      <div className="mb-4 flex items-center justify-between">
+                  <div className="organizer-analytics-trend-grid grid grid-cols-1 xl:grid-cols-6 gap-5">
+                    <div className="organizer-analytics-surface organizer-analytics-trend-card xl:col-span-3 overflow-x-auto rounded-2xl p-5" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                      <div className="organizer-analytics-card-heading mb-4 flex items-center justify-between">
                         <div><h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Revenue trend</h2><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Confirmed sales across the selected {analyticsRangeLabel.toLowerCase()} range</p></div>
                         <TrendingUpIcon size={17} style={{ color: 'var(--primary)' }} />
                       </div>
                       <RevenueTrendChart data={chartData} />
                     </div>
-                    <div className="xl:col-span-2 rounded-2xl p-5" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                      <div className="mb-5 flex items-center justify-between">
+                    <div className="organizer-analytics-surface organizer-analytics-event-performance-card xl:col-span-3 rounded-2xl p-5" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                      <div className="organizer-analytics-card-heading mb-5 flex items-center justify-between">
                         <div><h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Event performance</h2><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Revenue by event</p></div>
                         <BarChartIcon size={17} style={{ color: 'var(--accent)' }} />
                       </div>
@@ -1338,39 +1558,88 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                     </div>
                   </div>
 
-                  {/* Top events */}
-                  <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                    <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
-                      <h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>Event Performance</h2>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
+                  <div className="organizer-analytics-insight-grid grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                    <section className="organizer-analytics-surface organizer-analytics-insight-card rounded-2xl p-5">
+                      <div className="organizer-analytics-card-heading mb-5 flex items-center justify-between gap-3"><div><h2 className="font-bold">Ticket sales by event</h2><p className="mt-1">Confirmed tickets in the selected range</p></div><TicketCheck size={17} aria-hidden="true" /></div>
+                      <TicketSalesByEventChart events={events} performance={eventAnalytics} />
+                    </section>
+                    <section className="organizer-analytics-surface organizer-analytics-insight-card rounded-2xl p-5">
+                      <div className="organizer-analytics-card-heading mb-5 flex items-center justify-between gap-3"><div><h2 className="font-bold">Revenue composition</h2><p className="mt-1">Gross collection less deductions</p></div><CircleDollarSign size={17} aria-hidden="true" /></div>
+                      <RevenueBreakdownChart items={[
+                        { label: 'Gross ticket collection', amount: confirmedOrders.reduce((sum, order) => sum + ticketSubtotalForOrder(order), 0) },
+                        { label: 'Platform fees', amount: totalPlatformCommission },
+                        { label: 'Agent commissions', amount: totalAgentCommission },
+                        { label: 'Processed refunds', amount: totalProcessedRefunds },
+                        { label: 'Net ticket revenue', amount: totalRevenue },
+                      ]} />
+                    </section>
+                    <section className="organizer-analytics-surface organizer-analytics-insight-card rounded-2xl p-5">
+                      <div className="organizer-analytics-card-heading mb-5 flex items-center justify-between gap-3"><div><h2 className="font-bold">Payment methods</h2><p className="mt-1">Confirmed orders by method</p></div><Wallet size={17} aria-hidden="true" /></div>
+                      <PaymentMethodChart orders={confirmedOrders} />
+                    </section>
+                  </div>
+
+                  <div className="organizer-analytics-bottom-tables">
+                    <section className="organizer-analytics-surface organizer-analytics-insight-card organizer-analytics-recent-orders organizer-analytics-bottom-card rounded-2xl p-5" aria-labelledby="analytics-recent-orders-title">
+                      <div className="organizer-analytics-card-heading mb-5 flex items-center justify-between gap-3">
+                        <div><h2 id="analytics-recent-orders-title" className="font-bold">Recent orders</h2><p>Latest ticket purchases from your events</p></div>
+                        <ReceiptText size={17} aria-hidden="true" />
+                      </div>
+                      <div className="organizer-analytics-recent-table-wrap">
+                        <table className="organizer-analytics-recent-table organizer-analytics-insight-table organizer-analytics-bottom-table">
+                          <thead><tr>{['Customer', 'Event', 'Order total', 'Status'].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
+                          <tbody>
+                            {orders.slice(0, 8).map(o => {
+                              const customerName = (o as any).profiles?.full_name ?? 'Customer'
+                              return <tr key={o.id}>
+                                <td><span className="organizer-analytics-recent-customer"><strong>{customerName}</strong><small>{new Date(o.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</small></span></td>
+                                <td className="organizer-analytics-bottom-event">{(o as any).events?.title ?? 'Event ticket'}</td>
+                                <td><strong className="organizer-analytics-recent-total">{formatPrice(o.total)}</strong></td>
+                                <td><Badge className="organizer-analytics-status-badge" label={o.status} color={STATUS_COLORS[o.status] ?? '#888'} /></td>
+                              </tr>
+                            })}
+                            {orders.length === 0 && <tr><td colSpan={4} className="organizer-analytics-recent-empty">Your first ticket order will appear here.</td></tr>}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+
+                    <section className="organizer-analytics-surface organizer-analytics-insight-card organizer-analytics-event-table organizer-analytics-bottom-card rounded-2xl p-5" aria-labelledby="analytics-event-performance-title">
+                      <div className="organizer-analytics-card-heading mb-5 flex items-center justify-between gap-3">
+                        <div><h2 id="analytics-event-performance-title" className="font-bold">Event performance</h2><p>Revenue by event · sales and capacity</p></div>
+                        <BarChartIcon size={17} aria-hidden="true" />
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table aria-label="Event status, date, ticket sales, and revenue for the selected period" className="organizer-dashboard-event-performance-table organizer-analytics-premium-table organizer-analytics-insight-table organizer-analytics-bottom-table w-full text-sm">
                         <thead>
-                          <tr style={{ background: 'var(--muted)' }}>
-                            {['Event', 'Status', 'Date', 'Sold / Cap', 'Revenue'].map(h => (
-                              <th key={h} className="text-left px-5 py-3 text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{h}</th>
+                          <tr>
+                            {['Event', 'Status', 'Event date', 'Tickets sold', 'Revenue'].map(h => (
+                              <th key={h} scope="col" className="text-left px-5 py-3 text-xs font-semibold">{h}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
-                          {events.slice(0, 6).map(ev => {
+                          {events.slice(0, 8).map(ev => {
                             const performance = eventAnalytics.get(ev.id) ?? { tickets: 0, revenue: 0 }
+                            const capacity = Number(ev.capacity) || 0
+                            const soldPercent = capacity > 0 ? Math.min((performance.tickets / capacity) * 100, 100) : 0
                             return (
-                              <tr key={ev.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                                <td className="px-5 py-3 font-medium text-sm">{ev.title}</td>
-                                <td className="px-5 py-3"><Badge label={ev.status} color={STATUS_COLORS[ev.status] ?? '#888'} /></td>
-                                <td className="px-5 py-3 text-xs" style={{ color: 'var(--muted-foreground)' }}>{new Date(ev.date).toLocaleDateString()}</td>
-                                <td className="px-5 py-3 text-xs">{performance.tickets} / {ev.capacity}</td>
-                                <td className="px-5 py-3 text-xs font-bold" style={{ color: 'var(--primary)' }}>{formatPrice(performance.revenue)}</td>
+                              <tr key={ev.id} className="organizer-analytics-table-row border-t" style={{ borderColor: 'var(--border)' }}>
+                                <td className="organizer-analytics-event-name px-5 py-3"><span className="organizer-analytics-event-mark"><CalendarDays size={15} /></span><span><strong>{ev.title}</strong><small>{ev.venue || 'Venue not set'}</small></span></td>
+                                <td className="px-5 py-3"><Badge className="organizer-analytics-status-badge" label={ev.status} color={STATUS_COLORS[ev.status] ?? '#888'} /></td>
+                                <td className="px-5 py-3"><span className="organizer-analytics-date-cell">{new Date(ev.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span></td>
+                                <td className="organizer-analytics-capacity-cell px-5 py-3"><span><strong>{performance.tickets.toLocaleString()}</strong><small>{capacity > 0 ? `of ${capacity.toLocaleString()}` : 'tickets sold'}</small></span><i role="progressbar" aria-label={`${ev.title} capacity sold`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(soldPercent)}><b style={{ width: `${soldPercent}%` }} /></i></td>
+                                <td className="organizer-analytics-revenue-cell px-5 py-3"><strong>{formatPrice(performance.revenue)}</strong><small>Net ticket sales</small></td>
                               </tr>
                             )
                           })}
                           {events.length === 0 && (
-                            <tr><td colSpan={5} className="px-5 py-8 text-center text-xs" style={{ color: 'var(--muted-foreground)' }}>No events yet. Create your first event!</td></tr>
+                            <tr><td colSpan={5} className="organizer-analytics-empty-table px-5 py-12 text-center"><span><CalendarDays size={18} /></span><strong>No events to report yet</strong><small>Create an event to see performance metrics here.</small></td></tr>
                           )}
                         </tbody>
                       </table>
                     </div>
+                    </section>
                   </div>
                 </div>
               )}
@@ -1436,10 +1705,17 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                   navigate={navigate}
                 /> :
                 <section className="organizer-events-page">
-                  <header className="organizer-events-heading">
-                    <h1>Events</h1>
-                    <button type="button" className="organizer-events-create" onClick={openCreateEvent}><Plus size={17} />Create event</button>
+                  <header className="organizer-analytics-page-heading organizer-orders-heading organizer-events-heading">
+                    <div className="organizer-analytics-title-block"><h3>Events</h3><p>Manage event listings, ticket inventory, and event status.</p></div>
+                    <div className="organizer-events-header-actions"><button type="button" className="organizer-events-create" onClick={openCreateEvent}><Plus size={17} />Create event</button><div className="organizer-orders-heading-meta"><span className="organizer-finance-live-dot" />{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : 'Loading event activity'}</div></div>
                   </header>
+
+                  <div className="organizer-overview-stat-grid organizer-events-stat-grid">
+                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><CalendarDays size={17} strokeWidth={1.8} /></span><small>Total events</small><strong>{events.length.toLocaleString()}</strong><span>In your workspace</span></article>
+                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><TicketCheck size={17} strokeWidth={1.8} /></span><small>Published</small><strong>{publishedEvents.toLocaleString()}</strong><span>Currently live</span></article>
+                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><UsersRound size={17} strokeWidth={1.8} /></span><small>Tickets sold</small><strong>{totalTicketsSold.toLocaleString()}</strong><span>From confirmed orders</span></article>
+                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><TicketCheck size={17} strokeWidth={1.8} /></span><small>Tickets available</small><strong>{overviewTicketsRemaining.toLocaleString()}</strong><span>Across all events</span></article>
+                  </div>
 
                   <div className="organizer-events-tabs" role="tablist" aria-label="Filter events by status">
                     {eventFilterTabs.map(tab => {
@@ -1502,186 +1778,341 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
               {/* ── ORDERS ── */}
               {section === 'orders' && (
-                <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}>
-                    <div>
-                      <h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>{orders.length.toLocaleString()} Orders</h2>
-                      <p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>
-                        {orderStatusCounts.confirmed} confirmed · {orderStatusCounts.pending} pending · {orderStatusCounts.cancelled} cancelled · {orderStatusCounts.refunded} refunded
-                        {lastUpdated && ` · Updated ${lastUpdated.toLocaleTimeString()}`}
-                      </p>
-                    </div>
-                    <button type="button" onClick={() => void load()} disabled={dataLoading} className="rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-50" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>
-                      {dataLoading ? 'Refreshing…' : 'Refresh orders'}
-                    </button>
+                <div className="organizer-orders-page organizer-analytics-page space-y-5">
+                  <header className="organizer-analytics-page-heading organizer-orders-heading">
+                    <div className="organizer-analytics-title-block"><h3>Orders</h3><p>Keep track of ticket purchases across your events.</p></div>
+                    <div className="organizer-orders-heading-meta"><span className="organizer-finance-live-dot" />{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : 'Loading order activity'}</div>
+                  </header>
+
+                  <div className="organizer-orders-summary-grid">
+                    {([
+                      ['confirmed', 'Confirmed', '#39a981'], ['pending', 'Pending', '#d19a38'], ['cancelled', 'Cancelled', '#d76c6c'], ['refunded', 'Refunded', '#668fe0'],
+                    ] as const).map(([status, label, tone]) => <button key={status} type="button" className="organizer-orders-summary-card" onClick={() => setOrdersStatusFilter(current => current === status ? 'all' : status)} aria-pressed={ordersStatusFilter === status}>
+                      <span style={{ color: tone }}>{orderStatusCounts[status].toLocaleString()}</span><small>{label}</small>
+                    </button>)}
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr style={{ background: 'var(--muted)' }}>
-                          {['Order ID', 'Customer', 'Event', 'Tickets / tiers', 'Source', 'Method', 'Total', 'Status', 'Date', 'Actions'].map(h => (
-                            <th key={h} className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--muted-foreground)' }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {orders.map(o => {
+
+                  <section className="organizer-orders-panel">
+                    <div className="organizer-orders-toolbar">
+                      <label className="organizer-orders-search"><Search size={16} aria-hidden="true" /><input type="search" value={ordersSearch} onChange={event => setOrdersSearch(event.target.value)} placeholder="Search customer, event or order ID" aria-label="Search orders" />{ordersSearch && <button type="button" onClick={() => setOrdersSearch('')} aria-label="Clear search"><XIcon size={14} /></button>}</label>
+                      <div className="organizer-orders-toolbar-actions">
+                        <div className="organizer-orders-period-filter" role="group" aria-label="Filter orders by date">
+                          {([['all', 'All time'], ['day', 'Today'], ['week', 'This week'], ['month', 'This month']] as const).map(([period, label]) => <button key={period} type="button" aria-pressed={ordersPeriod === period} onClick={() => setOrdersPeriod(period)}>{label}</button>)}
+                        </div>
+                        <button type="button" className="organizer-orders-refresh" onClick={() => void load()} disabled={dataLoading}><RotateCcw size={14} />{dataLoading ? 'Refreshing' : 'Refresh'}</button>
+                        <button type="button" className="organizer-orders-export" onClick={exportOrders} disabled={!visibleOrders.length}><Download size={14} />Export CSV</button>
+                      </div>
+                    </div>
+
+                    <div className="organizer-orders-status-filters" role="group" aria-label="Filter orders by status">
+                      {([['all', 'All orders', orders.length], ['confirmed', 'Confirmed', orderStatusCounts.confirmed], ['pending', 'Pending', orderStatusCounts.pending], ['cancelled', 'Cancelled', orderStatusCounts.cancelled], ['refunded', 'Refunded', orderStatusCounts.refunded]] as const).map(([status, label, count]) => <button key={status} type="button" aria-pressed={ordersStatusFilter === status} onClick={() => setOrdersStatusFilter(status)}>{label}<span>{count}</span></button>)}
+                      <span className="organizer-orders-visible-count">Showing {visibleOrders.length} of {orders.length}</span>
+                    </div>
+
+                    <div className="organizer-orders-table-wrap">
+                      <table className="organizer-orders-table">
+                        <thead><tr>{['Order', 'Customer', 'Event', 'Tickets', 'Source', 'Method', 'Total', 'Status', 'Date', ''].map((h, index) => <th key={`${h}-${index}`} scope="col">{h || <span className="sr-only">Actions</span>}</th>)}</tr></thead>
+                        <tbody>
+                        {visibleOrders.map(o => {
                           const event = events.find(item => item.id === o.event_id)
                           const tierNames = new Map((event?.ticket_tiers ?? []).map(tier => [tier.id, tier.name]))
                           const ticketCount = o.order_items?.reduce((sum, item) => sum + item.quantity, 0) || agentOrderMeta[o.id]?.quantity || 0
                           const tiers = [...new Set((o.order_items ?? []).map(item => tierNames.get(item.ticket_tier_id) ?? 'Unknown tier'))]
+                          const customerName = (o as any).holder_name ?? (o as any).profiles?.full_name ?? 'Customer'
                           return (
-                          <tr key={o.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                            <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--muted-foreground)' }}>{o.id.slice(0, 8)}…</td>
-                            <td className="px-4 py-3 text-xs font-medium">{(o as any).holder_name ?? (o as any).profiles?.full_name ?? '—'}<span className="block text-[10px] font-normal" style={{ color: 'var(--muted-foreground)' }}>{(o as any).holder_email ?? (o as any).profiles?.email ?? ''}</span></td>
-                            <td className="px-4 py-3 text-xs truncate max-w-[140px]" style={{ color: 'var(--muted-foreground)' }}>{(o as any).events?.title ?? '—'}</td>
-                            <td className="px-4 py-3 text-xs"><span className="font-semibold">{ticketCount} ticket{ticketCount === 1 ? '' : 's'}</span><span className="block max-w-[150px] truncate text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{tiers.length ? tiers.join(', ') : 'Tier details unavailable'}</span></td>
-                            <td className="px-4 py-3 text-xs">{agentOrderMeta[o.id] ? <><span className="font-semibold">{agentOrderMeta[o.id].profiles?.full_name ?? 'Agent'}</span><span className="block text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Agent sale · {agentOrderMeta[o.id].quantity} ticket{agentOrderMeta[o.id].quantity === 1 ? '' : 's'}</span></> : <span style={{ color: 'var(--muted-foreground)' }}>Customer checkout</span>}</td>
-                            <td className="px-4 py-3 text-xs capitalize">{agentOrderMeta[o.id]?.payment_mode ?? o.payment_method?.replace('_', ' ') ?? '—'}</td>
-                            <td className="px-4 py-3 text-xs font-bold" style={{ color: 'var(--primary)' }}>{formatPrice(o.total)}</td>
-                            <td className="px-4 py-3"><Badge label={o.status} color={STATUS_COLORS[o.status] ?? '#888'} /></td>
-                            <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted-foreground)' }}>{new Date(o.created_at).toLocaleDateString()}</td>
-                            <td className="px-4 py-3"><button onClick={() => setSelectedOrder(o)} className="rounded-lg px-2.5 py-1.5 text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>View order</button></td>
+                          <tr key={o.id}>
+                            <td><span className="organizer-orders-id">#{o.id.slice(0, 8)}</span></td>
+                            <td><span className="organizer-orders-customer"><strong>{customerName}</strong><small>{(o as any).holder_email ?? (o as any).profiles?.email ?? 'Customer'}</small></span></td>
+                            <td><span className="organizer-orders-event">{(o as any).events?.title ?? '—'}</span></td>
+                            <td><span className="organizer-orders-ticket-count">{ticketCount} ticket{ticketCount === 1 ? '' : 's'}</span><small className="organizer-orders-ticket-tiers">{tiers.length ? tiers.join(', ') : 'Tier details unavailable'}</small></td>
+                            <td><span className="organizer-orders-source">{agentOrderMeta[o.id] ? agentOrderMeta[o.id].profiles?.full_name ?? 'Agent sale' : 'Online checkout'}</span></td>
+                            <td><span className="organizer-orders-method">{(agentOrderMeta[o.id]?.payment_mode ?? o.payment_method?.replace(/_/g, ' ') ?? '—')}</span></td>
+                            <td><strong className="organizer-orders-total">{formatPrice(o.total)}</strong></td>
+                            <td><Badge className="organizer-orders-status" label={o.status} color={STATUS_COLORS[o.status] ?? '#888'} /></td>
+                            <td><span className="organizer-orders-date">{new Date(o.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span></td>
+                            <td><button type="button" onClick={() => setSelectedOrder(o)} className="organizer-orders-view">View</button></td>
                           </tr>
                           )
                         })}
-                        {orders.length === 0 && (
-                          <tr><td colSpan={10} className="px-4 py-12 text-center text-xs" style={{ color: 'var(--muted-foreground)' }}>No orders yet</td></tr>
-                        )}
+                        {visibleOrders.length === 0 && <tr><td colSpan={10} className="organizer-orders-empty"><span><ClipboardList size={20} /></span><strong>{orders.length ? 'No orders match your filters' : 'No orders yet'}</strong><small>{orders.length ? 'Try another search or filter to see more orders.' : 'Your ticket purchases will appear here as they come in.'}</small>{(ordersSearch || ordersStatusFilter !== 'all' || ordersPeriod !== 'all') && <button type="button" onClick={() => { setOrdersSearch(''); setOrdersStatusFilter('all'); setOrdersPeriod('all') }}>Clear filters</button>}</td></tr>}
                       </tbody>
                     </table>
                   </div>
+                  <div className="organizer-orders-responsive-list">
+                    {visibleOrders.map(order => {
+                      const customerName = (order as any).holder_name ?? (order as any).profiles?.full_name ?? 'Customer'
+                      const eventTitle = (order as any).events?.title ?? 'Event ticket'
+                      const agentSale = agentOrderMeta[order.id]
+                      const ticketCount = order.order_items?.reduce((sum, item) => sum + item.quantity, 0) || agentSale?.quantity || 0
+                      return <article className="organizer-order-responsive-card" key={order.id}>
+                        <div className="organizer-order-responsive-top"><div><span className="organizer-orders-id">#{order.id.slice(0, 8)}</span><strong>{formatPrice(order.total)}</strong></div><Badge className="organizer-orders-status" label={order.status} color={STATUS_COLORS[order.status] ?? '#888'} /></div>
+                        <h4>{customerName}</h4>
+                        <p>{eventTitle}</p>
+                        <div className="organizer-order-responsive-meta"><span>{ticketCount} ticket{ticketCount === 1 ? '' : 's'}</span><span>{new Date(order.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span><span>{agentSale?.payment_mode ?? order.payment_method?.replace(/_/g, ' ') ?? 'Online'}</span></div>
+                        <button type="button" onClick={() => setSelectedOrder(order)} className="organizer-orders-view">View order</button>
+                      </article>
+                    })}
+                    {visibleOrders.length === 0 && <div className="organizer-orders-empty"><span><ClipboardList size={20} /></span><strong>{orders.length ? 'No orders match your filters' : 'No orders yet'}</strong><small>{orders.length ? 'Try another search or filter to see more orders.' : 'Your ticket purchases will appear here as they come in.'}</small>{(ordersSearch || ordersStatusFilter !== 'all' || ordersPeriod !== 'all') && <button type="button" onClick={() => { setOrdersSearch(''); setOrdersStatusFilter('all'); setOrdersPeriod('all') }}>Clear filters</button>}</div>}
+                  </div>
+                  </section>
                 </div>
               )}
 
               {/* ── CUSTOMERS ── */}
               {section === 'customers' && (
-                <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                  <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
-                    <h2 className="font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>{customers.length} Customers</h2>
+                <div className="organizer-customers-page organizer-analytics-page space-y-5">
+                  <header className="organizer-analytics-page-heading organizer-orders-heading">
+                    <div className="organizer-analytics-title-block"><h3>Customers</h3><p>Get to know the people showing up for your events.</p></div>
+                    <div className="organizer-orders-heading-meta"><span className="organizer-finance-live-dot" />{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : 'Customer list'}</div>
+                  </header>
+
+                  <div className="organizer-orders-summary-grid organizer-customers-summary-grid">
+                    <article className="organizer-orders-summary-card"><span>{customers.length.toLocaleString()}</span><small>Total customers</small></article>
+                    <article className="organizer-orders-summary-card"><span>{customers.filter(customer => customer.total_orders > 1).length.toLocaleString()}</span><small>Returning customers</small></article>
+                    <article className="organizer-orders-summary-card"><span>{formatPrice(customers.reduce((sum, customer) => sum + customer.total_spent, 0))}</span><small>Total customer spend</small></article>
+                    <article className="organizer-orders-summary-card"><span>{customers.length ? formatPrice(Math.round(customers.reduce((sum, customer) => sum + customer.total_spent, 0) / customers.length)) : '—'}</span><small>Average spend</small></article>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr style={{ background: 'var(--muted)' }}>
-                          {['Name', 'Email', 'Phone', 'Orders', 'Total Spent', 'Since'].map(h => (
-                            <th key={h} className="text-left px-4 py-3 text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {customers.map(c => (
-                          <tr key={c.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                            <td className="px-4 py-3 font-medium text-sm">{c.full_name ?? '—'}</td>
-                            <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted-foreground)' }}>{c.email ?? '—'}</td>
-                            <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted-foreground)' }}>{c.phone ?? '—'}</td>
-                            <td className="px-4 py-3 text-xs text-center">{c.total_orders}</td>
-                            <td className="px-4 py-3 text-xs font-bold" style={{ color: 'var(--primary)' }}>{formatPrice(c.total_spent)}</td>
-                            <td className="px-4 py-3 text-xs" style={{ color: 'var(--muted-foreground)' }}>{new Date(c.created_at).toLocaleDateString()}</td>
-                          </tr>
-                        ))}
-                        {customers.length === 0 && (
-                          <tr><td colSpan={6} className="px-4 py-12 text-center text-xs" style={{ color: 'var(--muted-foreground)' }}>No customers yet</td></tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+
+                  <section className="organizer-orders-panel organizer-customers-panel">
+                    <div className="organizer-orders-toolbar">
+                      <label className="organizer-orders-search"><Search size={16} aria-hidden="true" /><input type="search" value={customersSearch} onChange={event => setCustomersSearch(event.target.value)} placeholder="Search name, email or phone" aria-label="Search customers" />{customersSearch && <button type="button" onClick={() => setCustomersSearch('')} aria-label="Clear search"><XIcon size={14} /></button>}</label>
+                      <div className="organizer-orders-toolbar-actions">
+                        <div className="organizer-orders-period-filter" role="group" aria-label="Filter customers by join date">
+                          {([['all', 'All time'], ['day', 'Today'], ['week', 'This week'], ['month', 'This month']] as const).map(([period, label]) => <button key={period} type="button" aria-pressed={customersPeriod === period} onClick={() => setCustomersPeriod(period)}>{label}</button>)}
+                        </div>
+                        <button type="button" className="organizer-orders-export" onClick={exportCustomers} disabled={!visibleCustomers.length}><Download size={14} />Export CSV</button>
+                      </div>
+                    </div>
+                    <div className="organizer-customers-results"><span>{visibleCustomers.length} of {customers.length} customers</span></div>
+
+                    <div className="organizer-customers-table-wrap">
+                      <table className="organizer-orders-table organizer-customers-table">
+                        <thead><tr>{['Customer', 'Contact', 'Orders', 'Total spent', 'Customer since'].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
+                        <tbody>{visibleCustomers.map(customer => <tr key={customer.id}>
+                          <td><span className="organizer-customers-name"><strong>{customer.full_name || 'Unnamed customer'}</strong><small>Customer account</small></span></td>
+                          <td><span className="organizer-customers-contact"><strong>{customer.email || '—'}</strong><small>{customer.phone || 'Phone not provided'}</small></span></td>
+                          <td><span className="organizer-customers-order-count">{customer.total_orders.toLocaleString()}</span></td>
+                          <td><strong className="organizer-orders-total">{formatPrice(customer.total_spent)}</strong></td>
+                          <td><span className="organizer-orders-date">{new Date(customer.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span></td>
+                        </tr>)}
+                        {visibleCustomers.length === 0 && <tr><td colSpan={5} className="organizer-orders-empty"><span><UsersRound size={20} /></span><strong>{customers.length ? 'No customers match your search' : 'No customers yet'}</strong><small>{customers.length ? 'Try another name, email, phone number, or date range.' : 'Your ticket buyers will appear here.'}</small>{(customersSearch || customersPeriod !== 'all') && <button type="button" onClick={() => { setCustomersSearch(''); setCustomersPeriod('all') }}>Clear filters</button>}</td></tr>}</tbody>
+                      </table>
+                    </div>
+
+                    <div className="organizer-customers-mobile-list">
+                      {visibleCustomers.map(customer => <article key={customer.id} className="organizer-customers-mobile-card">
+                        <div className="organizer-customers-mobile-heading"><span className="organizer-customers-mobile-avatar">{(customer.full_name || 'C').trim().charAt(0).toUpperCase()}</span><span className="organizer-customers-name"><strong>{customer.full_name || 'Unnamed customer'}</strong><small>Joined {new Date(customer.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</small></span></div>
+                        <div className="organizer-customers-mobile-contact"><span>{customer.email || 'Email not provided'}</span><span>{customer.phone || 'Phone not provided'}</span></div>
+                        <div className="organizer-customers-mobile-stats"><span><small>Orders</small><strong>{customer.total_orders.toLocaleString()}</strong></span><span><small>Total spent</small><strong>{formatPrice(customer.total_spent)}</strong></span></div>
+                      </article>)}
+                      {visibleCustomers.length === 0 && <div className="organizer-orders-empty"><span><UsersRound size={20} /></span><strong>{customers.length ? 'No customers match your search' : 'No customers yet'}</strong><small>{customers.length ? 'Try another search or date range.' : 'Your ticket buyers will appear here.'}</small></div>}
+                    </div>
+                  </section>
                 </div>
               )}
 
               {/* ── MEMBERS ── */}
               {section === 'followers' && (
-                <div className="space-y-4">
-                  <div className="rounded-2xl p-5" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                    <p className="text-3xl font-black" style={{ fontFamily: 'Outfit, sans-serif', color: 'var(--primary)' }}>{followers.length}</p>
-                    <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>People following your organizer profile</p>
+                <div className="organizer-followers-page organizer-analytics-page space-y-5">
+                  <header className="organizer-analytics-page-heading organizer-orders-heading">
+                    <div className="organizer-analytics-title-block"><h3>Followers</h3><p>Your community, growing around the events you create.</p></div>
+                    <div className="organizer-orders-heading-meta"><span className="organizer-finance-live-dot" />Community</div>
+                  </header>
+                  <div className="organizer-orders-summary-grid organizer-community-summary-grid">
+                    <article className="organizer-orders-summary-card"><span>{followers.length.toLocaleString()}</span><small>Total followers</small></article>
+                    <article className="organizer-orders-summary-card"><span>{followers.filter(follower => Date.now() - new Date(follower.created_at).getTime() <= 30 * 24 * 60 * 60 * 1000).length.toLocaleString()}</span><small>Joined this month</small></article>
+                    <article className="organizer-orders-summary-card"><span>{events.filter(event => event.status === 'published').length.toLocaleString()}</span><small>Published events</small></article>
+                    <article className="organizer-orders-summary-card"><span>{organizer.verified || organizer.verification_status === 'verified' ? 'Verified' : 'Building trust'}</span><small>Organizer profile</small></article>
                   </div>
-                  {followers.length === 0 ? (
-                    <div className="rounded-2xl p-12 text-center" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                      <UsersIcon size={28} style={{ color: 'var(--muted-foreground)' }} />
-                      <p className="mt-3 font-bold">No followers yet</p>
+                  <section className="organizer-orders-panel organizer-community-panel">
+                    <div className="organizer-orders-toolbar">
+                      <label className="organizer-orders-search"><Search size={16} aria-hidden="true" /><input type="search" value={followersSearch} onChange={event => setFollowersSearch(event.target.value)} placeholder="Search followers by name or username" aria-label="Search followers" />{followersSearch && <button type="button" onClick={() => setFollowersSearch('')} aria-label="Clear search"><XIcon size={14} /></button>}</label>
+                      <div className="organizer-community-results">{visibleFollowers.length} of {followers.length} followers</div>
                     </div>
-                  ) : followers.map(follower => {
-                    const followerName = follower.profiles?.full_name || follower.profiles?.username || 'QPassa user'
-                    return (
-                      <div key={follower.id} className="flex items-center gap-3 rounded-2xl p-4" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-                        {follower.profiles?.avatar_url ? <img src={follower.profiles.avatar_url} alt={followerName} className="h-10 w-10 rounded-full object-cover" /> : <div className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold" style={{ background: 'var(--muted)' }}>{followerName[0]?.toUpperCase() ?? '?'}</div>}
-                        <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{followerName}</p><p className="truncate text-xs" style={{ color: 'var(--muted-foreground)' }}>{follower.profiles?.username ? `@${follower.profiles.username.replace(/^@/, '')}` : 'Follower'}</p></div>
-                        <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{new Date(follower.created_at).toLocaleDateString()}</span>
-                        <button onClick={() => removeFollower(follower.id)} className="rounded-lg px-3 py-1.5 text-xs font-bold" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>Remove</button>
-                      </div>
-                    )
-                  })}
+                    <div className="organizer-community-table-wrap">
+                      <table className="organizer-orders-table organizer-community-table">
+                        <thead><tr>{['Follower', 'Username', 'Following since', ''].map((label, index) => <th key={`${label}-${index}`} scope="col">{label || <span className="sr-only">Actions</span>}</th>)}</tr></thead>
+                        <tbody>{visibleFollowers.map(follower => {
+                          const followerName = follower.profiles?.full_name || follower.profiles?.username || 'QPassa user'
+                          return <tr key={follower.id}>
+                            <td><span className="organizer-community-person"><span className="organizer-community-avatar">{follower.profiles?.avatar_url ? <img src={follower.profiles.avatar_url} alt="" /> : followerName[0]?.toUpperCase() ?? '?'}</span><strong>{followerName}</strong></span></td>
+                            <td><span className="organizer-community-username">{follower.profiles?.username ? `@${follower.profiles.username.replace(/^@/, '')}` : '—'}</span></td>
+                            <td><span className="organizer-orders-date">{new Date(follower.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span></td>
+                            <td><button type="button" onClick={() => removeFollower(follower.id)} className="organizer-community-remove">Remove</button></td>
+                          </tr>
+                        })}{visibleFollowers.length === 0 && <tr><td colSpan={4} className="organizer-orders-empty"><span><Heart size={20} /></span><strong>{followers.length ? 'No followers match your search' : 'Your community starts here'}</strong><small>{followers.length ? 'Try another name or username.' : 'People who follow your organizer profile will appear here.'}</small>{followersSearch && <button type="button" onClick={() => setFollowersSearch('')}>Clear search</button>}</td></tr>}</tbody>
+                      </table>
+                    </div>
+                    <div className="organizer-community-mobile-list">{visibleFollowers.map(follower => {
+                      const followerName = follower.profiles?.full_name || follower.profiles?.username || 'QPassa user'
+                      return <article className="organizer-community-mobile-card" key={follower.id}>
+                        <div className="organizer-community-person"><span className="organizer-community-avatar">{follower.profiles?.avatar_url ? <img src={follower.profiles.avatar_url} alt="" /> : followerName[0]?.toUpperCase() ?? '?'}</span><span className="organizer-community-mobile-copy"><strong>{followerName}</strong><small>{follower.profiles?.username ? `@${follower.profiles.username.replace(/^@/, '')}` : 'Follower'}</small></span><button type="button" onClick={() => removeFollower(follower.id)} className="organizer-community-remove">Remove</button></div>
+                        <small className="organizer-community-follow-date">Following since {new Date(follower.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</small>
+                      </article>
+                    })}{visibleFollowers.length === 0 && <div className="organizer-orders-empty"><span><Heart size={20} /></span><strong>{followers.length ? 'No followers match your search' : 'Your community starts here'}</strong><small>{followers.length ? 'Try another name or username.' : 'People who follow your organizer profile will appear here.'}</small></div>}</div>
+                  </section>
                 </div>
               )}
 
               {/* ── MEMBERS ── */}
               {section === 'members' && (
-                <div className="mx-auto max-w-6xl space-y-5">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                    <div><p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--primary)' }}>Team management</p><h2 className="mt-1 text-2xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>{organizer.name}</h2><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>Manage team members and invitations for this organization.</p></div>
-                    {isOwner && <div className="flex flex-wrap gap-2"><button type="button" onClick={() => setShowInviteMember(true)} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: 'var(--primary)', color: '#fff' }}>Invite user</button><button type="button" onClick={() => setShowInviteAgent(true)} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>Invite agent</button></div>}
+                <div className="organizer-members-page organizer-analytics-page space-y-5">
+                  <header className="organizer-analytics-page-heading organizer-orders-heading">
+                    <div className="organizer-analytics-title-block"><h3>Members</h3><p>Manage the people who help bring your events to life.</p></div>
+                    <div className="organizer-members-header-actions">{isOwner && <><button type="button" className="organizer-orders-export" onClick={() => setShowInviteMember(true)}><Plus size={14} />Invite member</button><button type="button" className="organizer-members-secondary-action" onClick={() => setShowInviteAgent(true)}><UsersRound size={14} />Invite agent</button></>}<div className="organizer-orders-heading-meta"><span className="organizer-finance-live-dot" />{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : 'Team activity'}</div></div>
+                  </header>
+                  <div className="organizer-orders-summary-grid organizer-community-summary-grid">
+                    <article className="organizer-orders-summary-card"><span>{members.filter(member => member.status !== 'pending').length.toLocaleString()}</span><small>Team members</small></article>
+                    <article className="organizer-orders-summary-card"><span>{members.filter(member => member.status === 'active').length.toLocaleString()}</span><small>Active</small></article>
+                    <article className="organizer-orders-summary-card"><span>{members.filter(member => member.status === 'pending').length.toLocaleString()}</span><small>Invitations</small></article>
+                    <article className="organizer-orders-summary-card"><span>{agentAssignments.filter(assignment => assignment.status === 'active').length.toLocaleString()}</span><small>Active agents</small></article>
                   </div>
-                  <section className="organizer-finance-panel overflow-hidden rounded-2xl">
-                    <div className="flex flex-col gap-3 border-b px-5 pt-4 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--border)' }}>
+                  <section className="organizer-orders-panel organizer-community-panel">
+                    <div className="organizer-members-toolbar">
                       <div className="organizer-finance-tabs" role="tablist" aria-label="Team users and invitations">
-                        <button type="button" role="tab" aria-selected={teamTab === 'users'} onClick={() => setTeamTab('users')}>Users <span>{members.filter(member => member.status !== 'pending').length}</span></button>
+                        <button type="button" role="tab" aria-selected={teamTab === 'users'} onClick={() => setTeamTab('users')}>Members <span>{members.filter(member => member.status !== 'pending').length}</span></button>
                         <button type="button" role="tab" aria-selected={teamTab === 'invitations'} onClick={() => setTeamTab('invitations')}>Invitations <span>{members.filter(member => member.status === 'pending').length}</span></button>
                       </div>
-                      <input type="search" value={teamSearch} onChange={event => setTeamSearch(event.target.value)} placeholder="Search team…" aria-label="Search team members" className="organizer-finance-search mb-3 rounded-xl px-4 py-2 text-sm sm:mb-2 sm:w-64" />
+                      <label className="organizer-orders-search"><Search size={16} aria-hidden="true" /><input type="search" value={teamSearch} onChange={event => setTeamSearch(event.target.value)} placeholder="Search name or email" aria-label="Search team members" />{teamSearch && <button type="button" onClick={() => setTeamSearch('')} aria-label="Clear search"><XIcon size={14} /></button>}</label>
                     </div>
-                    <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm">
-                      <thead><tr>{['User', 'Role', 'Status', ...(isOwner ? ['Actions'] : [])].map(label => <th key={label} className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--muted-foreground)' }}>{label}</th>)}</tr></thead>
-                      <tbody>{members.filter(member => teamTab === 'invitations' ? member.status === 'pending' : member.status !== 'pending').filter(member => `${(member as any).profiles?.full_name ?? ''} ${(member as any).profiles?.email ?? ''}`.toLowerCase().includes(teamSearch.trim().toLowerCase())).map(member => {
-                        const fullName = (member as any).profiles?.full_name ?? 'Team member'
-                        const email = (member as any).profiles?.email ?? '—'
-                        const assignedAgent = agentAssignments.filter(assignment => assignment.user_id === member.user_id)
-                        return <tr key={member.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                          <td className="px-5 py-4"><div className="flex items-center gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>{fullName[0]?.toUpperCase() ?? '?'}</span><span className="min-w-0"><span className="block truncate font-semibold">{email}</span><span className="mt-0.5 block truncate text-xs" style={{ color: 'var(--muted-foreground)' }}>{fullName}</span></span></div></td>
-                          <td className="px-5 py-4">{isOwner ? <select value={member.role_id ?? ''} onChange={event => void updateMemberRole(member.id, event.target.value)} className="organizer-finance-search max-w-52 rounded-lg px-3 py-2 text-xs" aria-label={`Role for ${fullName}`}><option value="">Select role</option>{roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select> : <span className="text-xs font-semibold">{(member as any).organizer_roles?.name ?? '—'}</span>}</td>
-                          <td className="px-5 py-4"><Badge label={member.status === 'active' ? 'Active' : member.status} color={STATUS_COLORS[member.status] ?? '#888'} /></td>
-                          {isOwner && <td className="px-5 py-4"><div className="flex flex-wrap gap-2">{member.status === 'pending' && <button type="button" onClick={() => void updateMemberStatus(member.id, 'active')} className="rounded-lg px-3 py-1.5 text-xs font-bold" style={{ background: 'var(--selected)', color: 'var(--primary)' }}>Activate</button>}{assignedAgent.map(assignment => <button key={assignment.id} type="button" onClick={() => setEditingAgentAssignment(assignment)} className="rounded-lg px-3 py-1.5 text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--foreground)' }}>Agent settings</button>)}<button type="button" onClick={() => member.status === 'active' ? void updateMemberStatus(member.id, 'inactive') : void deleteMember(member.id)} className="rounded-lg px-3 py-1.5 text-xs font-bold" style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>{member.status === 'active' ? 'Deactivate' : 'Remove'}</button></div></td>}
-                        </tr>
-                      })}
-                      {members.filter(member => teamTab === 'invitations' ? member.status === 'pending' : member.status !== 'pending').filter(member => `${(member as any).profiles?.full_name ?? ''} ${(member as any).profiles?.email ?? ''}`.toLowerCase().includes(teamSearch.trim().toLowerCase())).length === 0 && <tr><td colSpan={isOwner ? 4 : 3} className="px-5 py-14 text-center text-sm" style={{ color: 'var(--muted-foreground)' }}>{teamTab === 'invitations' ? 'No pending invitations.' : 'No team members match your search.'}</td></tr>}</tbody>
-                    </table></div>
-                    <div className="border-t px-5 py-3 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>Showing {members.filter(member => teamTab === 'invitations' ? member.status === 'pending' : member.status !== 'pending').length} entries</div>
+                    <div className="organizer-community-results"><span>{visibleTeamMembers.length} shown</span></div>
+                    <div className="organizer-community-table-wrap">
+                      <table className="organizer-orders-table organizer-members-table">
+                        <thead><tr>{['Team member', 'Role', 'Status', ...(isOwner ? ['Actions'] : [])].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
+                        <tbody>{visibleTeamMembers.map(member => {
+                          const fullName = (member as any).profiles?.full_name ?? 'Team member'
+                          const email = (member as any).profiles?.email ?? '—'
+                          const assignedAgent = agentAssignments.filter(assignment => assignment.user_id === member.user_id)
+                          return <tr key={member.id}>
+                            <td><span className="organizer-community-person"><span className="organizer-community-avatar">{(member as any).profiles?.avatar_url || (member as any).profiles?.profile_image ? <img src={(member as any).profiles?.avatar_url ?? (member as any).profiles?.profile_image} alt="" /> : fullName[0]?.toUpperCase() ?? '?'}</span><span className="organizer-community-member-copy"><strong>{fullName}</strong><small>{email}</small></span></span></td>
+                            <td>{isOwner ? <select value={member.role_id ?? ''} onChange={event => void updateMemberRole(member.id, event.target.value)} className="organizer-members-role-select" aria-label={`Role for ${fullName}`}><option value="">Select role</option>{roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select> : <span className="organizer-community-username">{(member as any).organizer_roles?.name ?? '—'}</span>}</td>
+                            <td><Badge className="organizer-orders-status organizer-community-badge" label={member.status} color={STATUS_COLORS[member.status] ?? '#888'} /></td>
+                            {isOwner && <td><div className="organizer-members-actions">{member.status === 'pending' && <button type="button" onClick={() => void updateMemberStatus(member.id, 'active')}>Activate</button>}{assignedAgent.map(assignment => <button key={assignment.id} type="button" onClick={() => setEditingAgentAssignment(assignment)}>Agent settings</button>)}<button type="button" className="is-muted" onClick={() => member.status === 'active' ? void updateMemberStatus(member.id, 'inactive') : void deleteMember(member.id)}>{member.status === 'active' ? 'Deactivate' : 'Remove'}</button></div></td>}
+                          </tr>
+                        })}{visibleTeamMembers.length === 0 && <tr><td colSpan={isOwner ? 4 : 3} className="organizer-orders-empty"><span><UsersRound size={20} /></span><strong>{teamTab === 'invitations' ? 'No invitations found' : 'No team members found'}</strong><small>{teamSearch ? 'Try a different name or email.' : teamTab === 'invitations' ? 'Invitations you send will be listed here.' : 'Invite collaborators to help manage your events.'}</small>{teamSearch && <button type="button" onClick={() => setTeamSearch('')}>Clear search</button>}</td></tr>}</tbody>
+                      </table>
+                    </div>
+                    <div className="organizer-community-mobile-list">{visibleTeamMembers.map(member => {
+                      const fullName = (member as any).profiles?.full_name ?? 'Team member'
+                      const email = (member as any).profiles?.email ?? '—'
+                      const assignedAgent = agentAssignments.filter(assignment => assignment.user_id === member.user_id)
+                      return <article className="organizer-community-mobile-card" key={member.id}>
+                        <div className="organizer-community-mobile-member-top"><span className="organizer-community-person"><span className="organizer-community-avatar">{(member as any).profiles?.avatar_url || (member as any).profiles?.profile_image ? <img src={(member as any).profiles?.avatar_url ?? (member as any).profiles?.profile_image} alt="" /> : fullName[0]?.toUpperCase() ?? '?'}</span><span className="organizer-community-mobile-copy"><strong>{fullName}</strong><small>{email}</small></span></span><Badge className="organizer-orders-status organizer-community-badge" label={member.status} color={STATUS_COLORS[member.status] ?? '#888'} /></div>
+                        <div className="organizer-community-mobile-role">{isOwner ? <label>Role<select value={member.role_id ?? ''} onChange={event => void updateMemberRole(member.id, event.target.value)} className="organizer-members-role-select" aria-label={`Role for ${fullName}`}><option value="">Select role</option>{roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label> : <span>{(member as any).organizer_roles?.name ?? 'No role assigned'}</span>}</div>
+                        {isOwner && <div className="organizer-members-actions">{member.status === 'pending' && <button type="button" onClick={() => void updateMemberStatus(member.id, 'active')}>Activate</button>}{assignedAgent.map(assignment => <button key={assignment.id} type="button" onClick={() => setEditingAgentAssignment(assignment)}>Agent settings</button>)}<button type="button" className="is-muted" onClick={() => member.status === 'active' ? void updateMemberStatus(member.id, 'inactive') : void deleteMember(member.id)}>{member.status === 'active' ? 'Deactivate' : 'Remove'}</button></div>}
+                      </article>
+                    })}{visibleTeamMembers.length === 0 && <div className="organizer-orders-empty"><span><UsersRound size={20} /></span><strong>{teamTab === 'invitations' ? 'No invitations found' : 'No team members found'}</strong><small>{teamSearch ? 'Try a different name or email.' : 'Invite collaborators to help manage your events.'}</small></div>}</div>
                   </section>
                 </div>
               )}
 
               {/* ── ORGANIZER SETTINGS / ROLE REFERENCE ── */}
               {section === 'settings' && (
-                <div className="mx-auto max-w-5xl space-y-6">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--primary)' }}>Organization settings</p>
-                    <h2 className="mt-1 text-2xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Roles & permissions</h2>
-                    <p className="mt-1 max-w-2xl text-sm" style={{ color: 'var(--muted-foreground)' }}>Review the access profiles available to your team. Role definitions are managed by QPassa administrators; organization owners can assign a profile to a team member.</p>
+                <div className="organizer-settings-page organizer-analytics-page space-y-5">
+                  <header className="organizer-analytics-page-heading organizer-orders-heading">
+                    <div className="organizer-analytics-title-block"><h3>Settings</h3><p>Organization details, team access, and workspace shortcuts.</p></div>
+                    <div className="organizer-orders-heading-meta"><span className="organizer-finance-live-dot" />{isOwner ? 'Owner access' : 'Team access'}</div>
+                  </header>
+
+                  <div className="organizer-settings-nav" role="tablist" aria-label="Settings categories">
+                    {([['workspace', 'Workspace profile', Building2], ['roles', 'Roles & permissions', Shield], ['notifications', 'Notification preferences', Bell], ['security', 'Security', KeyIcon]] as const).map(([tab, label, TabIcon]) => <button key={tab} type="button" role="tab" aria-selected={organizerSettingsTab === tab} onClick={() => setOrganizerSettingsTab(tab)}><TabIcon size={15} />{label}</button>)}
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {[
-                      ['Organization scope', 'Roles apply only to this organization and its events.'],
-                      ['Role administration', 'Only QPassa platform administrators can create or edit role permissions.'],
-                    ].map(([title, description]) => <div key={title} className="organizer-finance-stat rounded-2xl p-4"><p className="font-bold">{title}</p><p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>{description}</p></div>)}
-                  </div>
+                  {organizerSettingsTab === 'workspace' && <section className="organizer-settings-workspace organizer-orders-panel" id="organizer-settings-workspace" aria-labelledby="organizer-settings-workspace-title">
+                    <div className="organizer-settings-section-heading"><span className="organizer-settings-section-icon"><Building2 size={17} /></span><div><h4 id="organizer-settings-workspace-title">Workspace profile</h4><p>Edit the public details associated with {organizer.name}.</p></div><Badge className="organizer-orders-status" label={verificationStatus} /></div>
+                    {organizerDetailsNotice && <p className="organizer-settings-security-notice" role="status">{organizerDetailsNotice}</p>}
+                    <div className="organizer-settings-edit-grid">
+                      <label>Organization name<input value={organizerDetailsDraft.name} onChange={event => setOrganizerDetailsDraft(current => ({ ...current, name: event.target.value }))} placeholder="Organization name" disabled={!isOwner} /></label>
+                      <label>City<input value={organizerDetailsDraft.city} onChange={event => setOrganizerDetailsDraft(current => ({ ...current, city: event.target.value }))} placeholder="City or region" disabled={!isOwner} /></label>
+                      <label>Website<input type="url" value={organizerDetailsDraft.website} onChange={event => setOrganizerDetailsDraft(current => ({ ...current, website: event.target.value }))} placeholder="https://example.com" disabled={!isOwner} /></label>
+                      <label>Contact phone<input type="tel" value={organizerDetailsDraft.phone} onChange={event => setOrganizerDetailsDraft(current => ({ ...current, phone: event.target.value }))} placeholder="Phone number" disabled={!isOwner} /></label>
+                      <div className="organizer-settings-edit-meta"><span><small>Subscription</small><strong className="capitalize">{organizer.subscription_tier}</strong></span><span><small>Account status</small><strong>{verificationStatus === 'verified' ? 'Verified' : verificationStatus === 'pending' ? 'Pending review' : 'Not verified'}</strong></span></div>
+                    </div>
+                    <div className="organizer-settings-section-footer"><span>{isOwner ? 'Only organization owners can edit workspace details.' : 'Workspace details are managed by the organization owner.'}</span>{isOwner && <button type="button" className="organizer-settings-save-button" disabled={organizerDetailsSaving || !organizerDetailsDraft.name.trim()} onClick={() => void saveOrganizerDetails()}>{organizerDetailsSaving ? 'Saving…' : 'Save changes'}</button>}</div>
+                  </section>}
 
-                  <section className="organizer-finance-panel overflow-hidden rounded-2xl">
-                    <div className="border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}><h3 className="font-bold">Role definitions</h3><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Available access profiles for {organizer.name}</p></div>
-                    <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm">
-                      <thead><tr>{['Role', 'Scope', 'Capabilities', 'Assigned members'].map(label => <th key={label} className="px-5 py-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--muted-foreground)' }}>{label}</th>)}</tr></thead>
+                  {organizerSettingsTab === 'roles' && <>
+                  <section className="organizer-settings-roles organizer-orders-panel" id="organizer-settings-roles" aria-labelledby="organizer-settings-roles-title">
+                    <div className="organizer-settings-section-heading"><span className="organizer-settings-section-icon"><Shield size={17} /></span><div><h4 id="organizer-settings-roles-title">Roles &amp; permissions</h4><p>Access profiles available to {organizer.name}. Role capabilities are managed by QPassa administrators.</p></div><span className="organizer-community-results">{roles.length} roles</span></div>
+                    <div className="organizer-community-table-wrap"><table className="organizer-orders-table organizer-settings-role-table">
+                      <thead><tr>{['Role', 'Scope', 'Capabilities', 'Assigned members'].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
                       <tbody>{roles.map(role => {
                         const capabilities = role.permissions?.all ? ['Full organization access'] : Object.entries(role.permissions ?? {}).filter(([, enabled]) => enabled).map(([permission]) => permission.replace(/_/g, ' '))
-                        return <tr key={role.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                          <td className="px-5 py-4 font-semibold">{role.name}</td>
-                          <td className="px-5 py-4 text-xs" style={{ color: 'var(--muted-foreground)' }}>Organization</td>
-                          <td className="px-5 py-4"><div className="flex max-w-lg flex-wrap gap-1.5">{capabilities.length ? capabilities.map(capability => <span key={capability} className="organizer-permission-chip">{capability}</span>) : <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>No access granted</span>}</div></td>
-                          <td className="px-5 py-4 text-xs">{members.filter(member => member.role_id === role.id).length}</td>
+                        return <tr key={role.id}>
+                          <td><strong className="organizer-settings-role-name">{role.name}</strong></td>
+                          <td><span className="organizer-community-username">Organization</span></td>
+                          <td><div className="organizer-settings-capabilities">{capabilities.length ? capabilities.map(capability => <span key={capability} className="organizer-permission-chip">{capability}</span>) : <span className="organizer-community-username">No access granted</span>}</div></td>
+                          <td><span className="organizer-customers-order-count">{members.filter(member => member.role_id === role.id).length}</span></td>
                         </tr>
-                      })}
-                      {roles.length === 0 && <tr><td colSpan={4} className="px-5 py-12 text-center text-sm" style={{ color: 'var(--muted-foreground)' }}>Role profiles are being configured by your platform administrator.</td></tr>}</tbody>
+                      })}{roles.length === 0 && <tr><td colSpan={4} className="organizer-orders-empty"><span><Shield size={20} /></span><strong>Role profiles are being configured</strong><small>Available access profiles will appear here when they are ready.</small></td></tr>}</tbody>
+                    </table></div>
+                    <div className="organizer-settings-section-footer"><span>Manage assignments and invitations in Team members.</span><button type="button" onClick={() => selectSection('members')}>Open team <ArrowUpRight size={14} /></button></div>
+                  </section>
+
+                  <section className="organizer-settings-matrix organizer-orders-panel" aria-labelledby="organizer-settings-matrix-title">
+                    <div className="organizer-settings-section-heading"><span className="organizer-settings-section-icon"><LayoutDashboard size={17} /></span><div><h4 id="organizer-settings-matrix-title">Capability matrix</h4><p>Feature access granted by each role in this organization.</p></div></div>
+                    <div className="organizer-community-table-wrap"><table className="organizer-orders-table organizer-settings-matrix-table">
+                      <thead><tr><th scope="col">Feature area</th>{roles.map(role => <th key={role.id} scope="col">{role.name}</th>)}</tr></thead>
+                      <tbody>{ORGANIZER_PERMISSION_ROWS.map(feature => <tr key={feature.key}>
+                        <td><span className="organizer-settings-feature"><strong>{feature.label}</strong><small>{feature.detail}</small></span></td>
+                        {roles.map(role => {
+                          const allowed = role.permissions?.all === true || role.permissions?.[feature.key] === true
+                          return <td key={role.id}><span className={`organizer-settings-access ${allowed ? 'is-allowed' : 'is-restricted'}`} aria-label={allowed ? 'Access granted' : 'No access'}>{allowed ? <CheckIcon size={14} /> : '—'}</span></td>
+                        })}
+                      </tr>)}
+                      {roles.length === 0 && <tr><td colSpan={Math.max(roles.length + 1, 2)} className="organizer-orders-empty"><span><LayoutDashboard size={20} /></span><strong>No role capabilities to show</strong><small>Capabilities appear here when roles are assigned to this organization.</small></td></tr>}</tbody>
+                    </table></div>
+                    <div className="organizer-settings-matrix-legend"><span><i className="is-allowed"><CheckIcon size={11} /></i>Access granted</span><span><i className="is-restricted">—</i>No access</span><small>Full organization access enables every listed feature.</small></div>
+                  </section>
+
+                  <section className="organizer-settings-assignment organizer-orders-panel" aria-labelledby="organizer-settings-assignment-title">
+                    <div className="organizer-settings-section-heading"><span className="organizer-settings-section-icon"><UsersRound size={17} /></span><div><h4 id="organizer-settings-assignment-title">Role management boundaries</h4><p>Administrative actions available in the QPassa organizer workspace.</p></div></div>
+                    <div className="organizer-community-table-wrap"><table className="organizer-orders-table organizer-settings-assignment-table">
+                      <thead><tr>{['Workspace actor', 'Invite members', 'Assign roles', 'Edit role definitions', 'Manage payouts'].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
+                      <tbody>
+                        <tr><td><strong className="organizer-settings-role-name">Organization owner</strong></td><td><span className="organizer-settings-access is-allowed"><CheckIcon size={14} />Yes</span></td><td><span className="organizer-settings-access is-allowed"><CheckIcon size={14} />Yes</span></td><td><span className="organizer-settings-access is-restricted">Platform admin</span></td><td><span className="organizer-settings-access is-allowed"><CheckIcon size={14} />Yes</span></td></tr>
+                        <tr><td><strong className="organizer-settings-role-name">Team member</strong></td><td><span className="organizer-settings-access is-restricted">Owner only</span></td><td><span className="organizer-settings-access is-restricted">Owner only</span></td><td><span className="organizer-settings-access is-restricted">Platform admin</span></td><td><span className="organizer-settings-access is-restricted">Owner only</span></td></tr>
+                        <tr><td><strong className="organizer-settings-role-name">QPassa administrator</strong></td><td><span className="organizer-settings-access is-allowed"><CheckIcon size={14} />Platform-wide</span></td><td><span className="organizer-settings-access is-allowed"><CheckIcon size={14} />Platform-wide</span></td><td><span className="organizer-settings-access is-allowed"><CheckIcon size={14} />Yes</span></td><td><span className="organizer-settings-access is-allowed"><CheckIcon size={14} />Platform-wide</span></td></tr>
+                      </tbody>
                     </table></div>
                   </section>
+
+                  <div className="organizer-settings-guides">
+                    <article><span className="organizer-settings-guide-icon"><CalendarDays size={16} /></span><div><small>TEAM WORKFLOW</small><strong>Delegate event operations</strong><p>Invite a team member and assign an event role to share day-to-day event tasks.</p><button type="button" onClick={() => selectSection('members')}>Manage team <ArrowUpRight size={13} /></button></div></article>
+                    <article><span className="organizer-settings-guide-icon"><Shield size={16} /></span><div><small>ACCESS CONTROL</small><strong>Keep finance access owner-managed</strong><p>Wallet and payout actions stay with the organization owner; team members can be granted statement access separately.</p><button type="button" onClick={() => selectSection('payouts')}>Review wallet access <ArrowUpRight size={13} /></button></div></article>
+                  </div>
+                  </>}
+
+                  {organizerSettingsTab === 'notifications' && <section className="organizer-settings-notifications organizer-orders-panel" aria-labelledby="organizer-settings-notifications-title">
+                    <div className="organizer-settings-section-heading"><span className="organizer-settings-section-icon"><Bell size={17} /></span><div><h4 id="organizer-settings-notifications-title">Notification preferences</h4><p>Choose the account-level updates you want to receive. Changes save automatically.</p></div></div>
+                    <div className="organizer-settings-preference-list">
+                      {([
+                        ['email_notifications', 'Email notifications', 'Receive important product and account updates by email.', Bell],
+                        ['event_reminders', 'Event reminders', 'Get reminders and updates related to events you manage or attend.', CalendarDays],
+                        ['promotions', 'Promotions and offers', 'Receive occasional product news, offers, and promotional updates.', Tag],
+                        ['nearby_events', 'Nearby event updates', 'Stay informed about events and activity relevant to your location.', MapPin],
+                      ] as const).map(([key, title, description, PreferenceIcon]) => <div className="organizer-settings-preference-row" key={key}>
+                        <span className="organizer-settings-preference-icon"><PreferenceIcon size={16} /></span>
+                        <span className="organizer-settings-preference-copy"><strong>{title}</strong><small>{description}</small></span>
+                        <button type="button" role="switch" aria-checked={organizerSettingsPreferences[key] === true} aria-label={title} disabled={organizerPreferenceSaving === key} onClick={() => void updateOrganizerSettingsPreference(key)} className="organizer-settings-switch"><i /></button>
+                      </div>)}
+                    </div>
+                    <p className="organizer-settings-note">These preferences are saved to your account profile. Transactional and security notices may still be sent when required.</p>
+                  </section>}
+
+                  {organizerSettingsTab === 'security' && <section className="organizer-settings-security organizer-orders-panel" aria-labelledby="organizer-settings-security-title">
+                    <div className="organizer-settings-section-heading"><span className="organizer-settings-section-icon"><Shield size={17} /></span><div><h4 id="organizer-settings-security-title">Account security</h4><p>Review your sign-in details and manage personal security controls.</p></div></div>
+                    {securityNotice && <p className="organizer-settings-security-notice" role="status">{securityNotice}</p>}
+                    <div className="organizer-settings-security-grid">
+                      <article className="organizer-settings-password-card"><div className="organizer-settings-security-card-heading"><span className="organizer-settings-security-icon"><KeyIcon size={17} /></span><div><strong>Change password</strong><p>Use a unique password with at least 8 characters to protect your account.</p></div></div>
+                        <label>New password<input type="password" autoComplete="new-password" value={securityPassword.password} onChange={event => setSecurityPassword(current => ({ ...current, password: event.target.value }))} placeholder="At least 8 characters" /></label>
+                        <label>Confirm new password<input type="password" autoComplete="new-password" value={securityPassword.confirm} onChange={event => setSecurityPassword(current => ({ ...current, confirm: event.target.value }))} placeholder="Enter it again" /></label>
+                        <button type="button" disabled={securityPasswordSaving || !securityPassword.password || !securityPassword.confirm} onClick={() => void updateAccountPassword()}>{securityPasswordSaving ? 'Updating…' : 'Update password'}</button>
+                      </article>
+                      <article><span className="organizer-settings-security-icon"><UserRound size={17} /></span><div><strong>Account profile</strong><p>Signed in as {profile?.email || user?.email || 'your account'}.</p></div><button type="button" onClick={() => navigate('profile')}>Open profile <ArrowUpRight size={14} /></button></article>
+                      <article><span className="organizer-settings-security-icon"><Wallet size={17} /></span><div><strong>Finance access</strong><p>Wallet and payout access is restricted to the organization owner.</p></div>{isOwner ? <button type="button" onClick={() => selectSection('payouts')}>Open wallet <ArrowUpRight size={14} /></button> : <span className="organizer-settings-owner-note">Owner managed</span>}</article>
+                    </div>
+                  </section>}
                 </div>
               )}
 
@@ -1764,15 +2195,10 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
               {/* ── STATEMENTS ── */}
               {section === 'transactions' && (
                 <div className="organizer-finance-page organizer-statements-page mx-auto max-w-6xl space-y-6">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                    <div className="organizer-finance-heading">
-                      <span className="organizer-finance-heading-mark"><ReceiptText size={20} /></span>
-                      <div><p className="organizer-finance-eyebrow">Finance · ledger</p>
-                      <h2 className="organizer-finance-title">Statements</h2>
-                      <p className="organizer-finance-description">A clear record of payments, platform fees, refunds, and completed wallet withdrawals for {organizer.name}.</p></div>
-                    </div>
-                    <div className="organizer-finance-header-actions"><button type="button" className="organizer-finance-secondary-action" onClick={() => selectSection('payouts')}><Wallet size={14} /> Open wallet</button><div className="organizer-finance-header-meta"><span className="organizer-finance-live-dot" />Updated {lastUpdated?.toLocaleTimeString() ?? 'loading'}</div></div>
-                  </div>
+                  <header className="organizer-analytics-page-heading organizer-orders-heading">
+                    <div className="organizer-analytics-title-block"><h3>Statements</h3><p>A clear record of payments, platform fees, refunds, and completed wallet withdrawals for {organizer.name}.</p></div>
+                    <div className="organizer-orders-heading-meta"><span className="organizer-finance-live-dot" />{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : 'Loading statement activity'}</div>
+                  </header>
 
                   <div className="organizer-statement-kpi-grid grid grid-cols-2 gap-3 xl:grid-cols-4">
                     {([
@@ -1781,7 +2207,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                       const StatIcon = type === 'payment' ? ArrowDownLeft : type === 'payout' ? ArrowUpRight : type === 'refund' ? RotateCcw : ReceiptText
                       const amount = transactions.filter(item => item.type === type && item.status === 'completed').reduce((sum, item) => sum + item.amount, 0)
                       const count = transactions.filter(item => item.type === type).length
-                      return <div key={type} className="organizer-finance-stat organizer-statement-stat rounded-2xl p-4"><span className={`organizer-statement-stat-icon is-${type}`}><StatIcon size={15} /></span><div><p className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--muted-foreground)' }}>{label}</p><p className="mt-2 text-xl font-black" style={{ color: type === 'refund' ? 'var(--error)' : 'var(--foreground)' }}>{formatPrice(amount)}</p><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{count} ledger record{count === 1 ? '' : 's'}</p></div></div>
+                      return <article key={type} className="organizer-overview-stat organizer-statement-stat"><span className="organizer-overview-stat-icon"><StatIcon size={16} /></span><small>{label}</small><strong>{formatPrice(amount)}</strong><span>{count} ledger record{count === 1 ? '' : 's'}</span></article>
                     })}
                   </div>
 
@@ -1792,7 +2218,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                     </div>
                     <>
                       <div className="organizer-finance-tools flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                        <label className="organizer-statement-search w-full sm:max-w-sm">
+                        <label className="organizer-orders-search organizer-statement-search w-full sm:max-w-sm">
                           <Search size={16} aria-hidden="true" />
                           <input type="search" value={statementSearch} onChange={event => setStatementSearch(event.target.value)} placeholder="Search statements…" aria-label="Search statements" />
                         </label>
@@ -1810,9 +2236,9 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                               {transaction.type === 'payment' ? <ArrowDownLeft size={16} /> : transaction.type === 'payout' ? <ArrowUpRight size={16} /> : transaction.type === 'refund' ? <RotateCcw size={15} /> : <ReceiptText size={15} />}
                             </span>
                             <div className="organizer-statement-description"><strong>{title}</strong><span>{transaction.reference ?? transaction.id.slice(0, 12)}</span></div>
-                            <div className="organizer-statement-meta"><span className="organizer-statement-date">{new Date(transaction.created_at).toLocaleDateString()}</span><Badge label={transaction.type} color={STATUS_COLORS[transaction.type] ?? '#888'} /></div>
+                            <div className="organizer-statement-meta"><span className="organizer-statement-date">{new Date(transaction.created_at).toLocaleDateString()}</span><Badge className="organizer-finance-badge" label={transaction.type} color={STATUS_COLORS[transaction.type] ?? '#888'} /></div>
                             <strong className={`organizer-statement-amount ${positive ? 'is-positive' : transaction.type === 'refund' ? 'is-refund' : ''}`}>{positive ? '+' : '−'}{formatPrice(transaction.amount)}</strong>
-                            <Badge label={transaction.status} color={STATUS_COLORS[transaction.status === 'completed' ? 'completed_t' : transaction.status === 'failed' ? 'failed' : 'pending_t'] ?? '#888'} />
+                            <Badge className="organizer-finance-badge" label={transaction.status} color={STATUS_COLORS[transaction.status === 'completed' ? 'completed_t' : transaction.status === 'failed' ? 'failed' : 'pending_t'] ?? '#888'} />
                           </article>
                         })}
                       </div>}
@@ -1823,15 +2249,10 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
               {section === 'payouts' && isOwner && (
                 <div className="organizer-finance-page organizer-wallet-page mx-auto max-w-7xl space-y-5">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                    <div className="organizer-finance-heading">
-                      <span className="organizer-finance-heading-mark"><Wallet size={20} /></span>
-                      <div><p className="organizer-finance-eyebrow">Organizer finance</p>
-                      <h2 className="organizer-finance-title">Wallet</h2>
-                      <p className="organizer-finance-description">Manage your available earnings, request a payout, and follow its progress.</p></div>
-                    </div>
-                    <div className="organizer-finance-header-actions"><button type="button" className="organizer-finance-secondary-action" onClick={() => selectSection('transactions')}><ReceiptText size={14} /> View statements</button></div>
-                  </div>
+                  <header className="organizer-analytics-page-heading organizer-orders-heading">
+                    <div className="organizer-analytics-title-block"><h3>Wallet</h3><p>Manage your available earnings, request a payout, and follow its progress.</p></div>
+                    <div className="organizer-orders-heading-meta"><span className="organizer-finance-live-dot" />{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : 'Loading wallet activity'}</div>
+                  </header>
 
                   <div className="organizer-wallet-dashboard-grid">
                     <div className="organizer-wallet-overview-column">
@@ -1881,7 +2302,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                       {withdrawals.length === 0 ? <div className="organizer-wallet-empty"><span><Wallet size={18} /></span><p>No payouts yet</p><small>Your payout requests and their statuses will show here.</small></div> : <div className="organizer-wallet-payout-list">
                         {withdrawals.map(withdrawal => <article key={withdrawal.id} className="organizer-wallet-payout-item">
                           <span className="organizer-wallet-payout-icon"><ArrowUpRight size={15} /></span>
-                          <div className="organizer-wallet-payout-copy"><div><strong>{formatPrice(withdrawal.amount)}</strong><Badge label={withdrawal.status} color={STATUS_COLORS[withdrawal.status] ?? '#888'} /></div><p>{withdrawal.payment_method === 'mobile_money' ? 'Mobile Money' : 'Bank transfer'} · {withdrawal.payment_reference}</p><small>{new Date(withdrawal.requested_at).toLocaleDateString()}{withdrawal.note ? ` · ${withdrawal.note}` : ''}</small></div>
+                          <div className="organizer-wallet-payout-copy"><div><strong>{formatPrice(withdrawal.amount)}</strong><Badge className="organizer-finance-badge" label={withdrawal.status} color={STATUS_COLORS[withdrawal.status] ?? '#888'} /></div><p>{withdrawal.payment_method === 'mobile_money' ? 'Mobile Money' : 'Bank transfer'} · {withdrawal.payment_reference}</p><small>{new Date(withdrawal.requested_at).toLocaleDateString()}{withdrawal.note ? ` · ${withdrawal.note}` : ''}</small></div>
                           {withdrawal.status === 'requested' && <button type="button" onClick={() => void cancelPayoutRequest(withdrawal)} className="organizer-wallet-cancel">Cancel</button>}
                         </article>)}
                       </div>}
@@ -1890,7 +2311,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                   </div>
 
                   <section className="organizer-finance-panel organizer-wallet-earnings overflow-hidden rounded-2xl">
-                    <div className="border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}><div className="organizer-wallet-panel-heading"><div><p className="organizer-finance-eyebrow">By event</p><h3>Earnings breakdown</h3><p>Confirmed ticket sales after fees, refunds, and agent commissions.</p></div><ChartNoAxesCombined size={17} /></div></div>
+                    <div className="border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}><div className="organizer-wallet-panel-heading"><div><h3>Earnings breakdown</h3><p>Confirmed ticket sales after fees, refunds, and agent commissions.</p></div><ChartNoAxesCombined size={17} /></div></div>
                     {walletEventBreakdown.length === 0 ? <div className="organizer-wallet-events-empty"><span><TicketCheck size={18} /></span><strong>No event earnings yet</strong><p>Confirmed ticket sales will appear here, broken down by event.</p></div> : <div className="organizer-wallet-event-list">
                       {walletEventBreakdown.map((item, index) => <article key={item.id} className="organizer-wallet-event-row">
                         <div className="organizer-wallet-event-heading"><span className="organizer-wallet-event-index">{String(index + 1).padStart(2, '0')}</span><div className="organizer-wallet-event-name"><strong>{item.title}</strong><small>{item.orders} confirmed order{item.orders === 1 ? '' : 's'}</small></div><div className="organizer-wallet-event-net"><small>Net settled</small><strong>{formatPrice(item.net)}</strong></div></div>
