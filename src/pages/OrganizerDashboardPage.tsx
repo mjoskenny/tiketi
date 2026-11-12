@@ -1,6 +1,7 @@
 // Organizer operations workspace, including the filterable event-card listing.
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import i18n from '../lib/i18n'
 import { signOut, supabase } from '../lib/supabase'
 import { fetchAllRows } from '../lib/supabasePagination'
 import { useAuth } from '../context/AuthContext'
@@ -30,6 +31,7 @@ type AgentOrderMeta = { order_id: string; agent_user_id: string; payment_mode: '
 type RefundRequest = { id: string; order_id: string; ticket_id: string | null; customer_id: string; reason: string; status: 'pending' | 'approved' | 'rejected' | 'processed'; created_at: string; profiles?: { full_name: string | null; email: string | null } | null; events?: { title: string | null } | null }
 
 type Props = { navigate: (p: string, extra?: unknown) => void }
+const t = i18n.t
 
 const NAV_ICONS: Record<Section, LucideIcon> = {
   overview: LayoutDashboard,
@@ -48,22 +50,22 @@ const NAV_ICONS: Record<Section, LucideIcon> = {
 }
 
 const NAV: { key: Section; label: string }[] = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'analytics', label: 'Analytics' },
-  { key: 'events', label: 'Events' },
-  { key: 'orders', label: 'Orders' },
-  { key: 'customers', label: 'Customers' },
-  { key: 'followers', label: 'Followers' },
-  { key: 'members', label: 'Members' },
-  { key: 'settings', label: 'Settings' },
-  { key: 'transactions', label: 'Statements' },
-  { key: 'payouts', label: 'Wallet' },
-  ...(FEATURES.refunds ? [{ key: 'refunds' as Section, label: 'Refund requests' }] : []),
+  { key: 'overview', label: t('Overview') },
+  { key: 'analytics', label: t('Analytics') },
+  { key: 'events', label: t('Events') },
+  { key: 'orders', label: t('Orders') },
+  { key: 'customers', label: t('Customers') },
+  { key: 'followers', label: t('Followers') },
+  { key: 'members', label: t('Members') },
+  { key: 'settings', label: t('Settings') },
+  { key: 'transactions', label: t('Transactions') },
+  { key: 'payouts', label: t('Wallet') },
+  ...(FEATURES.refunds ? [{ key: 'refunds' as Section, label: t('Refund requests') }] : []),
 ]
 
 const NAV_GROUPS: { label: string; keys: Section[] }[] = [
-  { label: 'Dashboard', keys: ['overview', 'events', 'members', 'analytics', 'orders', 'customers', 'followers'] },
-  { label: 'Finance', keys: ['payouts', 'transactions', 'refunds'] },
+  { label: t('Dashboard'), keys: ['overview', 'events', 'members', 'analytics', 'orders', 'customers', 'followers'] },
+  { label: t('Finance'), keys: ['payouts', 'transactions', 'refunds'] },
   { label: '', keys: ['settings'] },
 ]
 
@@ -112,6 +114,8 @@ function localDateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
+const overviewCalendarWeekdays = Array.from({ length: 7 }, (_, index) => formatLocaleDate(new Date(2024, 0, index + 7), { weekday: 'short' }).replace(/\./g, '').toUpperCase())
+
 const STATUS_COLORS: Record<string, string> = {
   published: '#22c55e', draft: '#F0A500', cancelled: '#ef4444', completed: '#888',
   confirmed: '#22c55e', pending: '#F0A500', refunded: '#ef4444',
@@ -130,17 +134,17 @@ function getEventCategoryTone(category: string) {
 }
 
 const ORGANIZER_PERMISSION_ROWS = [
-  { key: 'analytics', label: 'Analytics', detail: 'View sales, revenue, and performance reports' },
-  { key: 'events', label: 'Events', detail: 'Create and manage event listings' },
-  { key: 'orders', label: 'Orders', detail: 'Review ticket purchases and order details' },
-  { key: 'customers', label: 'Customers', detail: 'View customer records and purchase history' },
-  { key: 'checkin', label: 'Check-in', detail: 'Validate tickets and manage door access' },
-  { key: 'members', label: 'Team members', detail: 'View and manage workspace collaborators' },
-  { key: 'roles', label: 'Roles & settings', detail: 'Review access roles and workspace settings' },
-  { key: 'transactions', label: 'Statements', detail: 'View financial ledger entries' },
-  { key: 'payouts', label: 'Wallet & payouts', detail: 'View or manage organizer withdrawals' },
-  { key: 'refunds', label: 'Refund requests', detail: 'Review customer refund requests' },
-  { key: 'notifications', label: 'Notifications', detail: 'Access organizer activity updates' },
+  { key: 'analytics', label: t('Analytics'), detail: t('View sales, revenue, and performance reports') },
+  { key: 'events', label: t('Events'), detail: t('Create and manage event listings') },
+  { key: 'orders', label: t('Orders'), detail: t('Review ticket purchases and order details') },
+  { key: 'customers', label: t('Customers'), detail: t('View customer records and purchase history') },
+  { key: 'checkin', label: t('Check-in'), detail: t('Validate tickets and manage door access') },
+  { key: 'members', label: t('Team members'), detail: t('View and manage workspace collaborators') },
+  { key: 'roles', label: t('Roles & settings'), detail: t('Review access roles and workspace settings') },
+  { key: 'transactions', label: t('Transactions'), detail: t('View financial ledger entries') },
+  { key: 'payouts', label: t('Wallet & payouts'), detail: t('View or manage organizer withdrawals') },
+  { key: 'refunds', label: t('Refund requests'), detail: t('Review customer refund requests') },
+  { key: 'notifications', label: t('Notifications'), detail: t('Access organizer activity updates') },
 ] as const
 
 const Badge = StatusBadge
@@ -202,7 +206,7 @@ function EventPerformanceChart({ events, performance }: { events: Event[]; perfo
   const eventTitles = new Map(events.map(event => [event.id, event.title]))
   const data = [...performance.entries()].map(([eventId, result]) => ({
     id: eventId,
-    title: eventTitles.get(eventId) ?? 'Unknown event',
+    title: eventTitles.get(eventId) ?? t('Unknown event'),
     revenue: result.revenue,
   })).sort((a, b) => b.revenue - a.revenue).slice(0, 5)
   const max = Math.max(...data.map(event => event.revenue), 1)
@@ -220,7 +224,7 @@ function EventPerformanceChart({ events, performance }: { events: Event[]; perfo
           </div>
         </div>
       ))}
-      {data.length === 0 && <p className="py-8 text-center text-xs" style={{ color: 'var(--muted-foreground)' }}>Publish an event to see performance here</p>}
+      {data.length === 0 && <p className="py-8 text-center text-xs" style={{ color: 'var(--muted-foreground)' }}>{t('Publish an event to see performance here')}</p>}
     </div>
   )
 }
@@ -229,17 +233,17 @@ function TicketSalesByEventChart({ events, performance }: { events: Event[]; per
   const eventTitles = new Map(events.map(event => [event.id, event.title]))
   const data = [...performance.entries()].map(([eventId, result]) => ({
     id: eventId,
-    title: eventTitles.get(eventId) ?? 'Unknown event',
+    title: eventTitles.get(eventId) ?? t('Unknown event'),
     tickets: result.tickets,
   })).sort((left, right) => right.tickets - left.tickets).slice(0, 5)
   const max = Math.max(...data.map(event => event.tickets), 1)
 
   return <div className="organizer-analytics-metric-list">
     {data.map(event => <div className="organizer-analytics-metric-row" key={event.id}>
-      <div className="organizer-analytics-metric-heading"><span>{event.title}</span><strong>{event.tickets.toLocaleString()} tickets</strong></div>
+      <div className="organizer-analytics-metric-heading"><span>{event.title}</span><strong>{event.tickets.toLocaleString()} {t('tickets')}</strong></div>
       <div className="organizer-analytics-metric-track"><i style={{ width: `${event.tickets ? Math.max(event.tickets / max * 100, 4) : 0}%` }} /></div>
     </div>)}
-    {data.length === 0 && <p className="organizer-analytics-chart-empty">Confirmed ticket sales will appear here.</p>}
+    {data.length === 0 && <p className="organizer-analytics-chart-empty">{t('Confirmed ticket sales will appear here.')}</p>}
   </div>
 }
 
@@ -255,7 +259,7 @@ function RevenueBreakdownChart({ items }: { items: Array<{ label: string; amount
 
 function PaymentMethodChart({ orders }: { orders: Order[] }) {
   const data = [...orders.reduce((counts, order) => {
-    const method = order.payment_method?.replace(/_/g, ' ') || 'Not specified'
+    const method = order.payment_method?.replace(/_/g, ' ') || t('Not specified')
     counts.set(method, (counts.get(method) ?? 0) + 1)
     return counts
   }, new Map<string, number>())].map(([method, count]) => ({ method, count }))
@@ -263,10 +267,10 @@ function PaymentMethodChart({ orders }: { orders: Order[] }) {
   const max = Math.max(...data.map(item => item.count), 1)
   return <div className="organizer-analytics-metric-list">
     {data.map(item => <div className="organizer-analytics-metric-row" key={item.method}>
-      <div className="organizer-analytics-metric-heading"><span className="capitalize">{item.method}</span><strong>{item.count.toLocaleString()} orders</strong></div>
+      <div className="organizer-analytics-metric-heading"><span className="capitalize">{item.method}</span><strong>{item.count.toLocaleString()} {t('orders')}</strong></div>
       <div className="organizer-analytics-metric-track"><i style={{ width: `${item.count ? Math.max(item.count / max * 100, 4) : 0}%` }} /></div>
     </div>)}
-    {data.length === 0 && <p className="organizer-analytics-chart-empty">Confirmed orders will appear here.</p>}
+    {data.length === 0 && <p className="organizer-analytics-chart-empty">{t('Confirmed orders will appear here.')}</p>}
   </div>
 }
 
@@ -548,20 +552,20 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const updateAccountPassword = async () => {
     setSecurityNotice('')
     setActionError('')
-    if (securityPassword.password.length < 8) { setActionError('Choose a password with at least 8 characters.'); return }
-    if (securityPassword.password !== securityPassword.confirm) { setActionError('The passwords do not match.'); return }
+    if (securityPassword.password.length < 8) { setActionError(t('Choose a password with at least 8 characters.')); return }
+    if (securityPassword.password !== securityPassword.confirm) { setActionError(t('The passwords do not match.')); return }
     setSecurityPasswordSaving(true)
     const { error } = await supabase.auth.updateUser({ password: securityPassword.password })
     setSecurityPasswordSaving(false)
     if (error) { setActionError(error.message); return }
     setSecurityPassword({ password: '', confirm: '' })
-    setSecurityNotice('Your password has been updated.')
+    setSecurityNotice(t('Your password has been updated.'))
   }
 
   const saveOrganizerDetails = async () => {
     if (!organizer?.id || !isOwner) return
     const name = organizerDetailsDraft.name.trim()
-    if (!name) { setActionError('Organization name is required.'); return }
+    if (!name) { setActionError(t('Organization name is required.')); return }
     setActionError('')
     setOrganizerDetailsNotice('')
     setOrganizerDetailsSaving(true)
@@ -573,7 +577,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     }).eq('id', organizer.id)
     setOrganizerDetailsSaving(false)
     if (error) { setActionError(error.message); return }
-    setOrganizerDetailsNotice('Organization profile saved.')
+    setOrganizerDetailsNotice(t('Organization profile saved.'))
     await load()
   }
 
@@ -738,8 +742,8 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const analyticsRangeLabel = analyticsRange === 'custom'
     ? analyticsStart || analyticsEnd
       ? `${analyticsStart || analyticsEnd} to ${analyticsEnd || analyticsStart}`
-      : 'Select dates'
-    : analyticsRange === 'all' ? 'All time' : analyticsRange.charAt(0).toUpperCase() + analyticsRange.slice(1)
+      : t('Select dates')
+    : analyticsRange === 'all' ? t('All time') : t(analyticsRange.charAt(0).toUpperCase() + analyticsRange.slice(1))
   const visibleOrders = orders.filter(order => {
     const createdAt = new Date(order.created_at)
     return createdAt >= rangeStart && createdAt <= rangeEnd
@@ -979,14 +983,14 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   }
 
   const deleteEvent = async (id: string) => {
-    if (!confirm('Delete this event?')) return
+    if (!confirm(t('Delete this event?'))) return
     const { error } = await supabase.from('events').delete().eq('id', id)
     if (error) { setActionError(error.message); return }
     setEvents(prev => prev.filter(e => e.id !== id))
   }
 
   const removeFollower = async (id: string) => {
-    if (!confirm('Remove this follower?')) return
+    if (!confirm(t('Remove this follower?'))) return
     const { error } = await supabase.from('organizer_followers').delete().eq('id', id)
     if (error) { setActionError(error.message); return }
     setFollowers(prev => prev.filter(follower => follower.id !== id))
@@ -998,14 +1002,14 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   }
 
   const deleteMember = async (id: string) => {
-    if (!confirm('Remove this team member?')) return
+    if (!confirm(t('Remove this team member?'))) return
     const { error } = await supabase.from('organizer_members').delete().eq('id', id)
     if (error) { setActionError(error.message); return }
     setMembers(prev => prev.filter(member => member.id !== id))
   }
 
   const updateMemberRole = async (memberId: string, roleId: string) => {
-    if (!isOwner) { setActionError('Only the organizer owner can assign team roles.'); return }
+    if (!isOwner) { setActionError(t('Only the organizer owner can assign team roles.')); return }
     const { error } = await supabase.from('organizer_members').update({ role_id: roleId || null }).eq('id', memberId)
     if (error) { setActionError(error.message); return }
     setMembers(prev => prev.map(member => member.id === memberId ? { ...member, role_id: roleId || null, organizer_roles: roles.find(role => role.id === roleId) } : member))
@@ -1013,9 +1017,9 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
   const updateMemberStatus = async (memberId: string, status: 'active' | 'inactive') => {
     const member = members.find(item => item.id === memberId)
-    if (!member) { setActionError('This team member is no longer available.'); return }
-    if (status === 'inactive' && member.status === 'active' && !confirm('Deactivate this team member? They will lose access immediately.')) return
-    if (status === 'active' && member.status === 'pending' && !confirm('Activate this pending team invitation?')) return
+    if (!member) { setActionError(t('This team member is no longer available.')); return }
+    if (status === 'inactive' && member.status === 'active' && !confirm(t('Deactivate this team member? They will lose access immediately.'))) return
+    if (status === 'active' && member.status === 'pending' && !confirm(t('Activate this pending team invitation?'))) return
     const { error } = await supabase.from('organizer_members').update({ status }).eq('id', memberId)
     if (error) { setActionError(error.message); return }
     setMembers(prev => prev.map(m => m.id === memberId ? { ...m, status } : m))
@@ -1137,9 +1141,9 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     setPayoutNotice('')
     setActionError('')
     const amount = Number(payoutAmount)
-    if (!Number.isInteger(amount) || amount <= 0) { setActionError('Enter a whole-number payout amount greater than zero.'); return }
-    if (!payoutReference.trim()) { setActionError('Enter the Mobile Money phone number or bank account reference.'); return }
-    if (amount > availablePayoutBalance) { setActionError(`Amount exceeds your available balance of ${formatPrice(availablePayoutBalance)}.`); return }
+    if (!Number.isInteger(amount) || amount <= 0) { setActionError(t('Enter a whole-number payout amount greater than zero.')); return }
+    if (!payoutReference.trim()) { setActionError(t('Enter the Mobile Money phone number or bank account reference.')); return }
+    if (amount > availablePayoutBalance) { setActionError(t('Amount exceeds your available balance of {{amount}}.', { amount: formatPrice(availablePayoutBalance) })); return }
     setActionError('')
     setPayoutSubmitting(true)
     const { error } = await supabase.rpc('request_organizer_withdrawal', {
@@ -1151,7 +1155,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     if (error) { setActionError(error.message); return }
     setPayoutAmount('')
     setActionError('')
-    setPayoutNotice('Payout request submitted. It will appear below while the platform team processes the transfer.')
+    setPayoutNotice(t('Payout request submitted. It will appear below while the platform team processes the transfer.'))
     await load()
   }
 
@@ -1176,7 +1180,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   }
 
   const reviewRefundRequest = async (request: RefundRequest, status: 'approved' | 'rejected') => {
-    const note = window.prompt(status === 'approved' ? 'Optional note for the customer' : 'Reason for declining this request') ?? ''
+    const note = window.prompt(status === 'approved' ? t('Optional note for the customer') : t('Reason for declining this request')) ?? ''
     if (status === 'rejected' && !note.trim()) return
     setActionError('')
     const { error } = await supabase.rpc('review_ticket_refund', { p_request_id: request.id, p_status: status, p_note: note.trim() || null })
@@ -1187,10 +1191,10 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   if (!organizer) {
     return (
       <div className="flex items-center justify-center min-h-screen flex-col gap-4 pt-16" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
-        <p className="text-2xl font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>No organizer account found</p>
-        <p style={{ color: 'var(--muted-foreground)' }}>Sign in as an organizer to access the dashboard.</p>
+        <p className="text-2xl font-bold" style={{ fontFamily: 'Outfit, sans-serif' }}>{t('No organizer account found')}</p>
+        <p style={{ color: 'var(--muted-foreground)' }}>{t('Sign in as an organizer to access the dashboard.')}</p>
         <button onClick={() => navigate('auth-organizer')} className="px-6 py-3 rounded-xl font-bold" style={{ background: 'var(--primary)', color: '#000' }}>
-          Sign in as Organizer
+          {t('Sign in as Organizer')}
         </button>
       </div>
     )
@@ -1200,10 +1204,10 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
         <div className="w-full max-w-md rounded-2xl border p-6 text-center" style={{ background: '#1a1d1d', borderColor: 'var(--border)' }}>
-          <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>Team invitation</p>
-          <h1 className="mt-2 text-2xl font-black">Join {organizer.name}</h1>
-          <p className="mt-3 text-sm" style={{ color: 'var(--muted-foreground)' }}>Accept this invitation to access the organizer workspace.</p>
-          <button onClick={acceptMembership} className="mt-6 rounded-xl px-5 py-3 text-sm font-bold" style={{ background: 'var(--primary)', color: '#000' }}>Accept invitation</button>
+          <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>{t('Team invitation')}</p>
+          <h1 className="mt-2 text-2xl font-black">{t('Join')} {organizer.name}</h1>
+          <p className="mt-3 text-sm" style={{ color: 'var(--muted-foreground)' }}>{t('Accept this invitation to access the organizer workspace.')}</p>
+          <button onClick={acceptMembership} className="mt-6 rounded-xl px-5 py-3 text-sm font-bold" style={{ background: 'var(--primary)', color: '#000' }}>{t('Accept invitation')}</button>
         </div>
       </div>
     )
@@ -1213,8 +1217,8 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
         <div className="w-full max-w-md rounded-2xl border p-6 text-center" style={{ background: '#1a1d1d', borderColor: 'var(--border)' }}>
-          <h1 className="text-2xl font-black">No dashboard permissions</h1>
-          <p className="mt-3 text-sm" style={{ color: 'var(--muted-foreground)' }}>Ask the organizer owner to assign you a role with dashboard access.</p>
+          <h1 className="text-2xl font-black">{t('No dashboard permissions')}</h1>
+          <p className="mt-3 text-sm" style={{ color: 'var(--muted-foreground)' }}>{t('Ask the organizer owner to assign you a role with dashboard access.')}</p>
         </div>
       </div>
     )
@@ -1387,30 +1391,30 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
           {section === 'overview' && <section className="organizer-overview-page space-y-7">
             <header className="organizer-analytics-page-heading organizer-orders-heading organizer-dashboard-overview-heading">
-              <div className="organizer-analytics-title-block"><h3>Overview</h3><p>Your workspace at a glance—events, ticket sales, and recent activity.</p></div>
-              <div className="organizer-orders-heading-meta"><span className="organizer-finance-live-dot" />{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : 'Loading workspace activity'}</div>
+              <div className="organizer-analytics-title-block"><h3>{t('Overview')}</h3><p>{t('Your workspace at a glance—events, ticket sales, and recent activity.')}</p></div>
+              <div className="organizer-orders-heading-meta"><span className="organizer-finance-live-dot" />{lastUpdated ? t('Updated {{time}}', { time: lastUpdated.toLocaleTimeString() }) : t('Loading workspace activity')}</div>
             </header>
             <div className="organizer-overview-stat-grid">
-              <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><TicketCheck size={17} strokeWidth={1.8} /></span><small>Tickets sold</small><strong>{canViewOverviewAnalytics ? totalTicketsSold.toLocaleString() : '—'}</strong><span>{canViewOverviewAnalytics ? `${overviewTicketsRemaining.toLocaleString()} still available` : 'Analytics access required'}</span></article>
-              <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><CalendarDays size={17} strokeWidth={1.8} /></span><small>Published events</small><strong>{canViewEvents ? publishedEvents : '—'}</strong><span>{canViewEvents ? `${events.length} total in your workspace` : 'Event access required'}</span></article>
-              <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><CircleDollarSign size={17} strokeWidth={1.8} /></span><small>Net ticket revenue</small><strong>{canViewOverviewAnalytics || canAccessSection('transactions') ? formatPrice(totalRevenue) : '—'}</strong><span>{canViewOverviewAnalytics || canAccessSection('transactions') ? 'From confirmed ticket orders' : 'Finance access required'}</span></article>
-              <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><UsersRound size={17} strokeWidth={1.8} /></span><small>Customers</small><strong>{canViewOverviewCustomers ? customers.length.toLocaleString() : '—'}</strong><span>{canViewOverviewCustomers ? `${orders.length.toLocaleString()} orders recorded` : 'Customer access required'}</span></article>
+              <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><TicketCheck size={17} strokeWidth={1.8} /></span><small>{t('Tickets sold')}</small><strong>{canViewOverviewAnalytics ? totalTicketsSold.toLocaleString() : '—'}</strong><span>{canViewOverviewAnalytics ? t('{{count}} still available', { count: overviewTicketsRemaining.toLocaleString() }) : t('Analytics access required')}</span></article>
+              <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><CalendarDays size={17} strokeWidth={1.8} /></span><small>{t('Published events')}</small><strong>{canViewEvents ? publishedEvents : '—'}</strong><span>{canViewEvents ? t('{{count}} total in your workspace', { count: events.length }) : t('Event access required')}</span></article>
+              <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><CircleDollarSign size={17} strokeWidth={1.8} /></span><small>{t('Net ticket revenue')}</small><strong>{canViewOverviewAnalytics || canAccessSection('transactions') ? formatPrice(totalRevenue) : '—'}</strong><span>{canViewOverviewAnalytics || canAccessSection('transactions') ? t('From confirmed ticket orders') : t('Finance access required')}</span></article>
+              <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><UsersRound size={17} strokeWidth={1.8} /></span><small>{t('Customers')}</small><strong>{canViewOverviewCustomers ? customers.length.toLocaleString() : '—'}</strong><span>{canViewOverviewCustomers ? t('{{count}} orders recorded', { count: orders.length.toLocaleString() }) : t('Customer access required')}</span></article>
             </div>
 
             <div className="organizer-overview-feature-grid">
               <div className="organizer-overview-feature-left">
-              <section className="organizer-overview-wallet-banner" aria-label="Wallet overview">
+              <section className="organizer-overview-wallet-banner" aria-label={t('Wallet overview')}>
                 <div className="organizer-overview-wallet-top">
-                  <span className="organizer-overview-wallet-brand"><span className="organizer-overview-wallet-mark">Q</span><span>QPassa wallet</span></span>
+                  <span className="organizer-overview-wallet-brand"><span className="organizer-overview-wallet-mark">Q</span><span>{t('QPassa wallet')}</span></span>
                   <Wallet size={19} strokeWidth={1.7} aria-hidden="true" />
                 </div>
                 <div className="organizer-overview-wallet-balance">
-                  <small>Available balance</small>
-                  <strong>{isOwner ? formatPrice(availablePayoutBalance) : 'Owner-managed'}</strong>
+                  <small>{t('Available balance')}</small>
+                  <strong>{isOwner ? formatPrice(availablePayoutBalance) : t('Owner-managed')}</strong>
                 </div>
                 <div className="organizer-overview-wallet-footer">
-                  <span>{isOwner ? 'Ready for your next payout' : 'Wallet access is managed by the owner'}</span>
-                  {isOwner && <button type="button" onClick={() => selectSection('payouts')} className="organizer-overview-wallet-action">Open wallet <ArrowUpRight size={15} /></button>}
+                  <span>{isOwner ? t('Ready for your next payout') : t('Wallet access is managed by the owner')}</span>
+                  {isOwner && <button type="button" onClick={() => selectSection('payouts')} className="organizer-overview-wallet-action">{t('Open wallet')} <ArrowUpRight size={15} /></button>}
                 </div>
               </section>
 
@@ -1421,33 +1425,33 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
               >
                 {nextPublishedEvent?.cover_image && <img className="organizer-overview-next-event-cover" src={nextPublishedEvent.cover_image} alt="" />}
                 <span className="organizer-overview-next-event-copy">
-                  <strong>{nextPublishedEvent?.title ?? 'Make your next event happen'}</strong>
-                  <small>{nextPublishedEvent ? `${new Date(nextPublishedEvent.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${nextPublishedEvent.venue}` : 'Create an event and start selling tickets.'}</small>
+                  <strong>{nextPublishedEvent?.title ?? t('Make your next event happen')}</strong>
+                  <small>{nextPublishedEvent ? `${new Date(nextPublishedEvent.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${nextPublishedEvent.venue}` : t('Create an event and start selling tickets.')}</small>
                 </span>
-                <span className="organizer-overview-next-event-action">{nextPublishedEvent ? 'View event' : 'Create event'} <ArrowUpRight size={15} /></span>
+                <span className="organizer-overview-next-event-action">{nextPublishedEvent ? t('View event') : t('Create event')} <ArrowUpRight size={15} /></span>
               </button>
 
-              <section className="organizer-overview-quick-actions" aria-label="Quick actions">
-                <div className="organizer-overview-quick-heading"><p className="organizer-overview-card-kicker">QUICK ACTIONS</p><span>Jump back into your workflow</span></div>
+              <section className="organizer-overview-quick-actions" aria-label={t('Quick actions')}>
+                <div className="organizer-overview-quick-heading"><p className="organizer-overview-card-kicker">{t('QUICK ACTIONS')}</p><span>{t('Jump back into your workflow')}</span></div>
                 <div className="organizer-overview-quick-grid">
                   {canAccessSection('events') && <button type="button" onClick={openCreateEvent}>
                     <span className="organizer-overview-quick-icon"><CalendarPlus size={17} /></span>
-                    <span><strong>Create an event</strong><small>Set up your next experience</small></span>
+                    <span><strong>{t('Create an event')}</strong><small>{t('Set up your next experience')}</small></span>
                     <ArrowUpRight size={16} />
                   </button>}
                   {canAccessSection('events') && <button type="button" onClick={() => selectSection('events')}>
                     <span className="organizer-overview-quick-icon"><CalendarDays size={17} /></span>
-                    <span><strong>Manage events</strong><small>Update listings and tickets</small></span>
+                    <span><strong>{t('Manage events')}</strong><small>{t('Update listings and tickets')}</small></span>
                     <ArrowUpRight size={16} />
                   </button>}
                   {canAccessSection('orders') && <button type="button" onClick={() => selectSection('orders')}>
                     <span className="organizer-overview-quick-icon"><ClipboardList size={17} /></span>
-                    <span><strong>Review orders</strong><small>Check recent ticket sales</small></span>
+                    <span><strong>{t('Review orders')}</strong><small>{t('Check recent ticket sales')}</small></span>
                     <ArrowUpRight size={16} />
                   </button>}
                   {canViewOverviewAnalytics && <button type="button" onClick={() => selectSection('analytics')}>
                     <span className="organizer-overview-quick-icon"><ChartNoAxesCombined size={17} /></span>
-                    <span><strong>View analytics</strong><small>Track revenue and attendance</small></span>
+                    <span><strong>{t('View analytics')}</strong><small>{t('Track revenue and attendance')}</small></span>
                     <ArrowUpRight size={16} />
                   </button>}
                 </div>
@@ -1455,33 +1459,33 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
               </div>
 
               <div className="organizer-overview-calendar-column">
-              <section className="organizer-overview-calendar" aria-label="Event calendar">
+              <section className="organizer-overview-calendar" aria-label={t('Event calendar')}>
                 <div className="organizer-overview-calendar-heading">
-                  <button type="button" aria-label="Previous month" onClick={() => setOverviewCalendarMonth(month => new Date(month.getFullYear(), month.getMonth() - 1, 1))}><ChevronLeft size={17} /></button>
-                  <h3>{overviewCalendarMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</h3>
-                  <button type="button" aria-label="Next month" onClick={() => setOverviewCalendarMonth(month => new Date(month.getFullYear(), month.getMonth() + 1, 1))}><ChevronRight size={17} /></button>
+                  <button type="button" aria-label={t('Previous month')} onClick={() => setOverviewCalendarMonth(month => new Date(month.getFullYear(), month.getMonth() - 1, 1))}><ChevronLeft size={17} /></button>
+                  <h3>{formatLocaleDate(overviewCalendarMonth, { month: 'long', year: 'numeric' })}</h3>
+                  <button type="button" aria-label={t('Next month')} onClick={() => setOverviewCalendarMonth(month => new Date(month.getFullYear(), month.getMonth() + 1, 1))}><ChevronRight size={17} /></button>
                 </div>
-                <div className="organizer-overview-calendar-grid" role="grid" aria-label={overviewCalendarMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}>
-                  {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((day, index) => <span className="organizer-overview-calendar-weekday" key={`${day}-${index}`} role="columnheader">{day}</span>)}
+                <div className="organizer-overview-calendar-grid" role="grid" aria-label={formatLocaleDate(overviewCalendarMonth, { month: 'long', year: 'numeric' })}>
+                  {overviewCalendarWeekdays.map((day, index) => <span className="organizer-overview-calendar-weekday" key={`${day}-${index}`} role="columnheader">{day}</span>)}
                   {overviewCalendarCells.map(({ day, date, inMonth }) => {
                     const dateKey = localDateKey(date)
                     const hasEvents = overviewCalendarEventDays.has(dateKey)
-                    return <button key={dateKey} type="button" role="gridcell" aria-label={`${date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}${hasEvents ? ', events scheduled' : ''}`} aria-pressed={overviewCalendarDate === dateKey} data-today={dateKey === localDateKey(new Date()) || undefined} data-has-events={hasEvents || undefined} data-in-month={inMonth || undefined} onClick={() => { setOverviewCalendarDate(dateKey); if (!inMonth) setOverviewCalendarMonth(new Date(date.getFullYear(), date.getMonth(), 1)) }}>{day}{hasEvents && <i />}</button>
+                    return <button key={dateKey} type="button" role="gridcell" aria-label={`${formatLocaleDate(date, { month: 'long', day: 'numeric' })}${hasEvents ? `, ${t('events scheduled')}` : ''}`} aria-pressed={overviewCalendarDate === dateKey} data-today={dateKey === localDateKey(new Date()) || undefined} data-has-events={hasEvents || undefined} data-in-month={inMonth || undefined} onClick={() => { setOverviewCalendarDate(dateKey); if (!inMonth) setOverviewCalendarMonth(new Date(date.getFullYear(), date.getMonth(), 1)) }}>{day}{hasEvents && <i />}</button>
                   })}
                 </div>
                 <div className="organizer-overview-calendar-agenda">
-                  <strong>Upcoming events</strong>
+                  <strong>{t('Upcoming events')}</strong>
                   {overviewCalendarUpcomingEvents.length ? (
                     overviewCalendarUpcomingEvents.slice(0, 1).map(event => (
                       <button key={event.id} type="button" onClick={() => openEventView(event)}>
                         <span>
                           <strong>{event.title}</strong>
-                          <small>{new Date(`${event.date.slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</small>
+                          <small>{formatLocaleDate(new Date(`${event.date.slice(0, 10)}T00:00:00`), { weekday: 'short', month: 'short', day: 'numeric' })}</small>
                         </span>
                         <ArrowUpRight size={13} />
                       </button>
                     ))
-                  ) : <span>No upcoming events</span>}
+                  ) : <span>{t('No upcoming events')}</span>}
                 </div>
               </section>
               </div>
@@ -1489,12 +1493,12 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
             <div className="organizer-overview-bottom-grid">
               <section className="organizer-overview-panel">
-                <div className="organizer-overview-panel-heading"><div><p className="organizer-overview-card-kicker">YOUR WORKSPACE</p><h4>Pick up where you left off</h4></div><button type="button" onClick={() => selectSection('events')} aria-label="View all events"><ArrowUpRight size={17} /></button></div>
-                {events.slice(0, 3).length ? <div className="organizer-overview-event-list">{events.slice(0, 3).map(event => <button key={event.id} type="button" onClick={() => openEventView(event)}><span className="organizer-overview-event-thumb">{event.cover_image ? <img src={event.cover_image} alt="" /> : <CalendarDays size={18} />}</span><span className="min-w-0 flex-1"><strong>{event.title}</strong><small>{new Date(event.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} · {event.venue}</small></span><Badge className="organizer-overview-list-badge" label={event.status} color={STATUS_COLORS[event.status] ?? '#888'} /><ChevronRight size={15} /></button>)}</div> : <div className="organizer-overview-empty"><p>No events yet—your first one can start today.</p><button type="button" onClick={openCreateEvent}>Create event <Plus size={15} /></button></div>}
+                <div className="organizer-overview-panel-heading"><div><p className="organizer-overview-card-kicker">{t('YOUR WORKSPACE')}</p><h4>{t('Pick up where you left off')}</h4></div><button type="button" onClick={() => selectSection('events')} aria-label={t('View all events')}><ArrowUpRight size={17} /></button></div>
+                {events.slice(0, 3).length ? <div className="organizer-overview-event-list">{events.slice(0, 3).map(event => <button key={event.id} type="button" onClick={() => openEventView(event)}><span className="organizer-overview-event-thumb">{event.cover_image ? <img src={event.cover_image} alt="" /> : <CalendarDays size={18} />}</span><span className="min-w-0 flex-1"><strong>{event.title}</strong><small>{formatLocaleDate(event.date, { month: 'short', day: 'numeric', year: 'numeric' })} · {event.venue}</small></span><Badge className="organizer-overview-list-badge" label={event.status} color={STATUS_COLORS[event.status] ?? '#888'} /><ChevronRight size={15} /></button>)}</div> : <div className="organizer-overview-empty"><p>{t('No events yet—your first one can start today.')}</p><button type="button" onClick={openCreateEvent}>{t('Create event')} <Plus size={15} /></button></div>}
               </section>
               {canViewOverviewOrders && <section className="organizer-overview-panel organizer-overview-orders-panel">
-                <div className="organizer-overview-panel-heading"><div><p className="organizer-overview-card-kicker">RECENT ACTIVITY</p><h4>Latest orders</h4></div><button type="button" onClick={() => selectSection('orders')} aria-label="View all orders"><ArrowUpRight size={17} /></button></div>
-                {orders.slice(0, 3).length ? <div className="organizer-overview-order-list">{orders.slice(0, 3).map(order => <button type="button" key={order.id} onClick={() => { selectSection('orders'); setSelectedOrder(order) }}><span className="organizer-overview-order-icon"><TicketCheck size={16} /></span><span className="min-w-0 flex-1"><strong>{(order as any).profiles?.full_name ?? 'Ticket buyer'}</strong><small>{(order as any).events?.title ?? 'Event ticket'} · {new Date(order.created_at).toLocaleDateString()}</small></span><span className="organizer-overview-order-total">{formatPrice(order.total)}</span></button>)}</div> : <div className="organizer-overview-empty"><p>New ticket orders will show up here.</p><button type="button" onClick={() => selectSection('events')}>Explore events <ArrowUpRight size={15} /></button></div>}
+                <div className="organizer-overview-panel-heading"><div><p className="organizer-overview-card-kicker">{t('RECENT ACTIVITY')}</p><h4>{t('Latest orders')}</h4></div><button type="button" onClick={() => selectSection('orders')} aria-label={t('View all orders')}><ArrowUpRight size={17} /></button></div>
+                {orders.slice(0, 3).length ? <div className="organizer-overview-order-list">{orders.slice(0, 3).map(order => <button type="button" key={order.id} onClick={() => { selectSection('orders'); setSelectedOrder(order) }}><span className="organizer-overview-order-icon"><TicketCheck size={16} /></span><span className="min-w-0 flex-1"><strong>{(order as any).profiles?.full_name ?? t('Ticket buyer')}</strong><small>{(order as any).events?.title ?? t('Event ticket')} · {new Date(order.created_at).toLocaleDateString()}</small></span><span className="organizer-overview-order-total">{formatPrice(order.total)}</span></button>)}</div> : <div className="organizer-overview-empty"><p>{t('New ticket orders will show up here.')}</p><button type="button" onClick={() => selectSection('events')}>{t('Explore events')} <ArrowUpRight size={15} /></button></div>}
               </section>}
             </div>
           </section>}
@@ -1644,14 +1648,14 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
                     <section className="organizer-analytics-surface organizer-analytics-insight-card organizer-analytics-event-table organizer-analytics-bottom-card rounded-2xl p-5" aria-labelledby="analytics-event-performance-title">
                       <div className="organizer-analytics-card-heading mb-5 flex items-center justify-between gap-3">
-                        <div><h2 id="analytics-event-performance-title" className="font-bold">Event performance</h2><p>Revenue by event · sales and capacity</p></div>
+                        <div><h2 id="analytics-event-performance-title" className="font-bold">{t('Event performance')}</h2><p>{t('Revenue by event')} · {t('sales and capacity')}</p></div>
                         <BarChartIcon size={17} aria-hidden="true" />
                       </div>
                       <div className="overflow-x-auto">
-                        <table aria-label="Event status, date, ticket sales, and revenue for the selected period" className="organizer-dashboard-event-performance-table organizer-analytics-premium-table organizer-analytics-insight-table organizer-analytics-bottom-table w-full text-sm">
+                        <table aria-label={t('Event status, date, ticket sales, and revenue for the selected period')} className="organizer-dashboard-event-performance-table organizer-analytics-premium-table organizer-analytics-insight-table organizer-analytics-bottom-table w-full text-sm">
                         <thead>
                           <tr>
-                            {['Event', 'Status', 'Event date', 'Tickets sold', 'Revenue'].map(h => (
+                            {[t('Event'), t('Status'), t('Event date'), t('Tickets sold'), t('Revenue')].map(h => (
                               <th key={h} scope="col" className="text-left px-5 py-3 text-xs font-semibold">{h}</th>
                             ))}
                           </tr>
@@ -1663,16 +1667,16 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                             const soldPercent = capacity > 0 ? Math.min((performance.tickets / capacity) * 100, 100) : 0
                             return (
                               <tr key={ev.id} className="organizer-analytics-table-row border-t" style={{ borderColor: 'var(--border)' }}>
-                                <td className="organizer-analytics-event-name px-5 py-3"><span className="organizer-analytics-event-mark"><CalendarDays size={15} /></span><span><strong>{ev.title}</strong><small>{ev.venue || 'Venue not set'}</small></span></td>
+                                <td className="organizer-analytics-event-name px-5 py-3"><span className="organizer-analytics-event-mark"><CalendarDays size={15} /></span><span><strong>{ev.title}</strong><small>{ev.venue || t('Venue not set')}</small></span></td>
                                 <td className="px-5 py-3"><Badge className="organizer-analytics-status-badge" label={ev.status} color={STATUS_COLORS[ev.status] ?? '#888'} /></td>
                                 <td className="px-5 py-3"><span className="organizer-analytics-date-cell">{new Date(ev.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span></td>
-                                <td className="organizer-analytics-capacity-cell px-5 py-3"><span><strong>{performance.tickets.toLocaleString()}</strong><small>{capacity > 0 ? `of ${capacity.toLocaleString()}` : 'tickets sold'}</small></span><i role="progressbar" aria-label={`${ev.title} capacity sold`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(soldPercent)}><b style={{ width: `${soldPercent}%` }} /></i></td>
-                                <td className="organizer-analytics-revenue-cell px-5 py-3"><strong>{formatPrice(performance.revenue)}</strong><small>Net ticket sales</small></td>
+                                <td className="organizer-analytics-capacity-cell px-5 py-3"><span><strong>{performance.tickets.toLocaleString()}</strong><small>{capacity > 0 ? `${t('of')} ${capacity.toLocaleString()}` : t('tickets sold')}</small></span><i role="progressbar" aria-label={`${ev.title} ${t('capacity sold')}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(soldPercent)}><b style={{ width: `${soldPercent}%` }} /></i></td>
+                                <td className="organizer-analytics-revenue-cell px-5 py-3"><strong>{formatPrice(performance.revenue)}</strong><small>{t('Net ticket sales')}</small></td>
                               </tr>
                             )
                           })}
                           {events.length === 0 && (
-                            <tr><td colSpan={5} className="organizer-analytics-empty-table px-5 py-12 text-center"><span><CalendarDays size={18} /></span><strong>No events to report yet</strong><small>Create an event to see performance metrics here.</small></td></tr>
+                            <tr><td colSpan={5} className="organizer-analytics-empty-table px-5 py-12 text-center"><span><CalendarDays size={18} /></span><strong>{t('No events to report yet')}</strong><small>{t('Create an event to see performance metrics here.')}</small></td></tr>
                           )}
                         </tbody>
                       </table>
@@ -1686,32 +1690,32 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
               {section === 'notifications' && (
                 <div className="organizer-notifications-page organizer-analytics-page space-y-5">
                   <header className="organizer-analytics-page-heading organizer-orders-heading organizer-notifications-heading">
-                    <div className="organizer-analytics-title-block"><h3>Notifications</h3><p>Sales, event changes, followers, and team activity across your workspace.</p></div>
-                    {unreadOrganizerNotifications.length > 0 && <button type="button" onClick={() => void markAllOrganizerNotificationsRead()} className="organizer-orders-export"><CheckIcon size={14} />Mark all read</button>}
+                    <div className="organizer-analytics-title-block"><h3>{t('Notifications')}</h3><p>{t('Sales, event changes, followers, and team activity across your workspace.')}</p></div>
+                    {unreadOrganizerNotifications.length > 0 && <button type="button" onClick={() => void markAllOrganizerNotificationsRead()} className="organizer-orders-export"><CheckIcon size={14} />{t('Mark all read')}</button>}
                   </header>
 
                   <div className="organizer-notifications-stat-grid grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><Bell size={17} /></span><small>Total updates</small><strong>{organizerNotifications.length.toLocaleString()}</strong><span>Across this workspace</span></article>
-                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><Shield size={17} /></span><small>Unread</small><strong>{unreadOrganizerNotifications.length.toLocaleString()}</strong><span>Waiting for your review</span></article>
-                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><CalendarDays size={17} /></span><small>Event updates</small><strong>{organizerNotifications.filter(notification => notification.type === 'event' || !!notification.event_id).length.toLocaleString()}</strong><span>Listings and event activity</span></article>
-                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><UsersRound size={17} /></span><small>Followers</small><strong>{organizerNotifications.filter(notification => notification.type === 'follower').length.toLocaleString()}</strong><span>Community activity</span></article>
+                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><Bell size={17} /></span><small>{t('Total updates')}</small><strong>{organizerNotifications.length.toLocaleString()}</strong><span>{t('Across this workspace')}</span></article>
+                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><Shield size={17} /></span><small>{t('Unread')}</small><strong>{unreadOrganizerNotifications.length.toLocaleString()}</strong><span>{t('Waiting for your review')}</span></article>
+                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><CalendarDays size={17} /></span><small>{t('Event updates')}</small><strong>{organizerNotifications.filter(notification => notification.type === 'event' || !!notification.event_id).length.toLocaleString()}</strong><span>{t('Listings and event activity')}</span></article>
+                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><UsersRound size={17} /></span><small>{t('Followers')}</small><strong>{organizerNotifications.filter(notification => notification.type === 'follower').length.toLocaleString()}</strong><span>{t('Community activity')}</span></article>
                   </div>
 
                   <section className="organizer-orders-panel organizer-notifications-panel">
                     <div className="organizer-orders-toolbar">
-                      <div className="organizer-notifications-panel-heading"><strong>Recent activity</strong><small>{filteredOrganizerNotifications.length} update{filteredOrganizerNotifications.length === 1 ? '' : 's'} in this view</small></div>
-                      <span className="organizer-notifications-panel-total">{unreadOrganizerNotifications.length} unread</span>
+                      <div className="organizer-notifications-panel-heading"><strong>{t('Recent activity')}</strong><small>{filteredOrganizerNotifications.length} {t('update')}{filteredOrganizerNotifications.length === 1 ? '' : 's'} {t('in this view')}</small></div>
+                      <span className="organizer-notifications-panel-total">{unreadOrganizerNotifications.length} {t('unread')}</span>
                     </div>
-                    <div className="organizer-orders-status-filters organizer-notifications-filters" role="group" aria-label="Filter notifications">
-                      {([['all', 'All updates'], ['unread', 'Unread'], ['events', 'Events'], ['sales', 'Sales'], ['followers', 'Followers'], ['team', 'Team']] as const).map(([key, label]) => <button key={key} type="button" onClick={() => setNotificationFilter(key)} aria-pressed={notificationFilter === key}>{label}</button>)}
+                    <div className="organizer-orders-status-filters organizer-notifications-filters" role="group" aria-label={t('Filter notifications')}>
+                      {([['all', t('All updates')], ['unread', t('Unread')], ['events', t('Events')], ['sales', t('Sales')], ['followers', t('Followers')], ['team', t('Team')]] as const).map(([key, label]) => <button key={key} type="button" onClick={() => setNotificationFilter(key)} aria-pressed={notificationFilter === key}>{label}</button>)}
                     </div>
-                    {filteredOrganizerNotifications.length === 0 ? <div className="organizer-orders-empty organizer-notifications-empty"><span><Bell size={20} /></span><strong>Nothing here yet</strong><small>New organizer activity will appear here.</small></div> : <div className="organizer-notifications-list">{filteredOrganizerNotifications.map(notification => {
+                    {filteredOrganizerNotifications.length === 0 ? <div className="organizer-orders-empty organizer-notifications-empty"><span><Bell size={20} /></span><strong>{t('Nothing here yet')}</strong><small>{t('New organizer activity will appear here.')}</small></div> : <div className="organizer-notifications-list">{filteredOrganizerNotifications.map(notification => {
                       const title = notification.title.toLowerCase()
                       const NotificationIcon = notification.type === 'payment' || title.includes('order') || title.includes('ticket') ? DollarSignIcon : notification.type === 'follower' ? UserIcon : notification.type === 'team' || title.includes('member') || title.includes('role') ? UsersIcon : notification.type === 'event' || notification.event_id ? CalendarIcon : BellIcon
                       return <button key={notification.id} type="button" onClick={() => void openOrganizerNotification(notification)} className={`organizer-notification-row ${notification.read_at ? '' : 'is-unread'}`}>
                         <span className="organizer-notification-icon"><NotificationIcon size={17} /></span>
                         <span className="organizer-notification-copy"><span className="organizer-notification-title">{notification.title}</span><span className="organizer-notification-body">{notification.body}</span><span className="organizer-notification-time">{new Date(notification.created_at).toLocaleString()}</span></span>
-                        {!notification.read_at && <span className="organizer-notification-unread-dot" aria-label="Unread" />}
+                        {!notification.read_at && <span className="organizer-notification-unread-dot" aria-label={t('Unread')} />}
                       </button>
                     })}</div>}
                   </section>
@@ -1741,18 +1745,18 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                 /> :
                 <section className="organizer-events-page">
                   <header className="organizer-analytics-page-heading organizer-orders-heading organizer-events-heading">
-                    <div className="organizer-analytics-title-block"><h3>Events</h3><p>Manage event listings, ticket inventory, and event status.</p></div>
-                    <div className="organizer-events-header-actions"><button type="button" className="organizer-events-create" onClick={openCreateEvent}><Plus size={17} />Create event</button><div className="organizer-orders-heading-meta"><span className="organizer-finance-live-dot" />{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : 'Loading event activity'}</div></div>
+                    <div className="organizer-analytics-title-block"><h3>{t('Events')}</h3><p>{t('Manage event listings, ticket inventory, and event status.')}</p></div>
+                    <div className="organizer-events-header-actions"><button type="button" className="organizer-events-create" onClick={openCreateEvent}><Plus size={17} />{t('Create event')}</button><div className="organizer-orders-heading-meta"><span className="organizer-finance-live-dot" />{lastUpdated ? `${t('Updated')} ${lastUpdated.toLocaleTimeString()}` : t('Loading event activity')}</div></div>
                   </header>
 
                   <div className="organizer-overview-stat-grid organizer-events-stat-grid">
-                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><CalendarDays size={17} strokeWidth={1.8} /></span><small>Total events</small><strong>{events.length.toLocaleString()}</strong><span>In your workspace</span></article>
-                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><TicketCheck size={17} strokeWidth={1.8} /></span><small>Published</small><strong>{publishedEvents.toLocaleString()}</strong><span>Currently live</span></article>
-                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><UsersRound size={17} strokeWidth={1.8} /></span><small>Tickets sold</small><strong>{totalTicketsSold.toLocaleString()}</strong><span>From confirmed orders</span></article>
-                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><TicketCheck size={17} strokeWidth={1.8} /></span><small>Tickets available</small><strong>{overviewTicketsRemaining.toLocaleString()}</strong><span>Across all events</span></article>
+                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><CalendarDays size={17} strokeWidth={1.8} /></span><small>{t('Total events')}</small><strong>{events.length.toLocaleString()}</strong><span>{t('In your workspace')}</span></article>
+                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><TicketCheck size={17} strokeWidth={1.8} /></span><small>{t('Published')}</small><strong>{publishedEvents.toLocaleString()}</strong><span>{t('Currently live')}</span></article>
+                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><UsersRound size={17} strokeWidth={1.8} /></span><small>{t('Tickets sold')}</small><strong>{totalTicketsSold.toLocaleString()}</strong><span>{t('From confirmed orders')}</span></article>
+                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><TicketCheck size={17} strokeWidth={1.8} /></span><small>{t('Tickets available')}</small><strong>{overviewTicketsRemaining.toLocaleString()}</strong><span>{t('Across all events')}</span></article>
                   </div>
 
-                  <div className="organizer-events-tabs" role="tablist" aria-label="Filter events by status">
+                  <div className="organizer-events-tabs" role="tablist" aria-label={t('Filter events by status')}>
                     {eventFilterTabs.map(tab => {
                       const count = tab.key === 'all' ? events.length : events.filter(event => getEventListStatus(event) === tab.key).length
                       return <button key={tab.key} type="button" role="tab" aria-selected={eventsFilter === tab.key} onClick={() => setEventsFilter(tab.key)}>
@@ -1762,15 +1766,15 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                   </div>
 
                   <div className="organizer-events-toolbar">
-                    <label className="organizer-events-search"><Search size={17} aria-hidden="true" /><input type="search" value={eventsSearch} onChange={event => setEventsSearch(event.target.value)} placeholder="Search by event title…" aria-label="Search events by title" /></label>
-                    <label className="organizer-events-category"><Filter size={15} aria-hidden="true" /><select value={eventsCategory} onChange={event => setEventsCategory(event.target.value)} aria-label="Filter by category"><option value="all">All categories</option>{eventCategories.map(category => <option key={category} value={category}>{category}</option>)}</select></label>
-                    <span className="organizer-events-result-count">{filteredEvents.length} shown</span>
+                    <label className="organizer-events-search"><Search size={17} aria-hidden="true" /><input type="search" value={eventsSearch} onChange={event => setEventsSearch(event.target.value)} placeholder={t('Search by event title…')} aria-label={t('Search events by title')} /></label>
+                    <label className="organizer-events-category"><Filter size={15} aria-hidden="true" /><select value={eventsCategory} onChange={event => setEventsCategory(event.target.value)} aria-label={t('Filter by category')}><option value="all">{t('All categories')}</option>{eventCategories.map(category => <option key={category} value={category}>{category}</option>)}</select></label>
+                    <span className="organizer-events-result-count">{filteredEvents.length} {t('shown')}</span>
                   </div>
 
                   {filteredEvents.length === 0 ? <div className="organizer-events-empty">
-                    <span><CalendarDays size={23} /></span><h2>{events.length ? 'No events match these filters' : 'Your next event starts here'}</h2>
-                    <p>{events.length ? 'Try another status, category, or search term.' : 'Create an event page and bring your next experience to life.'}</p>
-                    <button type="button" onClick={() => events.length ? (setEventsFilter('all'), setEventsCategory('all'), setEventsSearch(''), setDashboardSearch('')) : openCreateEvent()}>{events.length ? 'Clear filters' : 'Create your first event'} <ArrowUpRight size={15} /></button>
+                    <span><CalendarDays size={23} /></span><h2>{events.length ? t('No events match these filters') : t('Your next event starts here')}</h2>
+                    <p>{events.length ? t('Try another status, category, or search term.') : t('Create an event page and bring your next experience to life.')}</p>
+                    <button type="button" onClick={() => events.length ? (setEventsFilter('all'), setEventsCategory('all'), setEventsSearch(''), setDashboardSearch('')) : openCreateEvent()}>{events.length ? t('Clear filters') : t('Create your first event')} <ArrowUpRight size={15} /></button>
                   </div> : <div className="organizer-events-grid">
                     {filteredEvents.map(ev => {
                       const sold = ev.ticket_tiers?.reduce((sum, tier) => sum + tier.sold, 0) ?? 0
@@ -2785,38 +2789,38 @@ function CreateEventPage({ orgId, event, onClose, onCreated }: { orgId: string; 
           </>}
 
           {step === 2 && <>
-          <div className="organizer-event-wizard-section-heading"><span>02</span><div><h3>Set up your tickets</h3><p>Add ticket options, prices and quantities. Your total inventory must fit the event capacity.</p></div></div>
-          <div className="organizer-event-wizard-capacity"><span className="organizer-event-wizard-capacity-icon"><TicketCheck size={17} /></span><span>Event capacity</span><strong>{(Number.parseInt(form.capacity, 10) || 0).toLocaleString()}</strong><small>tickets available across all ticket types</small></div>
+          <div className="organizer-event-wizard-section-heading"><span>02</span><div><h3>{t('Set up your tickets')}</h3><p>{t('Add ticket options, prices and quantities. Your total inventory must fit the event capacity.')}</p></div></div>
+          <div className="organizer-event-wizard-capacity"><span className="organizer-event-wizard-capacity-icon"><TicketCheck size={17} /></span><span>{t('Event capacity')}</span><strong>{(Number.parseInt(form.capacity, 10) || 0).toLocaleString()}</strong><small>{t('tickets available across all ticket types')}</small></div>
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Ticket Tiers</label>
+              <label className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{t('Ticket Tiers')}</label>
               <button type="button" className="organizer-event-add-tier" onClick={() => setTiers(t => [...t, { name: 'VIP', price: '75000', quantity: '100', description: '', ticket_type: 'non_consumable', consumable_amount: '', extra_info: '', expires_at: '', group_size: '1', show_optional_details: false, sold: 0 }])}>
-                <Plus size={14} /> Add ticket tier
+                <Plus size={14} /> {t('Add ticket tier')}
               </button>
             </div>
             {tiers.map((tier, i) => (
               <div key={i} className="organizer-event-wizard-tier mb-3 rounded-xl p-3" style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
-                <input placeholder="Name" value={tier.name} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
+                <input placeholder={t('Name')} value={tier.name} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
                   className="px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} />
-                <div className="flex items-center gap-2"><input type="number" min="0" placeholder="Price BIF" value={tier.price} disabled={tier.price === '0'} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, price: e.target.value } : x))}
-                  className="min-w-0 flex-1 px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} /><label className="flex shrink-0 items-center gap-1 text-[11px]" style={{ color: 'var(--muted-foreground)' }}><input type="checkbox" checked={tier.price === '0'} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, price: e.target.checked ? '0' : '30000' } : x))} /> Free</label></div>
-                <input placeholder="Qty" value={tier.quantity} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, quantity: e.target.value } : x))}
+                <div className="flex items-center gap-2"><input type="number" min="0" placeholder={t('Price BIF')} value={tier.price} disabled={tier.price === '0'} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, price: e.target.value } : x))}
+                  className="min-w-0 flex-1 px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} /><label className="flex shrink-0 items-center gap-1 text-[11px]" style={{ color: 'var(--muted-foreground)' }}><input type="checkbox" checked={tier.price === '0'} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, price: e.target.checked ? '0' : '30000' } : x))} /> {t('Free')}</label></div>
+                <input placeholder={t('Qty')} value={tier.quantity} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, quantity: e.target.value } : x))}
                   className="px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} />
-                <button type="button" onClick={() => setTiers(t => t.filter((_, j) => j !== i))} className="organizer-event-remove-tier" aria-label={`Remove ${tier.name || 'ticket'} tier`} title="Remove ticket tier"><XIcon size={15} /></button>
+                <button type="button" onClick={() => setTiers(t => t.filter((_, j) => j !== i))} className="organizer-event-remove-tier" aria-label={`Remove ${tier.name || 'ticket'} tier`} title={t('Remove ticket tier')}><XIcon size={15} /></button>
                 </div>
-                <input placeholder="Ticket description" value={tier.description} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, description: e.target.value } : x))}
+                <input placeholder={t('Ticket description')} value={tier.description} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, description: e.target.value } : x))}
                   className="mb-2 w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} />
                 <div className="grid grid-cols-2 gap-2">
-                  <div><label className="mb-1 block text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Ticket type</label><select value={tier.ticket_type} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, ticket_type: e.target.value as 'consumable' | 'non_consumable' } : x))} className="w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }}><option value="non_consumable">Non-consumable</option><option value="consumable">Consumable</option></select></div>
-                  {tier.ticket_type === 'consumable' && <div><label className="mb-1 block text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Consumable amount *</label><input type="number" min="1" step="1" placeholder="e.g. 2 drinks" value={tier.consumable_amount} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, consumable_amount: e.target.value } : x))} className="w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} /></div>}
+                  <div><label className="mb-1 block text-[11px]" style={{ color: 'var(--muted-foreground)' }}>{t('Ticket type')}</label><select value={tier.ticket_type} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, ticket_type: e.target.value as 'consumable' | 'non_consumable' } : x))} className="w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }}><option value="non_consumable">{t('Non-consumable')}</option><option value="consumable">{t('Consumable')}</option></select></div>
+                  {tier.ticket_type === 'consumable' && <div><label className="mb-1 block text-[11px]" style={{ color: 'var(--muted-foreground)' }}>{t('Consumable amount *')}</label><input type="number" min="1" step="1" placeholder={t('e.g. 2 drinks')} value={tier.consumable_amount} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, consumable_amount: e.target.value } : x))} className="w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} /></div>}
                 </div>
-                <button type="button" aria-expanded={tier.show_optional_details} onClick={() => setTiers(t => t.map((x, j) => j === i ? { ...x, show_optional_details: !x.show_optional_details } : x))} className="mt-2 text-[11px] font-semibold" style={{ color: 'var(--primary)' }}>{tier.show_optional_details ? 'Hide optional details −' : 'Show optional details +'}</button>
+                <button type="button" aria-expanded={tier.show_optional_details} onClick={() => setTiers(t => t.map((x, j) => j === i ? { ...x, show_optional_details: !x.show_optional_details } : x))} className="mt-2 text-[11px] font-semibold" style={{ color: 'var(--primary)' }}>{tier.show_optional_details ? t('Hide optional details −') : t('Show optional details +')}</button>
                 {tier.show_optional_details && <div className="mt-2 space-y-2 rounded-lg p-2" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                  <textarea placeholder="Extra info (optional)" value={tier.extra_info} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, extra_info: e.target.value } : x))} rows={2} className="w-full resize-none px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} />
+                  <textarea placeholder={t('Extra info (optional)')} value={tier.extra_info} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, extra_info: e.target.value } : x))} rows={2} className="w-full resize-none px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} />
                   <div className="grid grid-cols-2 gap-2">
-                    <div><label className="mb-1 block text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Group size (optional)</label><input type="number" min="1" value={tier.group_size} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, group_size: e.target.value } : x))} className="w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} /><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Tickets issued per purchase.</p></div>
-                    <div><label className="mb-1 block text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Expiry date (optional)</label><input type="date" value={tier.expires_at} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, expires_at: e.target.value } : x))} className="w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} /></div>
+                    <div><label className="mb-1 block text-[11px]" style={{ color: 'var(--muted-foreground)' }}>{t('Group size (optional)')}</label><input type="number" min="1" value={tier.group_size} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, group_size: e.target.value } : x))} className="w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} /><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{t('Tickets issued per purchase.')}</p></div>
+                    <div><label className="mb-1 block text-[11px]" style={{ color: 'var(--muted-foreground)' }}>{t('Expiry date (optional)')}</label><input type="date" value={tier.expires_at} onChange={e => setTiers(t => t.map((x, j) => j === i ? { ...x, expires_at: e.target.value } : x))} className="w-full px-3 py-2 rounded-lg text-xs outline-none" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: '#fff' }} /></div>
                   </div>
                 </div>}
               </div>
@@ -2825,50 +2829,50 @@ function CreateEventPage({ orgId, event, onClose, onCreated }: { orgId: string; 
           </>}
 
           {step === 3 && <>
-            <div className="organizer-event-wizard-section-heading"><span>03</span><div><h3>Review your event</h3><p>Check the details and choose whether to save as a draft or publish.</p></div></div>
+            <div className="organizer-event-wizard-section-heading"><span>03</span><div><h3>{t('Review your event')}</h3><p>{t('Check the details and choose whether to save as a draft or publish.')}</p></div></div>
             <div className="organizer-event-review-layout">
               <section className="organizer-event-review-main">
                 <div className="organizer-event-review-cover" style={{ backgroundImage: (coverPreview || form.cover_image) ? `linear-gradient(0deg, rgba(9,12,16,.9), rgba(9,12,16,.18) 85%), url(${coverPreview || form.cover_image})` : undefined }}>
-                  <span>{form.category}</span><h3>{form.title.trim() || 'Untitled event'}</h3>
-                  <p>{form.date ? formatLocaleDate(`${form.date}T12:00:00`, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'Date to be announced'} · {form.time || 'Time TBA'}</p>
-                  <small>{form.venue || 'Venue to be announced'}{form.city ? ` · ${form.city}` : ''}</small>
+                  <span>{form.category}</span><h3>{form.title.trim() || t('Untitled event')}</h3>
+                  <p>{form.date ? formatLocaleDate(`${form.date}T12:00:00`, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : t('Date to be announced')} · {form.time || t('Time TBA')}</p>
+                  <small>{form.venue || t('Venue to be announced')}{form.city ? ` · ${form.city}` : ''}</small>
                 </div>
                 <div className="organizer-event-review-card">
-                  <h4>Event details</h4>
+                  <h4>{t('Event details')}</h4>
                   <dl>
-                    <div><dt>Date and time</dt><dd>{form.date ? formatLocaleDate(`${form.date}T12:00:00`, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'Date not set'} · {form.time || 'Time TBA'}{form.end_date ? ` – ${formatLocaleDate(`${form.end_date}T12:00:00`, { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}{form.end_time ? `, ${form.end_time}` : ''}</dd></div>
-                    <div><dt>Venue</dt><dd>{form.venue || 'Venue not set'}{form.city ? ` · ${form.city}` : ''}</dd></div>
-                    <div><dt>Category · capacity</dt><dd>{form.category} · {(Number.parseInt(form.capacity, 10) || 0).toLocaleString()} people</dd></div>
-                    {form.tags.trim() && <div><dt>Tags / lineup</dt><dd>{form.tags}</dd></div>}
-                    {form.description.trim() && <div><dt>Description</dt><dd><RichTextContent value={form.description} /></dd></div>}
+                    <div><dt>{t('Date and time')}</dt><dd>{form.date ? formatLocaleDate(`${form.date}T12:00:00`, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : t('Date not set')} · {form.time || t('Time TBA')}{form.end_date ? ` – ${formatLocaleDate(`${form.end_date}T12:00:00`, { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}{form.end_time ? `, ${form.end_time}` : ''}</dd></div>
+                    <div><dt>{t('Venue')}</dt><dd>{form.venue || t('Venue not set')}{form.city ? ` · ${form.city}` : ''}</dd></div>
+                    <div><dt>{t('Category · capacity')}</dt><dd>{form.category} · {(Number.parseInt(form.capacity, 10) || 0).toLocaleString()} {t('people')}</dd></div>
+                    {form.tags.trim() && <div><dt>{t('Tags / lineup')}</dt><dd>{form.tags}</dd></div>}
+                    {form.description.trim() && <div><dt>{t('Description')}</dt><dd><RichTextContent value={form.description} /></dd></div>}
                   </dl>
                 </div>
                 <div className="organizer-event-review-card">
-                  <h4>Policies</h4>
-                  <dl><div><dt>Refund policy</dt><dd><RichTextContent value={form.refund_policy || 'Not specified'} /></dd></div><div><dt>Entry policy</dt><dd><RichTextContent value={form.entry_policy || 'Not specified'} /></dd></div><div><dt>Terms &amp; conditions</dt><dd><RichTextContent value={form.terms_and_conditions || 'Not specified'} /></dd></div></dl>
+                  <h4>{t('Policies')}</h4>
+                  <dl><div><dt>{t('Refund policy')}</dt><dd><RichTextContent value={form.refund_policy || t('Not specified')} /></dd></div><div><dt>{t('Entry policy')}</dt><dd><RichTextContent value={form.entry_policy || t('Not specified')} /></dd></div><div><dt>{t('Terms & conditions')}</dt><dd><RichTextContent value={form.terms_and_conditions || t('Not specified')} /></dd></div></dl>
                 </div>
               </section>
               <section className="organizer-event-review-tickets">
-                <div className="organizer-event-review-tickets-heading"><div><h4>Ticket types</h4><p>{tiers.length} ticket {tiers.length === 1 ? 'type' : 'types'} · {tiers.reduce((total, tier) => total + ((Number.parseInt(tier.quantity, 10) || 0) * (Number.parseInt(tier.group_size, 10) || 1)), 0).toLocaleString()} total tickets</p></div><button type="button" onClick={() => setStep(2)}>Edit</button></div>
-                {tiers.map((tier, index) => <article className="organizer-event-review-ticket" key={`${tier.id ?? tier.name}-${index}`}><div><strong>{tier.name || `Ticket type ${index + 1}`}</strong><small>{tier.ticket_type === 'consumable' ? `Consumable · ${tier.consumable_amount || 0} included` : 'Standard entry'}{(Number.parseInt(tier.group_size, 10) || 1) > 1 ? ` · group of ${tier.group_size}` : ''}</small>{tier.description && <small>{tier.description}</small>}</div><div><b>{Number.parseInt(tier.price, 10) === 0 ? 'Free' : `${(Number.parseInt(tier.price, 10) || 0).toLocaleString()} BIF`}</b><small>{(Number.parseInt(tier.quantity, 10) || 0).toLocaleString()} available</small></div></article>)}
+                <div className="organizer-event-review-tickets-heading"><div><h4>{t('Ticket types')}</h4><p>{tiers.length} {t('ticket')} {tiers.length === 1 ? t('type') : t('types')} · {tiers.reduce((total, tier) => total + ((Number.parseInt(tier.quantity, 10) || 0) * (Number.parseInt(tier.group_size, 10) || 1)), 0).toLocaleString()} {t('total tickets')}</p></div><button type="button" onClick={() => setStep(2)}>{t('Edit')}</button></div>
+                {tiers.map((tier, index) => <article className="organizer-event-review-ticket" key={`${tier.id ?? tier.name}-${index}`}><div><strong>{tier.name || t('Ticket type {{index}}', { index: index + 1 })}</strong><small>{tier.ticket_type === 'consumable' ? `${t('Consumable')} · ${tier.consumable_amount || 0} ${t('included')}` : t('Standard entry')}{(Number.parseInt(tier.group_size, 10) || 1) > 1 ? ` · ${t('group of')} ${tier.group_size}` : ''}</small>{tier.description && <small>{tier.description}</small>}</div><div><b>{Number.parseInt(tier.price, 10) === 0 ? t('Free') : `${(Number.parseInt(tier.price, 10) || 0).toLocaleString()} BIF`}</b><small>{(Number.parseInt(tier.quantity, 10) || 0).toLocaleString()} {t('available')}</small></div></article>)}
               </section>
             </div>
             <div className="organizer-event-review-publish">
-              <label htmlFor="event-publication-status">When you confirm</label>
+              <label htmlFor="event-publication-status">{t('When you confirm')}</label>
               <select id="event-publication-status" value={form.status} onChange={e => f('status', e.target.value)}>
-                <option value="draft">Save as draft — only you can see it</option><option value="published">Publish — make it visible to attendees</option>
-                {event && <><option value="cancelled">Mark as cancelled</option><option value="completed">Mark as completed</option></>}
+                <option value="draft">{t('Save as draft — only you can see it')}</option><option value="published">{t('Publish — make it visible to attendees')}</option>
+                {event && <><option value="cancelled">{t('Mark as cancelled')}</option><option value="completed">{t('Mark as completed')}</option></>}
               </select>
             </div>
           </>}
         </div>
         </div>
         <footer className="organizer-event-wizard-footer">
-          <button type="button" onClick={step === 1 ? onClose : () => { setError(''); setStep(current => Math.max(1, current - 1)) }} disabled={saving} className="organizer-event-wizard-back">{step === 1 ? 'Back to events' : 'Back'}</button>
-          <span>Step {step} of 3</span>
+          <button type="button" onClick={step === 1 ? onClose : () => { setError(''); setStep(current => Math.max(1, current - 1)) }} disabled={saving} className="organizer-event-wizard-back">{step === 1 ? t('Back to events') : t('Back')}</button>
+          <span>{t('Step')} {step} {t('of')} 3</span>
           {step < 3
-            ? <button type="button" onClick={goToNextStep} className="organizer-event-wizard-next">Continue <ArrowRightIcon size={15} /></button>
-            : <button type="button" onClick={handleSubmit} disabled={saving || invalidEventEnd} className="organizer-event-wizard-next" style={{ opacity: saving || invalidEventEnd ? 0.55 : 1 }}>{saving ? (event ? 'Saving…' : 'Creating…') : event ? 'Confirm changes' : form.status === 'published' ? 'Confirm & publish' : 'Confirm & save draft'} <CheckIcon size={15} /></button>}
+            ? <button type="button" onClick={goToNextStep} className="organizer-event-wizard-next">{t('Continue')} <ArrowRightIcon size={15} /></button>
+            : <button type="button" onClick={handleSubmit} disabled={saving || invalidEventEnd} className="organizer-event-wizard-next" style={{ opacity: saving || invalidEventEnd ? 0.55 : 1 }}>{saving ? (event ? t('Saving…') : t('Creating…')) : event ? t('Confirm changes') : form.status === 'published' ? t('Confirm & publish') : t('Confirm & save draft')} <CheckIcon size={15} /></button>}
         </footer>
       </div>
     </section>

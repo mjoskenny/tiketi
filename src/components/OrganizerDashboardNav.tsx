@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import i18n from '../lib/i18n'
+import { LanguageSwitcher } from './LocaleContent'
 import {
   Bell,
   Building2,
@@ -54,6 +56,8 @@ type Props = {
   onNavigate: (page: string, extra?: unknown) => void
   onSignOut: () => void
 }
+
+const t = i18n.t
 
 function ThemeGlyph({ theme }: { theme: 'dark' | 'light' }) {
   return theme === 'dark' ? (
@@ -114,10 +118,10 @@ export default function OrganizerDashboardNav({
 
   return (
     <>
-      {openPanel && <button className="qpassa-nav-dismiss" type="button" aria-label="Close menu" onClick={closePanel} />}
-      <aside className={`qpassa-workspace-sidebar ${isOpen ? 'is-open' : ''}`} aria-label="Organizer workspace">
+      {openPanel && <button className="qpassa-nav-dismiss" type="button" aria-label={t('Close')} onClick={closePanel} />}
+      <aside className={`qpassa-workspace-sidebar ${isOpen ? 'is-open' : ''}`} aria-label={t('Dashboard')}>
         <div className="qpassa-workspace-org-wrap">
-          <button type="button" className="qpassa-workspace-org-switcher" aria-label="Switch organization" aria-expanded={openPanel === 'organizations'} onClick={() => setOpenPanel(value => value === 'organizations' ? null : 'organizations')}>
+          <button type="button" className="qpassa-workspace-org-switcher" aria-label={t('Switch organization')} aria-expanded={openPanel === 'organizations'} onClick={() => setOpenPanel(value => value === 'organizations' ? null : 'organizations')}>
             <span className="qpassa-workspace-org-avatar">
               {organizerOptions.find(option => option.organizer.id === activeOrganizerId)?.organizer.logo_url
                 ? <img src={organizerOptions.find(option => option.organizer.id === activeOrganizerId)?.organizer.logo_url ?? ''} alt="" />
@@ -126,17 +130,20 @@ export default function OrganizerDashboardNav({
             <span className="qpassa-workspace-org-copy"><strong>{organizationName}</strong><small>{organizationRole}</small></span>
             <ChevronsUpDown size={15} strokeWidth={1.8} />
           </button>
-          {openPanel === 'organizations' && <div className="qpassa-workspace-org-menu" role="menu" aria-label="Organizations">
-            <p>Switch organization</p>
+          {openPanel === 'organizations' && <div className="qpassa-workspace-org-menu" role="menu" aria-label={t('Organizations')}>
+            <p>{t('Switch organization')}</p>
             {organizerOptions.map(option => <button key={option.organizer.id} type="button" role="menuitemradio" aria-checked={option.organizer.id === activeOrganizerId} onClick={() => { onSwitchOrganizer(option.organizer.id); closePanel() }}>
               <span className="qpassa-workspace-org-option-avatar">{option.organizer.logo_url ? <img src={option.organizer.logo_url} alt="" /> : <Building2 size={14} />}</span>
               <span>{option.organizer.name}</span>
               {option.organizer.id === activeOrganizerId && <Check size={14} />}
             </button>)}
-            {!organizerOptions.length && <span className="qpassa-workspace-org-empty">No organizations available</span>}
+            {!organizerOptions.length && <span className="qpassa-workspace-org-empty">{t('No organizations available')}</span>}
           </div>}
         </div>
         <nav className="qpassa-workspace-links" aria-label="Organizer dashboard sections">
+          <div className="qpassa-workspace-language-switcher" style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'flex-start' }}>
+            <LanguageSwitcher bare />
+          </div>
           {navGroups.map(group => {
             const groupItems = group.keys.flatMap(key => {
               const item = navItems.find(candidate => candidate.key === key)
@@ -165,66 +172,63 @@ export default function OrganizerDashboardNav({
 
         {canCreateEvent && <div className="qpassa-workspace-create-card">
           <span className="qpassa-workspace-create-mark"><Plus size={15} strokeWidth={2.2} /></span>
-          <strong>Ready to host?</strong>
-          <span>Bring your next event to life.</span>
-          <button type="button" onClick={onCreateEvent}>Create an event <Plus size={13} strokeWidth={2} /></button>
-          <small className="qpassa-workspace-create-context">Organizer dashboard</small>
+          <strong>{t('Ready to host?')}</strong>
+          <span>{t('Bring your next event to life.')}</span>
+          <button type="button" onClick={onCreateEvent}>{t('Create an event')} <Plus size={13} strokeWidth={2} /></button>
+          <small className="qpassa-workspace-create-context">{t('Organizer dashboard')}</small>
         </div>}
 
         <div className="qpassa-workspace-user-wrap">
           {openPanel === 'profile' && <div className="qpassa-workspace-user-menu" role="menu">
             <p title={email}>{email || fullName || organizationName}</p>
-            <button type="button" role="menuitem" onClick={() => { closePanel(); onOpenSettings() }}><UserRoundIcon />Account profile</button>
-            <button type="button" role="menuitem" onClick={() => { closePanel(); onNavigate('organizer-profile') }}><ExternalLink size={15} strokeWidth={1.8} />Organizer profile</button>
-            <button type="button" role="menuitem" onClick={() => { closePanel(); onNavigate('organizer-profile') }}><Eye size={15} strokeWidth={1.8} />View site</button>
-            <button type="button" role="menuitem" onClick={onSignOut} className="is-signout"><LogOut size={15} strokeWidth={1.8} />Sign out</button>
+            <button type="button" role="menuitem" onClick={() => { closePanel(); onOpenSettings() }}><UserRoundIcon />{t('Account profile')}</button>
+            <button type="button" role="menuitem" onClick={() => { closePanel(); onNavigate('organizer-profile') }}><ExternalLink size={15} strokeWidth={1.8} />{t('Organizer profile')}</button>
+            <button type="button" role="menuitem" onClick={() => { closePanel(); onNavigate('organizer-profile') }}><Eye size={15} strokeWidth={1.8} />{t('View site')}</button>
+            <button type="button" role="menuitem" onClick={onSignOut} className="is-signout"><LogOut size={15} strokeWidth={1.8} />{t('Sign out')}</button>
           </div>}
-          <button type="button" className="qpassa-workspace-user" aria-label="Open profile menu" aria-expanded={openPanel === 'profile'} onClick={() => setOpenPanel(value => value === 'profile' ? null : 'profile')}>
+          <button type="button" className="qpassa-workspace-user" aria-label={t('Open profile menu')} aria-expanded={openPanel === 'profile'} onClick={() => setOpenPanel(value => value === 'profile' ? null : 'profile')}>
             <span className="qpassa-workspace-user-avatar">
               {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{(fullName || organizationName || '?').slice(0, 1).toUpperCase()}</span>}
             </span>
-            <span className="qpassa-workspace-user-copy"><strong>{fullName || organizationName}</strong><small>View profile</small></span>
+            <span className="qpassa-workspace-user-copy"><strong>{fullName || organizationName}</strong><small>{t('View profile')}</small></span>
             {openPanel === 'profile' ? <ChevronDown size={15} strokeWidth={1.8} /> : <ChevronRight size={15} strokeWidth={1.8} />}
           </button>
         </div>
       </aside>
 
-      {isOpen && <button type="button" className="qpassa-workspace-backdrop" aria-label="Close sidebar" onClick={onToggle} />}
+      {isOpen && <button type="button" className="qpassa-workspace-backdrop" aria-label={t('Close sidebar')} onClick={onToggle} />}
       <header className={`qpassa-workspace-header ${isOpen ? 'is-sidebar-open' : ''} ${isScrolled ? 'is-scrolled' : ''}`}>
         <div className="qpassa-workspace-header-start">
-          <button type="button" className="qpassa-workspace-menu-button" aria-label={isOpen ? 'Close sidebar' : 'Open sidebar'} onClick={onToggle}>
+          <button type="button" className="qpassa-workspace-menu-button" aria-label={isOpen ? t('Close sidebar') : t('Open sidebar')} onClick={onToggle}>
             {isOpen ? <X size={19} strokeWidth={1.8} /> : <Menu size={19} strokeWidth={1.8} />}
           </button>
           <span className="qpassa-workspace-mobile-brand" aria-label="QPassa">
             <span className="qpassa-workspace-mobile-brand-mark" aria-hidden="true">Q</span>
             <strong>QPassa</strong>
           </span>
-          <div className="qpassa-workspace-header-title">
-            <strong>Overview</strong>
-          </div>
         </div>
         <div className="qpassa-workspace-header-actions">
           <label className="qpassa-workspace-search">
             <Search size={16} strokeWidth={1.8} aria-hidden="true" />
-            <input value={searchValue} onChange={event => onSearchChange(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') onSearch() }} placeholder="Search anything…" aria-label="Search events" />
+            <input value={searchValue} onChange={event => onSearchChange(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') onSearch() }} placeholder={t('Search')} aria-label={t('Search events')} />
             <kbd>↵</kbd>
           </label>
-          {canCreateEvent && <button type="button" className="qpassa-workspace-create" onClick={onCreateEvent}><Plus size={15} strokeWidth={1.9} />New event</button>}
+          {canCreateEvent && <button type="button" className="qpassa-workspace-create" onClick={onCreateEvent}><Plus size={15} strokeWidth={1.9} />{t('Create Event')}</button>}
           <button type="button" className="qpassa-workspace-icon-button" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} onClick={onToggleTheme}><ThemeGlyph theme={theme} /></button>
           <div className="qpassa-workspace-notices">
-            <button type="button" className="qpassa-workspace-icon-button" aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'} aria-expanded={openPanel === 'notifications'} onClick={() => setOpenPanel(value => value === 'notifications' ? null : 'notifications')}>
+            <button type="button" className="qpassa-workspace-icon-button" aria-label={unreadCount ? `${t('Notifications')}, ${unreadCount} ${t('unread')}` : t('Notifications')} aria-expanded={openPanel === 'notifications'} onClick={() => setOpenPanel(value => value === 'notifications' ? null : 'notifications')}>
               <Bell size={17} strokeWidth={1.8} />
               {unreadCount > 0 && <span>{unreadCount > 99 ? '99+' : unreadCount}</span>}
             </button>
             {openPanel === 'notifications' && <div className="qpassa-workspace-notice-menu">
-              <div className="qpassa-workspace-notice-heading"><strong>Notifications</strong><Bell size={15} strokeWidth={1.8} /></div>
+              <div className="qpassa-workspace-notice-heading"><strong>{t('Notifications')}</strong><Bell size={15} strokeWidth={1.8} /></div>
               <div className="qpassa-workspace-notice-list">
                 {notifications.slice(0, 6).map(notification => <button key={notification.id} type="button" onClick={() => { closePanel(); onOpenNotification(notification) }} className={!notification.read_at ? 'is-unread' : ''}>
                   <strong>{notification.title}</strong><span>{notification.body}</span>
                 </button>)}
-                {!notifications.length && <p>No organizer updates yet.</p>}
+                {!notifications.length && <p>{t('No organizer updates yet.')}</p>}
               </div>
-              <button type="button" className="qpassa-workspace-view-notices" onClick={() => { closePanel(); onViewNotifications() }}>View all notifications</button>
+              <button type="button" className="qpassa-workspace-view-notices" onClick={() => { closePanel(); onViewNotifications() }}>{t('View all notifications')}</button>
             </div>}
           </div>
         </div>

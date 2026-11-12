@@ -18,7 +18,7 @@ function formatEventDate(date: string) {
 }
 
 function formatPrice(value: number) {
-  if (!value) return 'Free entry'
+  if (!value) return i18n.t('Free entry')
   return `BIF ${value.toLocaleString()}`
 }
 
@@ -82,7 +82,7 @@ export default function OrganizerProfilePage({ organizer: initialOrganizer, navi
     if (!result.error) {
       setIsFollowing(!isFollowing)
       setFollowerCount(count => Math.max(0, count + (isFollowing ? -1 : 1)))
-    } else setFollowError(result.error.code === '23505' ? 'You are already following this organizer.' : result.error.message)
+    } else setFollowError(result.error.code === '23505' ? i18n.t('You are already following this organizer.') : result.error.message)
     setFollowBusy(false)
   }
 
@@ -151,7 +151,7 @@ export default function OrganizerProfilePage({ organizer: initialOrganizer, navi
     let mounted = true
 
     if (!organizer.id) {
-      setEventsError('This organizer could not be identified.')
+      setEventsError(i18n.t('This organizer could not be identified.'))
       setEventsLoading(false)
       return () => { mounted = false }
     }
@@ -229,59 +229,59 @@ export default function OrganizerProfilePage({ organizer: initialOrganizer, navi
     <main className="sinc-organizer-profile organizer-profile-refresh">
       <section className="sinc-organizer-header">
         <div className="sinc-organizer-cover" style={organizerCover ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.10), rgba(0,0,0,0.65)), url(${organizerCover})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
-          <button type="button" className="sinc-organizer-back" onClick={() => navigate('events')} aria-label="Back to events">
+          <button type="button" className="sinc-organizer-back" onClick={() => navigate('events')} aria-label={i18n.t('Back to events')}>
             <ArrowLeftIcon size={17} />
           </button>
         </div>
         <div className="sinc-organizer-cover-content">
-          <div className="sinc-organizer-avatar"><span className="sinc-organizer-avatar-image">{organizerAvatar ? <img src={organizerAvatar} alt={displayName} /> : initials}</span>{(organizer.verified || organizer.verification_status === 'verified') && <span className="verified-profile-badge sinc-organizer-verified" aria-label="Verified organizer"><CheckIcon size={13} /></span>}</div>
+          <div className="sinc-organizer-avatar"><span className="sinc-organizer-avatar-image">{organizerAvatar ? <img src={organizerAvatar} alt={displayName} /> : initials}</span>{(organizer.verified || organizer.verification_status === 'verified') && <span className="verified-profile-badge sinc-organizer-verified" aria-label={i18n.t('Verified organizer')}><CheckIcon size={13} /></span>}</div>
           <div className="sinc-organizer-actions">
-            <button type="button" className="share-action-button sinc-organizer-action-icon" onClick={() => setShareOpen(true)} aria-label={`Share ${displayName}`} title="Share organizer">
+            <button type="button" className="share-action-button sinc-organizer-action-icon" onClick={() => setShareOpen(true)} aria-label={i18n.t('Share {{name}}', { name: displayName })} title={i18n.t('Share organizer')}>
               <ShareNodesIcon size={16} />
             </button>
-            {organizer.profiles?.email && <button type="button" className="share-action-button sinc-organizer-action-icon" onClick={emailOrganizer} aria-label={`Email ${displayName}`} title={user?.email ? `Email ${displayName} from your mail app` : 'Sign in to email this organizer'}><MailIcon size={16} /></button>}
-            <button type="button" className={`sinc-organizer-follow ${isFollowing ? 'is-following' : ''}`} onClick={user?.id === organizer.user_id ? () => navigate('profile') : toggleFollow} disabled={followBusy} aria-pressed={user?.id !== organizer.user_id ? isFollowing : undefined}>{user?.id === organizer.user_id ? 'Your profile' : followBusy ? 'Saving…' : isFollowing ? 'Following' : 'Follow'}</button>
+            {organizer.profiles?.email && <button type="button" className="share-action-button sinc-organizer-action-icon" onClick={emailOrganizer} aria-label={i18n.t('Email {{name}}', { name: displayName })} title={user?.email ? i18n.t('Email {{name}} from your mail app', { name: displayName }) : i18n.t('Sign in to email this organizer')}><MailIcon size={16} /></button>}
+            <button type="button" className={`sinc-organizer-follow ${isFollowing ? 'is-following' : ''}`} onClick={user?.id === organizer.user_id ? () => navigate('profile') : toggleFollow} disabled={followBusy} aria-pressed={user?.id !== organizer.user_id ? isFollowing : undefined}>{user?.id === organizer.user_id ? i18n.t('Your profile') : followBusy ? i18n.t('Saving…') : isFollowing ? i18n.t('Following') : i18n.t('Follow')}</button>
           </div>
         </div>
         <div className="sinc-organizer-identities">
-          <p className="sinc-organizer-kicker">Organizer profile</p><h1 data-locale-ignore>{displayName}</h1>
+          <p className="sinc-organizer-kicker">{i18n.t('Organizer profile')}</p><h1 data-locale-ignore>{displayName}</h1>
           {organizerUsername && <p style={{ color: 'var(--accent)' }}>@{organizerUsername}</p>}
-          <div className="sinc-organizer-profile-meta"><span><UsersIcon size={14} /> {`${followerCount} ${followerCount === 1 ? 'follower' : 'followers'}`}</span><span><CalendarIcon size={14} /> {`${events.length} ${events.length === 1 ? 'published event' : 'published events'}`}</span>{organizer.city && <span><MapPinIcon size={14} /> {organizer.city}</span>}</div>
+          <div className="sinc-organizer-profile-meta"><span><UsersIcon size={14} /> {`${followerCount} ${followerCount === 1 ? i18n.t('follower') : i18n.t('followers')}`}</span><span><CalendarIcon size={14} /> {`${events.length} ${events.length === 1 ? i18n.t('published event') : i18n.t('published events')}`}</span>{organizer.city && <span><MapPinIcon size={14} /> {organizer.city}</span>}</div>
           {localizedDescription && <p className="sinc-organizer-description" data-locale-ignore>{localizedDescription}</p>}
           {followError && <p style={{ color: '#fca5a5' }}>{followError}</p>}
         </div>
       </section>
 
       <section className="sinc-organizer-content">
-        <div className="sinc-organizer-events-heading"><div><p className="sinc-organizer-kicker">What&apos;s on</p><h2 className="sinc-organizer-events-title">Events</h2></div><span>{`${activeEvents.length} upcoming`}</span></div>
+        <div className="sinc-organizer-events-heading"><div><p className="sinc-organizer-kicker">{i18n.t("What's on")}</p><h2 className="sinc-organizer-events-title">{i18n.t('Events')}</h2></div><span>{`${activeEvents.length} ${i18n.t('upcoming')}`}</span></div>
 
         <div className="sinc-organizer-event-list">
           {activeEvents.length > 0 && (
             <div className="sinc-organizer-group">
-              <p className="sinc-organizer-group-label">Active events</p>
+              <p className="sinc-organizer-group-label">{i18n.t('Active events')}</p>
               <div className="sinc-organizer-event-grid">{activeEvents.map((event) => <EventCard key={event.id} event={event} poster fullWidthMobile onClick={() => navigate('event-detail', event)} />)}</div>
             </div>
           )}
 
           {pastEvents.length > 0 && (
             <div className="sinc-organizer-group">
-              <p className="sinc-organizer-group-label">Past events</p>
+              <p className="sinc-organizer-group-label">{i18n.t('Past events')}</p>
               <div className="sinc-organizer-event-grid">{pastEvents.map((event) => <EventCard key={event.id} event={event} poster fullWidthMobile onClick={() => navigate('event-detail', event)} />)}</div>
             </div>
           )}
 
           {eventsLoading && (
-            <div className="organizer-no-events"><p>Loading events...</p></div>
+            <div className="organizer-no-events"><p>{i18n.t('Loading events...')}</p></div>
           )}
 
           {!eventsLoading && eventsError && (
-            <div className="organizer-no-events"><p>Unable to load events right now.</p><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{eventsError}</p><button onClick={() => setEventsRetryToken(current => current + 1)} className="mt-3 rounded-xl px-4 py-2 text-xs font-bold" style={{ background: 'var(--primary)', color: '#000' }}>Try again</button></div>
+            <div className="organizer-no-events"><p>{i18n.t('Unable to load events right now.')}</p><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{eventsError}</p><button onClick={() => setEventsRetryToken(current => current + 1)} className="mt-3 rounded-xl px-4 py-2 text-xs font-bold" style={{ background: 'var(--primary)', color: '#000' }}>{i18n.t('Try again')}</button></div>
           )}
 
           {!eventsLoading && !eventsError && events.length === 0 && (
             <div className="organizer-no-events">
               <UserIcon size={24} />
-              <p>No upcoming events yet.</p>
+              <p>{i18n.t('No upcoming events yet.')}</p>
             </div>
           )}
         </div>
