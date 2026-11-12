@@ -241,10 +241,10 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
         { label: 'Net Cash Sales', value: formatPrice(cashSales), note: 'After fees, agent commissions, and processed refunds', Icon: DollarSignIcon, color: '#86efac' },
         { label: 'Platform Commissions', value: formatPrice(platformCommission), note: 'Deducted from organizer proceeds', Icon: DollarSignIcon, color: '#c4a7ff' },
         { label: 'Agent Commissions', value: formatPrice(agentCommission), note: 'Earned by ticket agents', Icon: UsersIcon, color: '#7dd3fc' },
-      ].map(({ label, value, note, Icon }) => <article key={label} className="organizer-event-view-stat organizer-overview-stat">
-        <span className="organizer-overview-stat-icon"><Icon size={17} strokeWidth={1.8} /></span>
-        <small>{label}</small><strong>{value}</strong><span>{note}</span>
-      </article>)}
+      ].map(({ label, value, note, Icon, color }) => <div key={label} className="organizer-event-view-stat rounded-2xl border p-4 sm:p-5" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+        <div className="organizer-event-view-stat-icon flex h-9 w-9 items-center justify-center rounded-xl" style={{ background: `${color}18`, color }}><Icon size={17} /></div>
+        <p className="mt-4 break-words text-lg font-black sm:text-2xl">{value}</p><p className="mt-1 text-xs font-semibold">{label}</p><p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{note}</p>
+      </div>)}
     </section>
 
     <div className="grid gap-5 lg:grid-cols-2">
@@ -267,7 +267,7 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
     <section className="organizer-event-view-panel organizer-event-view-customers overflow-hidden rounded-2xl border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
       <div className="flex flex-col gap-4 border-b p-5 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--border)' }}>
         <div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Audience</p><h2 className="mt-1 text-lg font-bold">Event customers <span className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>({filteredCustomers.length})</span></h2></div>
-        <button type="button" onClick={exportCustomers} disabled={!filteredCustomers.length} className="organizer-orders-export inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40"><DownloadIcon size={14} /> Export CSV</button>
+        <button type="button" onClick={exportCustomers} disabled={!filteredCustomers.length} className="inline-flex items-center justify-center gap-2 rounded-xl border px-3.5 py-2.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40" style={{ borderColor: 'var(--border)', color: 'var(--foreground)' }}><DownloadIcon size={14} /> Export CSV</button>
       </div>
       <div className="flex flex-col gap-3 p-4 sm:flex-row">
         <label className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border px-3" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.025)' }}><SearchIcon size={15} /><input value={customerSearch} onChange={input => setCustomerSearch(input.target.value)} placeholder="Search name, email, or phone" className="min-w-0 flex-1 bg-transparent py-2.5 text-xs outline-none" /></label>
@@ -275,7 +275,7 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-xs">
-          <thead><tr>{['Customer', 'Email', 'Phone', 'Tickets', 'Amount', 'Status', 'Purchased'].map(label => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr></thead>
+          <thead><tr style={{ background: 'rgba(255,255,255,.025)', color: 'var(--muted-foreground)' }}>{['Customer', 'Email', 'Phone', 'Tickets', 'Amount', 'Status', 'Purchased'].map(label => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr></thead>
           <tbody>{filteredCustomers.map(customer => <tr key={customer.key} className="border-t" style={{ borderColor: 'var(--border)' }}><td className="px-4 py-3 font-semibold">{customer.name}</td><td className="px-4 py-3" style={{ color: 'var(--muted-foreground)' }}>{customer.email || '—'}</td><td className="px-4 py-3" style={{ color: 'var(--muted-foreground)' }}>{customer.phone || '—'}</td><td className="px-4 py-3">{customer.ticketCount}</td><td className="px-4 py-3 font-bold" style={{ color: 'var(--primary)' }}>{formatPrice(customer.amount)}</td><td className="px-4 py-3 capitalize">{customer.status}</td><td className="px-4 py-3" style={{ color: 'var(--muted-foreground)' }}>{new Date(customer.createdAt).toLocaleDateString()}</td></tr>)}
             {filteredCustomers.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center" style={{ color: 'var(--muted-foreground)' }}>{customers.length ? 'No customers match these filters.' : 'No ticket holders for this event yet.'}</td></tr>}
           </tbody>
@@ -301,7 +301,7 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
     <div className="grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
       <div className="space-y-5">
         <section className="organizer-event-view-panel rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-          <div className="organizer-wallet-panel-heading organizer-event-view-section-heading mb-4"><div><p className="organizer-finance-eyebrow">Event overview</p><h2>Details</h2></div><TrendingUpIcon size={18} /></div>
+          <div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Event overview</p><h2 className="mt-1 text-lg font-bold">Details</h2></div><TrendingUpIcon size={18} /></div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Detail Icon={CalendarIcon} label="Date" value={event.end_date && event.end_date !== event.date ? `${formatDate(event.date)} – ${formatDate(event.end_date)}` : formatDate(event.date)} />
             <Detail Icon={ClockIcon} label="Time" value={(() => {
@@ -323,7 +323,7 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
         </section>
 
         <section className="organizer-event-view-panel organizer-event-view-tiers rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-          <div className="organizer-wallet-panel-heading organizer-event-view-section-heading mb-4"><div><p className="organizer-finance-eyebrow">Inventory</p><h2>Ticket tiers</h2></div><span className="organizer-event-view-section-meta">{ticketsReserved.toLocaleString()} reserved</span></div>
+          <div className="mb-4 flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Inventory</p><h2 className="mt-1 text-lg font-bold">Ticket tiers</h2></div><span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{ticketsReserved.toLocaleString()} reserved</span></div>
           {tiers.length === 0 ? <p className="rounded-xl border p-5 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>No ticket tiers have been added.</p> : <div className="space-y-3">{tiers.map(tier => {
             const tierRemaining = Math.max(0, tier.quantity - tier.sold)
             const tierPercent = tier.quantity ? Math.min(100, Math.round(tier.sold / tier.quantity * 100)) : 0

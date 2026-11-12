@@ -12,8 +12,6 @@ import {
   Menu,
   Plus,
   Search,
-  ShoppingCart,
-  UserRound,
   X,
   type LucideIcon,
 } from 'lucide-react'
@@ -50,7 +48,6 @@ type Props = {
   notifications: OrganizerNotice[]
   onOpenNotification: (notification: OrganizerNotice) => void
   onViewNotifications: () => void
-  onOpenSettings: () => void
   onNavigate: (page: string, extra?: unknown) => void
   onSignOut: () => void
 }
@@ -95,13 +92,15 @@ export default function OrganizerDashboardNav({
   notifications,
   onOpenNotification,
   onViewNotifications,
-  onOpenSettings,
   onNavigate,
   onSignOut,
 }: Props) {
   const [openPanel, setOpenPanel] = useState<'profile' | 'notifications' | 'organizations' | null>(null)
   const [isScrolled, setIsScrolled] = useState(false)
   const unreadCount = notifications.filter(notification => !notification.read_at).length
+  const firstName = fullName.trim().split(/\s+/)[0] || organizationName
+  const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening'
+
   const closePanel = () => setOpenPanel(null)
 
   useEffect(() => {
@@ -167,15 +166,14 @@ export default function OrganizerDashboardNav({
           <strong>Ready to host?</strong>
           <span>Bring your next event to life.</span>
           <button type="button" onClick={onCreateEvent}>Create an event <Plus size={13} strokeWidth={2} /></button>
-          <small className="qpassa-workspace-create-context">Organizer dashboard</small>
         </div>}
 
         <div className="qpassa-workspace-user-wrap">
           {openPanel === 'profile' && <div className="qpassa-workspace-user-menu" role="menu">
             <p title={email}>{email || fullName || organizationName}</p>
-            <button type="button" role="menuitem" onClick={() => { closePanel(); onOpenSettings() }}><UserRoundIcon />Account profile</button>
+            <button type="button" role="menuitem" onClick={() => { closePanel(); onNavigate('profile') }}><UserRoundIcon />Account profile</button>
             <button type="button" role="menuitem" onClick={() => { closePanel(); onNavigate('organizer-profile') }}><ExternalLink size={15} strokeWidth={1.8} />Organizer profile</button>
-            <button type="button" role="menuitem" onClick={() => { closePanel(); onNavigate('organizer-profile') }}><Eye size={15} strokeWidth={1.8} />View site</button>
+            <button type="button" role="menuitem" onClick={() => { closePanel(); onNavigate('home') }}><Eye size={15} strokeWidth={1.8} />View site</button>
             <button type="button" role="menuitem" onClick={onSignOut} className="is-signout"><LogOut size={15} strokeWidth={1.8} />Sign out</button>
           </div>}
           <button type="button" className="qpassa-workspace-user" aria-label="Open profile menu" aria-expanded={openPanel === 'profile'} onClick={() => setOpenPanel(value => value === 'profile' ? null : 'profile')}>
@@ -198,6 +196,10 @@ export default function OrganizerDashboardNav({
             <span className="qpassa-workspace-mobile-brand-mark" aria-hidden="true">Q</span>
             <strong>QPassa</strong>
           </span>
+          <div className="qpassa-workspace-header-title">
+            <strong>{greeting}, {firstName}</strong>
+            <span>{navItems.find(item => item.key === currentSection)?.label ?? 'Dashboard'} · {organizationName}</span>
+          </div>
         </div>
         <div className="qpassa-workspace-header-actions">
           <label className="qpassa-workspace-search">
@@ -226,25 +228,14 @@ export default function OrganizerDashboardNav({
         </div>
       </header>
       <nav className="qpassa-workspace-mobile-nav" aria-label="Organizer dashboard shortcuts">
-        {[
-          { key: 'overview', label: 'Overview', Icon: navIcons.overview },
-          { key: 'orders', label: 'Orders', Icon: ShoppingCart },
-          { key: 'events', label: 'Events', Icon: navIcons.events },
-          { key: 'customers', label: 'Customers', Icon: navIcons.customers },
-          { key: 'profile', label: 'Profile', Icon: UserRound },
-        ].flatMap(item => {
-          const dashboardSection = item.key === 'profile' ? null : item.key
-          const sectionAvailable = dashboardSection === null || navItems.some(candidate => candidate.key === dashboardSection)
-          if (!sectionAvailable || !item.Icon) return []
-          const active = dashboardSection ? currentSection === dashboardSection : currentSection === 'settings'
-          return [<button key={item.key} type="button" aria-current={active ? 'page' : undefined} onClick={() => {
-            closePanel()
-            if (dashboardSection) onSelectSection(dashboardSection)
-            else onOpenSettings()
-          }}>
-            <item.Icon size={17} strokeWidth={1.8} aria-hidden="true" />
-            {active && <span>{item.label}</span>}
-          </button>]
+        {(['overview', 'notifications', 'customers', 'events'] as const).flatMap(key => {
+          const item = navItems.find(candidate => candidate.key === key)
+          const Icon = navIcons[key]
+          return item && Icon ? [<button key={key} type="button" aria-current={currentSection === key ? 'page' : undefined} onClick={() => { closePanel(); onSelectSection(key) }}>
+            <Icon size={17} strokeWidth={1.8} aria-hidden="true" />
+            {currentSection === key && <span>{key === 'overview' ? 'Home' : item.label}</span>}
+            {key === 'notifications' && unreadCount > 0 && <i>{unreadCount > 99 ? '99+' : unreadCount}</i>}
+          </button>] : []
         })}
       </nav>
     </>
