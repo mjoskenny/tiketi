@@ -102,6 +102,7 @@ export default function OrganizerDashboardNav({
   const [openPanel, setOpenPanel] = useState<'profile' | 'notifications' | 'organizations' | null>(null)
   const [isScrolled, setIsScrolled] = useState(false)
   const unreadCount = notifications.filter(notification => !notification.read_at).length
+
   const closePanel = () => setOpenPanel(null)
 
   useEffect(() => {
@@ -143,7 +144,7 @@ export default function OrganizerDashboardNav({
             })
             if (!groupItems.length) return null
             return <section className="qpassa-workspace-link-group" key={group.label}>
-              <h6>{group.label}</h6>
+              {group.label && <h6>{group.label}</h6>}
               {groupItems.map(item => {
                 const Icon = navIcons[item.key]
                 return <a
@@ -198,6 +199,9 @@ export default function OrganizerDashboardNav({
             <span className="qpassa-workspace-mobile-brand-mark" aria-hidden="true">Q</span>
             <strong>QPassa</strong>
           </span>
+          <div className="qpassa-workspace-header-title">
+            <strong>Overview</strong>
+          </div>
         </div>
         <div className="qpassa-workspace-header-actions">
           <label className="qpassa-workspace-search">
@@ -227,7 +231,7 @@ export default function OrganizerDashboardNav({
       </header>
       <nav className="qpassa-workspace-mobile-nav" aria-label="Organizer dashboard shortcuts">
         {[
-          { key: 'overview', label: 'Overview', Icon: navIcons.overview },
+          { key: 'overview', label: 'Home', Icon: navIcons.overview },
           { key: 'orders', label: 'Orders', Icon: ShoppingCart },
           { key: 'events', label: 'Events', Icon: navIcons.events },
           { key: 'customers', label: 'Customers', Icon: navIcons.customers },

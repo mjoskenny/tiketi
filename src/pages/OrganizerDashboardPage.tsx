@@ -1,5 +1,6 @@
 // Organizer operations workspace, including the filterable event-card listing.
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { signOut, supabase } from '../lib/supabase'
 import { fetchAllRows } from '../lib/supabasePagination'
 import { useAuth } from '../context/AuthContext'
@@ -47,7 +48,7 @@ const NAV_ICONS: Record<Section, LucideIcon> = {
 }
 
 const NAV: { key: Section; label: string }[] = [
-  { key: 'overview', label: 'Dashboard' },
+  { key: 'overview', label: 'Overview' },
   { key: 'analytics', label: 'Analytics' },
   { key: 'events', label: 'Events' },
   { key: 'orders', label: 'Orders' },
@@ -58,13 +59,12 @@ const NAV: { key: Section; label: string }[] = [
   { key: 'transactions', label: 'Statements' },
   { key: 'payouts', label: 'Wallet' },
   ...(FEATURES.refunds ? [{ key: 'refunds' as Section, label: 'Refund requests' }] : []),
-  { key: 'notifications', label: 'Notifications' },
 ]
 
 const NAV_GROUPS: { label: string; keys: Section[] }[] = [
-  { label: 'Main', keys: ['overview', 'analytics'] },
-  { label: 'Operations', keys: ['events', 'orders', 'customers', 'followers'] },
-  { label: 'Account', keys: ['members', 'settings', 'transactions', 'payouts', 'refunds'] },
+  { label: 'Dashboard', keys: ['overview', 'events', 'members', 'analytics', 'orders', 'customers', 'followers'] },
+  { label: 'Finance', keys: ['payouts', 'transactions', 'refunds'] },
+  { label: '', keys: ['settings'] },
 ]
 
 const SECTION_PATHS: Record<Section, string> = {
@@ -118,6 +118,15 @@ const STATUS_COLORS: Record<string, string> = {
   active: '#22c55e', inactive: '#888',
   completed_t: '#22c55e', failed: '#ef4444', pending_t: '#F0A500',
   payment: 'var(--primary)', refund: '#ef4444', payout: 'var(--accent)', fee: '#888',
+}
+
+const EVENT_CATEGORY_TONES: Record<string, string> = {
+  music: '#c084fc', festivals: '#fb923c', festival: '#fb923c', parties: '#f472b6', party: '#f472b6',
+  sports: '#60a5fa', comedy: '#facc15', conferences: '#2dd4bf', culture: '#fb7185', business: '#a3e635',
+}
+
+function getEventCategoryTone(category: string) {
+  return EVENT_CATEGORY_TONES[category.trim().toLowerCase()] ?? '#f0a36a'
 }
 
 const ORGANIZER_PERMISSION_ROWS = [
@@ -324,6 +333,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const [eventsSearch, setEventsSearch] = useState('')
   const [eventsCategory, setEventsCategory] = useState('all')
   const [openEventMenu, setOpenEventMenu] = useState<string | null>(null)
+  const [eventMenuPosition, setEventMenuPosition] = useState<{ top: number; left: number } | null>(null)
   const [teamTab, setTeamTab] = useState<TeamTab>('users')
   const [teamSearch, setTeamSearch] = useState('')
   const [followersSearch, setFollowersSearch] = useState('')
@@ -332,6 +342,28 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
   const [payoutReference, setPayoutReference] = useState('')
   const [payoutSubmitting, setPayoutSubmitting] = useState(false)
   const [payoutNotice, setPayoutNotice] = useState('')
+
+  useEffect(() => {
+    if (!openEventMenu) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenEventMenu(null)
+    }
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      const target = event.target
+      if (target instanceof Element && !target.closest('.organizer-event-menu, .organizer-event-more')) setOpenEventMenu(null)
+    }
+    const closeOnViewportChange = () => setOpenEventMenu(null)
+    document.addEventListener('keydown', closeOnEscape)
+    document.addEventListener('mousedown', closeOnOutsideClick)
+    window.addEventListener('scroll', closeOnViewportChange, true)
+    window.addEventListener('resize', closeOnViewportChange)
+    return () => {
+      document.removeEventListener('keydown', closeOnEscape)
+      document.removeEventListener('mousedown', closeOnOutsideClick)
+      window.removeEventListener('scroll', closeOnViewportChange, true)
+      window.removeEventListener('resize', closeOnViewportChange)
+    }
+  }, [openEventMenu])
 
   // Modals
   const [showInviteMember, setShowInviteMember] = useState(false)
@@ -1331,6 +1363,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
         notifications={organizerNotifications}
         onOpenNotification={notification => { void openOrganizerNotification(notification) }}
         onViewNotifications={() => selectSection('notifications')}
+        onOpenSettings={() => { setOrganizerSettingsTab('workspace'); selectSection('settings') }}
         onNavigate={(page, extra) => navigate(page, extra ?? (page === 'organizer-profile' ? organizer : undefined))}
         onSignOut={handleSignOut}
       />
@@ -1353,6 +1386,10 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
           </aside>}
 
           {section === 'overview' && <section className="organizer-overview-page space-y-7">
+            <header className="organizer-analytics-page-heading organizer-orders-heading organizer-dashboard-overview-heading">
+              <div className="organizer-analytics-title-block"><h3>Overview</h3><p>Your workspace at a glance—events, ticket sales, and recent activity.</p></div>
+              <div className="organizer-orders-heading-meta"><span className="organizer-finance-live-dot" />{lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : 'Loading workspace activity'}</div>
+            </header>
             <div className="organizer-overview-stat-grid">
               <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><TicketCheck size={17} strokeWidth={1.8} /></span><small>Tickets sold</small><strong>{canViewOverviewAnalytics ? totalTicketsSold.toLocaleString() : '—'}</strong><span>{canViewOverviewAnalytics ? `${overviewTicketsRemaining.toLocaleString()} still available` : 'Analytics access required'}</span></article>
               <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><CalendarDays size={17} strokeWidth={1.8} /></span><small>Published events</small><strong>{canViewEvents ? publishedEvents : '—'}</strong><span>{canViewEvents ? `${events.length} total in your workspace` : 'Event access required'}</span></article>
@@ -1469,6 +1506,7 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                   <header className="organizer-analytics-page-heading">
                     <div className="organizer-analytics-title-block">
                       <h3>Analytics</h3>
+                      <p>Track revenue, ticket sales, and event performance across your workspace.</p>
                     </div>
                     <div className="organizer-analytics-header-controls">
                       <div className="organizer-analytics-header-ranges" role="group" aria-label="Analytics date range">
@@ -1646,40 +1684,37 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
 
               {/* ── ORGANIZER NOTIFICATIONS ── */}
               {section === 'notifications' && (
-                <div className="mx-auto max-w-5xl space-y-6">
-                  <div className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-end sm:justify-between" style={{ borderColor: 'var(--border)' }}>
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--accent)' }}>Workspace signal</p>
-                      <h2 className="mt-1 text-2xl font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Organizer inbox</h2>
-                      <p className="mt-1 max-w-xl text-sm" style={{ color: 'var(--muted-foreground)' }}>Keep up with sales, event changes, followers, and team activity across your workspace.</p>
+                <div className="organizer-notifications-page organizer-analytics-page space-y-5">
+                  <header className="organizer-analytics-page-heading organizer-orders-heading organizer-notifications-heading">
+                    <div className="organizer-analytics-title-block"><h3>Notifications</h3><p>Sales, event changes, followers, and team activity across your workspace.</p></div>
+                    {unreadOrganizerNotifications.length > 0 && <button type="button" onClick={() => void markAllOrganizerNotificationsRead()} className="organizer-orders-export"><CheckIcon size={14} />Mark all read</button>}
+                  </header>
+
+                  <div className="organizer-notifications-stat-grid grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><Bell size={17} /></span><small>Total updates</small><strong>{organizerNotifications.length.toLocaleString()}</strong><span>Across this workspace</span></article>
+                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><Shield size={17} /></span><small>Unread</small><strong>{unreadOrganizerNotifications.length.toLocaleString()}</strong><span>Waiting for your review</span></article>
+                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><CalendarDays size={17} /></span><small>Event updates</small><strong>{organizerNotifications.filter(notification => notification.type === 'event' || !!notification.event_id).length.toLocaleString()}</strong><span>Listings and event activity</span></article>
+                    <article className="organizer-overview-stat"><span className="organizer-overview-stat-icon"><UsersRound size={17} /></span><small>Followers</small><strong>{organizerNotifications.filter(notification => notification.type === 'follower').length.toLocaleString()}</strong><span>Community activity</span></article>
+                  </div>
+
+                  <section className="organizer-orders-panel organizer-notifications-panel">
+                    <div className="organizer-orders-toolbar">
+                      <div className="organizer-notifications-panel-heading"><strong>Recent activity</strong><small>{filteredOrganizerNotifications.length} update{filteredOrganizerNotifications.length === 1 ? '' : 's'} in this view</small></div>
+                      <span className="organizer-notifications-panel-total">{unreadOrganizerNotifications.length} unread</span>
                     </div>
-                    {unreadOrganizerNotifications.length > 0 && <button type="button" onClick={() => void markAllOrganizerNotificationsRead()} className="shrink-0 rounded-xl border px-3 py-2 text-xs font-bold" style={{ borderColor: 'rgba(249,112,21,0.35)', color: 'var(--primary)', background: 'rgba(249,112,21,0.08)' }}>Mark all read</button>}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    {[
-                      ['Total updates', organizerNotifications.length.toString(), 'var(--foreground)'],
-                      ['Needs attention', unreadOrganizerNotifications.length.toString(), 'var(--primary)'],
-                      ['Event updates', organizerNotifications.filter(notification => notification.type === 'event' || !!notification.event_id).length.toString(), '#9bd4ff'],
-                      ['Followers', organizerNotifications.filter(notification => notification.type === 'follower').length.toString(), '#c8a96e'],
-                    ].map(([label, value, color]) => <div key={label} className="rounded-2xl border p-4" style={{ background: 'rgba(255,255,255,0.035)', borderColor: 'var(--border)' }}><p className="text-2xl font-black" style={{ color }}>{value}</p><p className="mt-1 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>{label}</p></div>)}
-                  </div>
-
-                  <div className="organizer-dashboard-filter-row flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-                    {([['all', 'All updates'], ['unread', 'Needs attention'], ['events', 'Events'], ['sales', 'Sales'], ['followers', 'Followers'], ['team', 'Team']] as const).map(([key, label]) => <button key={key} type="button" onClick={() => setNotificationFilter(key)} className="organizer-dashboard-filter-button shrink-0 rounded-xl border px-3 py-2 text-xs font-bold" aria-pressed={notificationFilter === key} style={{ background: notificationFilter === key ? 'rgba(249,112,21,0.14)' : 'transparent', borderColor: notificationFilter === key ? 'rgba(249,112,21,0.4)' : 'var(--border)', color: notificationFilter === key ? 'var(--primary)' : 'var(--muted-foreground)' }}>{label}</button>)}
-                  </div>
-
-                    <div className="organizer-dashboard-table-card overflow-hidden rounded-2xl border" style={{ background: 'rgba(255,255,255,0.025)', borderColor: 'var(--border)' }}>
-                    <div className="border-b px-5 py-4" style={{ borderColor: 'var(--border)' }}><p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>{filteredOrganizerNotifications.length} update{filteredOrganizerNotifications.length === 1 ? '' : 's'} in this view</p></div>
-                    {filteredOrganizerNotifications.length === 0 ? <div className="px-5 py-16 text-center"><BellIcon size={24} /><p className="mt-4 font-bold">Nothing here yet</p><p className="mt-1 text-sm" style={{ color: 'var(--muted-foreground)' }}>New organizer activity will appear in this inbox.</p></div> : <div>{filteredOrganizerNotifications.map(notification => {
+                    <div className="organizer-orders-status-filters organizer-notifications-filters" role="group" aria-label="Filter notifications">
+                      {([['all', 'All updates'], ['unread', 'Unread'], ['events', 'Events'], ['sales', 'Sales'], ['followers', 'Followers'], ['team', 'Team']] as const).map(([key, label]) => <button key={key} type="button" onClick={() => setNotificationFilter(key)} aria-pressed={notificationFilter === key}>{label}</button>)}
+                    </div>
+                    {filteredOrganizerNotifications.length === 0 ? <div className="organizer-orders-empty organizer-notifications-empty"><span><Bell size={20} /></span><strong>Nothing here yet</strong><small>New organizer activity will appear here.</small></div> : <div className="organizer-notifications-list">{filteredOrganizerNotifications.map(notification => {
                       const title = notification.title.toLowerCase()
                       const NotificationIcon = notification.type === 'payment' || title.includes('order') || title.includes('ticket') ? DollarSignIcon : notification.type === 'follower' ? UserIcon : notification.type === 'team' || title.includes('member') || title.includes('role') ? UsersIcon : notification.type === 'event' || notification.event_id ? CalendarIcon : BellIcon
-                      return <button key={notification.id} type="button" onClick={() => void openOrganizerNotification(notification)} className="flex w-full items-start gap-4 border-b px-5 py-4 text-left transition-colors last:border-b-0 hover:bg-white/[0.035]" style={{ borderColor: 'var(--border)', background: notification.read_at ? 'transparent' : 'rgba(249,112,21,0.055)' }}>
-                        <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: notification.read_at ? 'rgba(255,255,255,0.06)' : 'rgba(249,112,21,0.14)', color: notification.read_at ? 'var(--muted-foreground)' : 'var(--primary)' }}><NotificationIcon size={17} /></span>
-                        <span className="min-w-0 flex-1"><span className="flex items-start justify-between gap-3"><span className="text-sm font-bold">{notification.title}</span>{!notification.read_at && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: 'var(--primary)' }} />}</span><span className="mt-1 block text-xs leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>{notification.body}</span><span className="mt-2 block text-[10px] font-medium uppercase tracking-wide" style={{ color: 'var(--muted-foreground)' }}>{new Date(notification.created_at).toLocaleString()}</span></span>
+                      return <button key={notification.id} type="button" onClick={() => void openOrganizerNotification(notification)} className={`organizer-notification-row ${notification.read_at ? '' : 'is-unread'}`}>
+                        <span className="organizer-notification-icon"><NotificationIcon size={17} /></span>
+                        <span className="organizer-notification-copy"><span className="organizer-notification-title">{notification.title}</span><span className="organizer-notification-body">{notification.body}</span><span className="organizer-notification-time">{new Date(notification.created_at).toLocaleString()}</span></span>
+                        {!notification.read_at && <span className="organizer-notification-unread-dot" aria-label="Unread" />}
                       </button>
                     })}</div>}
-                  </div>
+                  </section>
                 </div>
               )}
 
@@ -1752,16 +1787,29 @@ export default function OrganizerDashboardPage({ navigate }: Props) {
                             <span className="organizer-event-card-shade" />
                           </button>
                           <span className={`organizer-event-status is-${eventStatus}`}>{eventStatus === 'review' ? 'In review' : eventStatus === 'drafts' ? 'Draft' : eventStatus === 'active' ? 'Published' : eventStatus === 'past' ? 'Past event' : 'Inactive'}</span>
-                          <button type="button" className="organizer-event-more" aria-label={`More actions for ${ev.title}`} aria-expanded={openEventMenu === ev.id} onClick={() => setOpenEventMenu(current => current === ev.id ? null : ev.id)}><MoreHorizontal size={19} /></button>
-                          {openEventMenu === ev.id && <div className="organizer-event-menu" role="menu">
+                          <button type="button" className="organizer-event-more" aria-label={`More actions for ${ev.title}`} aria-expanded={openEventMenu === ev.id} onClick={event => {
+                            if (openEventMenu === ev.id) { setOpenEventMenu(null); return }
+                            const rect = event.currentTarget.getBoundingClientRect()
+                            const menuWidth = 176
+                            const menuHeight = Math.min(192, Math.max(0, window.innerHeight - 16))
+                            const spaceBelow = window.innerHeight - rect.bottom - 8
+                            const spaceAbove = rect.top - 8
+                            const top = spaceBelow >= menuHeight || spaceBelow >= spaceAbove
+                              ? Math.max(8, Math.min(rect.bottom + 8, window.innerHeight - menuHeight - 8))
+                              : Math.max(8, rect.top - menuHeight - 8)
+                            const left = Math.max(8, Math.min(window.innerWidth - menuWidth - 8, rect.right - menuWidth))
+                            setEventMenuPosition({ top, left })
+                            setOpenEventMenu(ev.id)
+                          }}><MoreHorizontal size={19} /></button>
+                          {openEventMenu === ev.id && eventMenuPosition && createPortal(<div className="organizer-event-menu" role="menu" style={{ top: eventMenuPosition.top, left: eventMenuPosition.left }}>
                             <button type="button" role="menuitem" onClick={() => { setOpenEventMenu(null); openEventView(ev) }}><EyeIcon size={15} />View details</button>
                             <button type="button" role="menuitem" onClick={() => { setOpenEventMenu(null); openEditEvent(ev) }}><EditIcon size={15} />Edit event</button>
                             <button type="button" role="menuitem" onClick={() => { setOpenEventMenu(null); void toggleEventStatus(ev) }}>{ev.status === 'published' ? <XIcon size={15} /> : <CheckIcon size={15} />}{ev.status === 'published' ? 'Unpublish' : 'Publish'}</button>
                             <button type="button" role="menuitem" className="is-danger" onClick={() => { setOpenEventMenu(null); void deleteEvent(ev.id) }}><TrashIcon size={15} />Delete event</button>
-                          </div>}
+                          </div>, document.body)}
                         </div>
                         <button type="button" className="organizer-event-card-copy" onClick={() => openEventView(ev)}>
-                          <span className="organizer-event-card-category">{ev.category || 'Event'}</span>
+                          <span className="organizer-event-card-category" style={{ '--category-tone': getEventCategoryTone(ev.category || '') } as React.CSSProperties}>{ev.category || 'Event'}</span>
                           <strong>{ev.title || 'Untitled event'}</strong>
                           <span className="organizer-event-card-meta"><span><CalendarDays size={14} />{dateLabel}</span><span><MapPin size={14} />{ev.venue || 'Location to be announced'}</span></span>
                           <span className="organizer-event-sales">
@@ -2859,17 +2907,23 @@ function InviteAgentModal({ orgId, events, onClose, onInvited }: { orgId: string
     if (error) { setMessage(error.message); setSaving(false); return }
     onInvited()
   }
-  return <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,.8)' }}><div className="organizer-modal w-full max-w-sm rounded-2xl p-6" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-    <div className="flex items-center justify-between"><h2 className="font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Invite Agent</h2><button onClick={onClose}>✕</button></div>
-    <p className="mt-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>The person must already have a QPassa account.</p>
-    <div className="mt-4 space-y-3">
-      <input value={email} onChange={event => setEmail(event.target.value)} placeholder="agent@example.com" className="w-full rounded-xl px-4 py-2.5 text-sm" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} />
-      <select value={eventId} onChange={event => { setEventId(event.target.value); setTierIds([]) }} className="w-full rounded-xl px-4 py-2.5 text-sm" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }}>{events.map(event => <option key={event.id} value={event.id}>{event.title}</option>)}</select>
-      <div><p className="mb-2 text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Ticket types, or all if none selected</p><div className="flex flex-wrap gap-2">{tiers.map(tier => <button key={tier.id} onClick={() => toggleTier(tier.id)} className="rounded-full px-3 py-1.5 text-xs font-bold" style={{ background: tierIds.includes(tier.id) ? 'var(--primary)' : 'var(--muted)', color: tierIds.includes(tier.id) ? '#000' : '#fff' }}>{tier.name}</button>)}</div></div>
-      <div className="grid grid-cols-3 gap-2"><input value={commission} onChange={event => setCommission(event.target.value)} type="number" min="0" max="100" placeholder="%" className="rounded-xl px-3 py-2.5 text-sm" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} /><input value={ticketLimit} onChange={event => setTicketLimit(event.target.value)} type="number" min="0" placeholder="Ticket limit" className="rounded-xl px-3 py-2.5 text-sm" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} /><input value={salesLimit} onChange={event => setSalesLimit(event.target.value)} type="number" min="0" placeholder="Sales limit" className="rounded-xl px-3 py-2.5 text-sm" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} /></div>
-      {message && <p className="text-xs text-red-400">{message}</p>}<button onClick={() => void invite()} disabled={saving || !email.trim() || !eventId} className="w-full rounded-xl py-3 text-sm font-bold disabled:opacity-50" style={{ background: 'var(--primary)', color: '#000' }}>{saving ? 'Sending...' : 'Send agent invitation'}</button>
-    </div>
-  </div></div>
+  return <div className="organizer-invite-overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
+    <section className="organizer-modal organizer-invite-dialog organizer-invite-agent-dialog" role="dialog" aria-modal="true" aria-labelledby="invite-agent-title">
+      <header className="organizer-invite-heading"><div><p>Team access</p><h2 id="invite-agent-title">Invite an agent</h2><span>The agent must already have a QPassa account.</span></div><button type="button" onClick={onClose} aria-label="Close invite agent dialog">×</button></header>
+      <div className="organizer-invite-body">
+        {message && <p className="organizer-invite-error" role="alert">{message}</p>}
+        <label className="organizer-invite-field">Agent email<input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="agent@example.com" autoComplete="email" /></label>
+        <label className="organizer-invite-field">Event<select value={eventId} onChange={event => { setEventId(event.target.value); setTierIds([]) }} disabled={!events.length}><option value="">Select an event</option>{events.map(event => <option key={event.id} value={event.id}>{event.title}</option>)}</select></label>
+        <fieldset className="organizer-invite-tier-field"><legend>Ticket types</legend><p>Select specific tiers, or leave all unselected to allow every tier.</p><div className="organizer-invite-tier-list">{tiers.map(tier => <button key={tier.id} type="button" aria-pressed={tierIds.includes(tier.id)} onClick={() => toggleTier(tier.id)}>{tier.name}</button>)}{!tiers.length && <span>{selectedEvent ? 'No ticket tiers are set up for this event.' : 'Choose an event to see its ticket tiers.'}</span>}</div></fieldset>
+        <div className="organizer-invite-limits-grid">
+          <label className="organizer-invite-field">Commission (%)<input value={commission} onChange={event => setCommission(event.target.value)} type="number" min="0" max="100" /></label>
+          <label className="organizer-invite-field">Ticket limit<input value={ticketLimit} onChange={event => setTicketLimit(event.target.value)} type="number" min="0" placeholder="No limit" /></label>
+          <label className="organizer-invite-field">Sales limit<input value={salesLimit} onChange={event => setSalesLimit(event.target.value)} type="number" min="0" placeholder="No limit" /></label>
+        </div>
+      </div>
+      <footer className="organizer-invite-footer"><button type="button" className="organizer-invite-secondary" onClick={onClose}>Cancel</button><button type="button" className="organizer-invite-primary" onClick={() => void invite()} disabled={saving || !email.trim() || !eventId}>{saving ? 'Sending…' : 'Send invitation'}</button></footer>
+    </section>
+  </div>
 }
 
 function EditAgentAssignmentModal({ assignment, events, onClose, onSaved }: { assignment: AgentAssignment; events: Event[]; onClose: () => void; onSaved: () => void }) {
@@ -2963,44 +3017,18 @@ function InviteMemberModal({ orgId, onClose, roles, onInvited }: { orgId: string
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)' }}>
-      <div className="organizer-modal dashboard-form-modal w-full max-w-sm rounded-2xl" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
-          <h2 className="font-black" style={{ fontFamily: 'Outfit, sans-serif' }}>Invite Member</h2>
-          <button onClick={onClose} style={{ color: 'var(--muted-foreground)' }}>✕</button>
+    <div className="organizer-invite-overlay" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
+      <section className="organizer-modal organizer-invite-dialog" role="dialog" aria-modal="true" aria-labelledby="invite-member-title">
+        <header className="organizer-invite-heading"><div><p>Team access</p><h2 id="invite-member-title">Invite a member</h2><span>Invite an existing QPassa account to your workspace.</span></div><button type="button" onClick={onClose} aria-label="Close invite member dialog">×</button></header>
+        <div className="organizer-invite-body">
+          {error && <p className="organizer-invite-error" role="alert">{error}</p>}
+          <label className="organizer-invite-field">Member email<input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="team.member@example.com" autoComplete="email" /></label>
+          {roles.length > 0 && <label className="organizer-invite-field">Role<select value={roleId} onChange={e => setRoleId(e.target.value)}><option value="">No role</option>{roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>}
+          <div className="organizer-invite-link-card"><div><strong>Registration link</strong><span>Share this link if they still need to create an account.</span></div><div className="organizer-invite-link-row"><input readOnly aria-label="Organizer registration link" value={`${window.location.origin}?intent=organizer`} /><button type="button" className="organizer-invite-secondary" onClick={() => void navigator.clipboard.writeText(`${window.location.origin}?intent=organizer`)}>Copy link</button></div></div>
+          {roles.length > 0 && <div className="organizer-invite-role-note"><strong>Available roles</strong><div>{roles.map(role => <span key={role.id}>{role.name}</span>)}</div></div>}
         </div>
-        <div className="p-6 space-y-4">
-          {error && <p className="rounded-lg px-3 py-2 text-xs" style={{ background: '#3a1717', color: '#fecaca' }}>{error}</p>}
-          <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Add an existing QPassa account to your team, or share the registration link below first.</p>
-          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="team.member@example.com"
-            className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} />
-          {roles.length > 0 && <select value={roleId} onChange={e => setRoleId(e.target.value)} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }}>
-            <option value="">No role</option>
-            {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-          </select>}
-          <button onClick={invite} disabled={saving || !email.trim()} className="w-full py-2.5 rounded-xl text-sm font-bold" style={{ background: 'var(--primary)', color: '#000', opacity: saving || !email.trim() ? 0.5 : 1 }}>{saving ? 'Adding...' : 'Add member'}</button>
-          <div className="h-px" style={{ background: 'var(--border)' }} />
-          <div className="flex gap-2">
-            <input readOnly value={`${window.location.origin}?intent=organizer`}
-              className="flex-1 px-4 py-2.5 rounded-xl text-xs outline-none font-mono" style={{ background: 'var(--muted)', border: '1px solid var(--border)', color: '#fff' }} />
-            <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}?intent=organizer`)}
-              className="px-4 py-2.5 rounded-xl text-xs font-bold" style={{ background: 'var(--primary)', color: '#000' }}>
-              Copy
-            </button>
-          </div>
-          {roles.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold mb-1" style={{ color: 'var(--muted-foreground)' }}>Assign role after they join:</p>
-              <div className="flex flex-wrap gap-2">
-                {roles.map(r => (
-                  <span key={r.id} className="text-xs px-3 py-1 rounded-full" style={{ background: 'rgba(249,112,21,0.12)', color: 'var(--primary)' }}>{r.name}</span>
-                ))}
-              </div>
-            </div>
-          )}
-          <button onClick={onClose} className="w-full py-3 rounded-xl font-bold text-sm" style={{ background: 'var(--muted)', color: 'rgba(255,255,255,0.7)' }}>Close</button>
-        </div>
-      </div>
+        <footer className="organizer-invite-footer"><button type="button" className="organizer-invite-secondary" onClick={onClose}>Cancel</button><button type="button" className="organizer-invite-primary" onClick={invite} disabled={saving || !email.trim()}>{saving ? 'Adding…' : 'Add member'}</button></footer>
+      </section>
     </div>
   )
 }
