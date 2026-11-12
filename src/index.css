@@ -6432,7 +6432,7 @@ button[style*="var(--brand-blue)"],
 .about-studio-contact-actions { justify-content: flex-end; margin-top: 0; }
 
 /* Organizer dashboard navigation — single source of truth. */
-.qpassa-nav-dismiss { position: fixed; z-index: 65; inset: 0; border: 0; background: transparent; }
+.qpassa-nav-dismiss { position: fixed; z-index: 55; inset: 0; border: 0; background: transparent; }
 .qpassa-workspace-sidebar {
   position: fixed;
   z-index: 70;
@@ -10404,6 +10404,28 @@ button[style*="var(--brand-blue)"],
   .organizer-orders-refresh,
   .organizer-orders-export { width: 100%; }
 }
+.organizer-notifications-heading .organizer-orders-export { min-height: 2.45rem; }
+.organizer-notifications-panel .organizer-orders-toolbar { grid-template-columns: minmax(0, 1fr) auto; }
+.organizer-notifications-panel-heading strong,
+.organizer-notifications-panel-heading small { display: block; }
+.organizer-notifications-panel-heading strong { color: var(--foreground); font-size: .73rem; font-weight: 750; }
+.organizer-notifications-panel-heading small,
+.organizer-notifications-panel-total { margin-top: .18rem; color: var(--muted-foreground); font-size: .58rem; }
+.organizer-notifications-panel-total { margin: 0; white-space: nowrap; }
+.organizer-notifications-filters { margin-top: .7rem; }
+.organizer-notifications-list { padding: 0 .75rem .75rem; }
+.organizer-notification-row { display: flex; width: 100%; min-width: 0; align-items: flex-start; gap: .75rem; padding: .85rem .65rem; border: 0; border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent); background: transparent; color: var(--foreground); text-align: left; transition: background .15s ease; }
+.organizer-notification-row:first-child { border-top: 0; }
+.organizer-notification-row:hover { background: color-mix(in srgb, var(--brand-blue) 5%, var(--card)); }
+.organizer-notification-row.is-unread { background: color-mix(in srgb, var(--brand-blue) 4%, var(--card)); }
+.organizer-notification-icon { display: grid; width: 2.25rem; height: 2.25rem; flex: 0 0 2.25rem; place-items: center; border: 1px solid var(--border); border-radius: .75rem; background: var(--background); color: var(--muted-foreground); }
+.organizer-notification-row.is-unread .organizer-notification-icon { border-color: color-mix(in srgb, var(--brand-blue) 22%, var(--border)); background: var(--brand-blue-soft); color: var(--brand-blue); }
+.organizer-notification-copy { display: block; min-width: 0; flex: 1; }
+.organizer-notification-title { display: block; color: var(--foreground); font-size: .68rem; font-weight: 700; line-height: 1.4; }
+.organizer-notification-body { display: block; margin-top: .2rem; color: var(--muted-foreground); font-size: .61rem; line-height: 1.55; }
+.organizer-notification-time { display: block; margin-top: .38rem; color: var(--muted-foreground); font-size: .53rem; }
+.organizer-notification-unread-dot { width: .48rem; height: .48rem; flex: 0 0 .48rem; margin-top: .35rem; border-radius: 50%; background: var(--brand-blue); box-shadow: 0 0 0 3px var(--brand-blue-soft); }
+.organizer-notifications-empty { padding-block: 3.25rem !important; }
 .organizer-community-summary-grid .organizer-orders-summary-card { cursor: default; }
 .organizer-community-panel { min-width: 0; }
 .organizer-members-toolbar { display: grid; grid-template-columns: auto minmax(14rem, 1fr); align-items: center; gap: .75rem; padding: .8rem; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--card) 92%, var(--background)); }
@@ -11660,116 +11682,4 @@ button[style*="var(--brand-blue)"],
   #root .organizer-dashboard-shell .organizer-dashboard-main .organizer-analytics-header-ranges { flex: 1 1 100%; }
   #root .organizer-dashboard-shell .organizer-dashboard-main .organizer-analytics-header-ranges button { min-height: 2.4rem; padding-inline: .35rem; font-size: .65rem; }
   #root .organizer-dashboard-shell .organizer-dashboard-main .organizer-analytics-date-trigger { flex: 1 1 auto; justify-content: center; }
-}
-
-/* Organizer inbox uses the same restrained panels and controls as the dashboard. */
-#root .organizer-dashboard-shell .organizer-dashboard-main .organizer-notifications-page {
-  width: 100%;
-  max-width: 1500px;
-  margin: 0 auto;
-}
-#root .organizer-dashboard-shell .organizer-dashboard-main .organizer-notifications-page > .organizer-orders-heading {
-  align-items: flex-end;
-  margin: 0;
-  padding: 0 0 .35rem;
-  border: 0 !important;
-}
-#root .organizer-dashboard-shell .organizer-dashboard-main .organizer-notifications-page .organizer-analytics-title-block h3 {
-  margin: 0;
-  color: var(--foreground);
-  font-size: 1.5rem !important;
-  font-weight: 700 !important;
-  letter-spacing: -.04em !important;
-}
-#root .organizer-dashboard-shell .organizer-dashboard-main .organizer-notifications-page .organizer-analytics-title-block > p {
-  margin: .4rem 0 0;
-  color: var(--muted-foreground);
-  font-size: .75rem;
-}
-.organizer-notifications-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: .55rem; }
-.organizer-notifications-mark-read {
-  min-height: 2.35rem;
-  padding: .5rem .85rem;
-  border: 1px solid var(--border) !important;
-  border-radius: 999px !important;
-  background: var(--card) !important;
-  color: var(--foreground) !important;
-  font-size: .62rem;
-  font-weight: 650;
-  white-space: nowrap;
-}
-.organizer-notifications-mark-read:hover { background: var(--muted) !important; }
-#root .organizer-dashboard-shell .organizer-dashboard-main .organizer-notifications-summary-grid .organizer-orders-summary-card {
-  min-height: 5rem;
-  border: 0 !important;
-  border-radius: .9rem !important;
-  background: var(--card) !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,.07) !important;
-}
-#root .organizer-dashboard-shell .organizer-dashboard-main .organizer-notifications-summary-grid .organizer-orders-summary-card > span { color: var(--foreground) !important; }
-#root .organizer-dashboard-shell .organizer-dashboard-main .organizer-notifications-summary-grid .organizer-orders-summary-card > small { color: var(--muted-foreground) !important; }
-.organizer-notifications-panel { min-width: 0; overflow: hidden; border: 0; border-radius: 1rem; background: var(--card); box-shadow: 0 8px 24px rgba(0,0,0,.07); }
-.organizer-notifications-toolbar { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: .75rem; padding: .8rem .9rem; border-bottom: 1px solid var(--border); }
-.organizer-notifications-filters { display: flex; min-width: 0; flex-wrap: wrap; gap: .3rem; }
-.organizer-notifications-filters > button {
-  display: inline-flex;
-  min-height: 2.25rem;
-  align-items: center;
-  gap: .4rem;
-  padding: .4rem .68rem;
-  border: 0 !important;
-  border-radius: 999px !important;
-  background: transparent !important;
-  color: var(--muted-foreground) !important;
-  font-size: .62rem;
-  font-weight: 650;
-  white-space: nowrap;
-}
-.organizer-notifications-filters > button:hover { background: var(--muted) !important; color: var(--foreground) !important; }
-.organizer-notifications-filters > button[aria-pressed='true'] { background: var(--muted) !important; color: var(--foreground) !important; }
-.organizer-notifications-filters > button > span { display: inline-grid; min-width: 1.25rem; height: 1.25rem; place-items: center; padding-inline: .25rem; border-radius: 999px; background: color-mix(in srgb, var(--foreground) 8%, transparent); color: inherit; font-size: .53rem; }
-.organizer-notifications-count { flex: 0 0 auto; color: var(--muted-foreground); font-size: .6rem; white-space: nowrap; }
-.organizer-notifications-list { min-width: 0; }
-.organizer-notification-row {
-  display: flex;
-  width: 100%;
-  min-width: 0;
-  align-items: flex-start;
-  gap: .75rem;
-  padding: .9rem 1rem;
-  border: 0 !important;
-  border-bottom: 1px solid var(--border) !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  color: var(--foreground) !important;
-  text-align: left;
-  transition: background .16s ease;
-}
-.organizer-notification-row:last-child { border-bottom: 0 !important; }
-.organizer-notification-row:hover { background: color-mix(in srgb, var(--foreground) 3%, transparent) !important; }
-.organizer-notification-row.is-unread { background: color-mix(in srgb, var(--brand-blue) 5%, var(--card)) !important; }
-.organizer-notification-icon { display: grid; width: 2.35rem; height: 2.35rem; flex: 0 0 2.35rem; place-items: center; border-radius: .72rem; background: var(--muted); color: var(--muted-foreground); }
-.organizer-notification-row.is-unread .organizer-notification-icon { background: color-mix(in srgb, var(--brand-blue) 12%, var(--muted)); color: var(--brand-blue); }
-.organizer-notification-copy { display: grid; min-width: 0; flex: 1; gap: .22rem; }
-.organizer-notification-title { display: flex; align-items: flex-start; justify-content: space-between; gap: .6rem; color: var(--foreground); font-size: .72rem; font-weight: 700; line-height: 1.4; }
-.organizer-notification-title > i { width: .45rem; height: .45rem; flex: 0 0 .45rem; margin-top: .3rem; border-radius: 50%; background: #3478ee; }
-.organizer-notification-body { color: var(--muted-foreground); font-size: .65rem; line-height: 1.5; }
-.organizer-notification-time { margin-top: .1rem; color: var(--muted-foreground); font-size: .57rem; }
-.organizer-notification-row > svg:last-child { flex: 0 0 auto; margin-top: .25rem; color: var(--muted-foreground); }
-.organizer-notifications-empty { display: grid; min-height: 14rem; align-content: center; justify-items: center; gap: .4rem; padding: 2rem 1rem; text-align: center; }
-.organizer-notifications-empty > span { display: grid; width: 2.6rem; height: 2.6rem; place-items: center; border-radius: .8rem; background: var(--muted); color: var(--muted-foreground); }
-.organizer-notifications-empty > strong { color: var(--foreground); font-size: .82rem; }
-.organizer-notifications-empty > small { color: var(--muted-foreground); font-size: .65rem; }
-@media (max-width: 767px) {
-  #root .organizer-dashboard-shell .organizer-dashboard-main .organizer-notifications-page > .organizer-orders-heading { align-items: flex-start; }
-  .organizer-notifications-header-actions { align-items: flex-start; flex-direction: column; }
-  .organizer-notifications-toolbar { align-items: flex-start; flex-direction: column; }
-  .organizer-notifications-filters { width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-  .organizer-notifications-filters::-webkit-scrollbar { display: none; }
-  .organizer-notifications-count { align-self: flex-end; }
-  .organizer-notification-row { gap: .6rem; padding: .8rem .75rem; }
-}
-@media (max-width: 520px) {
-  #root .organizer-dashboard-shell .organizer-dashboard-main .organizer-notifications-page > .organizer-orders-heading { gap: .6rem; }
-  .organizer-notifications-header-actions { align-items: center; flex-direction: row; justify-content: space-between; }
 }
