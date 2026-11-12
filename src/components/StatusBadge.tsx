@@ -3,6 +3,7 @@ type StatusBadgeProps = {
   size?: 'sm' | 'md'
   tone?: 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'accent'
   color?: string
+  className?: string
 }
 
 type ToneStyle = { foreground: string; background: string; border: string }
@@ -26,12 +27,12 @@ function readableLabel(label: string) {
   return label.replace(/_/g, ' ')
 }
 
-export default function StatusBadge({ label, size = 'sm', tone }: StatusBadgeProps) {
+export default function StatusBadge({ label, size = 'sm', tone, className }: StatusBadgeProps) {
   const normalizedLabel = label.toLowerCase().replace(/\s+/g, '_')
   const semanticTone = tone ?? STATUS_TONES[normalizedLabel] ?? (normalizedLabel.includes('pending') ? 'warning' : normalizedLabel.includes('verified') ? 'success' : 'neutral')
   const palette = TONES[semanticTone]
   return (
-    <span className={`inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-full border font-bold capitalize ${size === 'md' ? 'px-3 py-1.5 text-xs' : 'px-2.5 py-1 text-[10px] tracking-[.02em]'}`} style={{ color: palette.foreground, background: palette.background, borderColor: palette.border }}>
+    <span className={`inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-full border font-bold capitalize ${size === 'md' ? 'px-3 py-1.5 text-xs' : 'px-2.5 py-1 text-[10px] tracking-[.02em]'} ${className ?? ''}`.trim()} style={{ color: palette.foreground, background: palette.background, borderColor: palette.border }}>
       <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: palette.foreground }} />
       {readableLabel(label)}
     </span>
