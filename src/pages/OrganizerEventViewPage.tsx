@@ -7,6 +7,7 @@ import { sendOrderTicketEmails } from '../lib/ticketEmail'
 import CheckInPanel from './CheckInPage'
 import { currentLocale, formatLocaleDate } from '../lib/locale'
 import { RichTextContent } from '../components/RichTextEditor'
+import i18n from '../lib/i18n'
 
 type Props = {
   event: Event | null
@@ -25,7 +26,7 @@ type Props = {
 }
 
 function formatDate(value: string) {
-  if (!value) return 'Date to be announced'
+  if (!value) return i18n.t('Date to be announced')
   return formatLocaleDate(`${value}T12:00:00`, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 }
 
@@ -53,7 +54,7 @@ function TrafficChart({ orders }: { orders: Order[] }) {
   }), [orders])
   const max = Math.max(...points.map(point => point.count), 1)
 
-  return <div className="mt-4 grid h-36 grid-cols-7 items-end gap-2" aria-label="Ticket order activity for the past seven days">
+        return <div className="mt-4 grid h-36 grid-cols-7 items-end gap-2" aria-label={i18n.t('Ticket order activity for the past seven days')}>
     {points.map(point => <div key={point.label} className="flex h-full flex-col items-center justify-end gap-2">
       <span className="text-[10px] font-bold" style={{ color: 'var(--muted-foreground)' }}>{point.count}</span>
       <div className="flex w-full flex-1 items-end"><div className="w-full rounded-t-md" style={{ height: `${point.count ? Math.max(10, point.count / max * 100) : 4}%`, background: 'linear-gradient(180deg, var(--primary), rgba(249,112,21,.28))' }} /></div>
@@ -72,15 +73,15 @@ function TicketCircle({ capacity, reserved, scanned }: { capacity: number; reser
 
   return <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-7">
     <div className="relative h-36 w-36 shrink-0">
-      <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" role="img" aria-label={`${reservedPercent}% of event ticket capacity reserved`}>
+            <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" role="img" aria-label={i18n.t(`${reservedPercent}% of event ticket capacity reserved`)}>
         <circle cx="50" cy="50" r={radius} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="10" />
         <circle cx="50" cy="50" r={radius} fill="none" stroke="#60a5fa" strokeWidth="10" strokeDasharray={`${scannedLength} ${circumference - scannedLength}`} strokeLinecap="round" />
         <circle cx="50" cy="50" r={radius} fill="none" stroke="var(--primary)" strokeWidth="10" strokeDasharray={`${reservedLength} ${circumference - reservedLength}`} strokeDashoffset={-scannedLength} strokeLinecap="round" />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center"><strong className="text-2xl font-black">{reservedPercent}%</strong><span className="text-[10px]" style={{ color: 'var(--muted-foreground)' }}>reserved</span></div>
+      <div className="absolute inset-0 flex flex-col items-center justify-center"><strong className="text-2xl font-black">{reservedPercent}%</strong><span className="text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{i18n.t('reserved')}</span></div>
     </div>
     <div className="grid w-full grid-cols-1 gap-3 text-sm">
-      {[["Reserved tickets", reserved, 'var(--primary)'], ['Scanned tickets', scanned, '#60a5fa'], ['Available tickets', Math.max(0, capacity - reserved), 'rgba(255,255,255,.32)']].map(([label, value, color]) => <div key={String(label)} className="flex items-center justify-between gap-4"><span className="flex items-center gap-2 text-xs" style={{ color: 'var(--muted-foreground)' }}><i className="h-2.5 w-2.5 rounded-full" style={{ background: String(color) }} />{String(label)}</span><b>{Number(value).toLocaleString()}</b></div>)}
+      {[[i18n.t('Reserved tickets'), reserved, 'var(--primary)'], [i18n.t('Scanned tickets'), scanned, '#60a5fa'], [i18n.t('Available tickets'), Math.max(0, capacity - reserved), 'rgba(255,255,255,.32)']].map(([label, value, color]) => <div key={String(label)} className="flex items-center justify-between gap-4"><span className="flex items-center gap-2 text-xs" style={{ color: 'var(--muted-foreground)' }}><i className="h-2.5 w-2.5 rounded-full" style={{ background: String(color) }} />{String(label)}</span><b>{Number(value).toLocaleString()}</b></div>)}
     </div>
   </div>
 }
@@ -99,9 +100,9 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
   const [savingSale, setSavingSale] = useState(false)
   if (!event) {
     return <div className="mx-auto max-w-5xl py-14 text-center">
-      <button type="button" onClick={onBack} aria-label="Back to events" title="Back to events" className="mb-6 flex h-10 w-10 items-center justify-center rounded-full" style={{ color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={18} /></button>
-      <p className="font-bold">{loading ? 'Loading event…' : 'Event not found'}</p>
-      {!loading && <p className="mt-2 text-sm" style={{ color: 'var(--muted-foreground)' }}>This event may have been removed or you may not have access to it.</p>}
+      <button type="button" onClick={onBack} aria-label={i18n.t('Back to events')} title={i18n.t('Back to events')} className="mb-6 flex h-10 w-10 items-center justify-center rounded-full" style={{ color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={18} /></button>
+      <p className="font-bold">{loading ? i18n.t('Loading event…') : i18n.t('Event not found')}</p>
+      {!loading && <p className="mt-2 text-sm" style={{ color: 'var(--muted-foreground)' }}>{i18n.t('This event may have been removed or you may not have access to it.')}</p>}
     </div>
   }
 
@@ -139,7 +140,7 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
       const orderTickets = eventTickets.filter(ticket => ticket.order_id === order.id)
       return {
       key: ((order as any).holder_email || (order as any).profiles?.email || order.id).toLowerCase(),
-      name: (order as any).holder_name || orderTickets[0]?.holder_name || (order as any).profiles?.full_name || 'Customer',
+      name: (order as any).holder_name || orderTickets[0]?.holder_name || (order as any).profiles?.full_name || i18n.t('Customer'),
       email: (order as any).holder_email || orderTickets[0]?.holder_email || (order as any).profiles?.email || '',
       phone: (order as any).holder_phone || orderTickets[0]?.holder_phone || '',
       ticketCount: orderTickets.length || order.order_items?.reduce((sum, item) => sum + item.quantity, 0) || 0,
@@ -168,7 +169,7 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
 
   const exportCustomers = () => {
     const csvRows = [
-      ['Customer', 'Email', 'Phone', 'Tickets', 'Amount', 'Status', 'Purchase date'],
+      [i18n.t('Customer'), i18n.t('Email'), i18n.t('Phone'), i18n.t('Tickets'), i18n.t('Amount'), i18n.t('Status'), i18n.t('Purchased')],
       ...filteredCustomers.map(customer => [customer.name, customer.email, customer.phone, customer.ticketCount, customer.amount, customer.status, new Date(customer.createdAt).toLocaleString()]),
     ]
     const csv = csvRows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(',')).join('\n')
@@ -183,10 +184,10 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
     setSaleError('')
     setSaleMessage('')
     const count = Number(quantity)
-    if (!selectedTier) { setSaleError('Choose a ticket type first.'); return }
-    if (!Number.isInteger(count) || count < 1) { setSaleError('Enter a valid ticket quantity.'); return }
-    if (!paymentMethod) { setSaleError('Select the payment method used.'); return }
-    if (!recipientEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())) { setSaleError('Enter a valid email address for ticket delivery.'); return }
+    if (!selectedTier) { setSaleError(i18n.t('Choose a ticket type first.')); return }
+    if (!Number.isInteger(count) || count < 1) { setSaleError(i18n.t('Enter a valid ticket quantity.')); return }
+    if (!paymentMethod) { setSaleError(i18n.t('Select the payment method used.')); return }
+    if (!recipientEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim())) { setSaleError(i18n.t('Enter a valid email address for ticket delivery.')); return }
     setSavingSale(true)
     const { data: orderId, error } = await supabase.rpc('record_organizer_ticket_sale', {
       p_event_id: event.id,
@@ -198,11 +199,11 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
       p_amount: saleAmount,
     })
     setSavingSale(false)
-    if (error || !orderId) { setSaleError(error?.message ?? 'The transaction could not be recorded.'); return }
+    if (error || !orderId) { setSaleError(error?.message ?? i18n.t('The transaction could not be recorded.')); return }
     const emailDelivery = await sendOrderTicketEmails(orderId)
     setSaleMessage(emailDelivery.failedCount
-      ? `Transaction recorded and tickets issued. ${emailDelivery.sentCount} of ${emailDelivery.total} ticket emails sent. ${emailDelivery.reason ?? ''}`
-      : `Transaction recorded. ${emailDelivery.sentCount} ticket${emailDelivery.sentCount === 1 ? '' : 's'} emailed successfully.`)
+      ? i18n.t('Transaction recorded and tickets issued. {{sent}} of {{total}} ticket emails sent. {{reason}}', { sent: emailDelivery.sentCount, total: emailDelivery.total, reason: emailDelivery.reason ?? '' })
+      : i18n.t('Transaction recorded. {{count}} ticket(s) emailed successfully.', { count: emailDelivery.sentCount }))
     setRecipientEmail('')
     setRecipientName('')
     setQuantity('1')
@@ -216,14 +217,13 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
   return <>
   <div className="organizer-event-view-page mx-auto w-full max-w-6xl space-y-5 pb-10">
     <div className="organizer-event-view-toolbar">
-      <button type="button" onClick={onBack} aria-label="Back to all events" title="Back to all events" className="organizer-event-view-icon-button organizer-event-view-action-button" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={18} /></button>
+      <button type="button" onClick={onBack} aria-label={i18n.t('Back to all events')} title={i18n.t('Back to all events')} className="organizer-event-view-icon-button organizer-event-view-action-button" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}><ArrowLeftIcon size={18} /></button>
       <div className="organizer-event-view-actions">
-        {event.status === 'published' && <button type="button" onClick={() => navigate('event-detail', event)} aria-label="Preview public event page" title="Preview public page" className="organizer-event-view-icon-button organizer-event-view-action-button" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.04)', color: 'var(--foreground)' }}><EyeIcon size={17} /></button>}
-        {canCheckIn && event.status === 'published' && <button type="button" onClick={() => setCheckInOpen(true)} aria-label="Check in guests" title="Check in guests" className="organizer-event-view-icon-button organizer-event-view-action-button" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.04)', color: 'var(--foreground)' }}><QrCodeIcon size={17} /></button>}
-        <button type="button" onClick={() => onEdit(event)} aria-label="Edit event and ticket tiers" title="Edit event and ticket tiers" className="organizer-event-view-icon-button organizer-event-view-action-button is-primary" style={{ background: 'var(--primary)', color: '#111' }}><EditIcon size={17} /></button>
+        {event.status === 'published' && <button type="button" onClick={() => navigate('event-detail', event)} aria-label={i18n.t('Preview public event page')} title={i18n.t('Preview public page')} className="organizer-event-view-icon-button organizer-event-view-action-button" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.04)', color: 'var(--foreground)' }}><EyeIcon size={17} /></button>}
+        {canCheckIn && event.status === 'published' && <button type="button" onClick={() => setCheckInOpen(true)} aria-label={i18n.t('Check in guests')} title={i18n.t('Check in guests')} className="organizer-event-view-icon-button organizer-event-view-action-button" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.04)', color: 'var(--foreground)' }}><QrCodeIcon size={17} /></button>}
+        <button type="button" onClick={() => onEdit(event)} aria-label={i18n.t('Edit event and ticket tiers')} title={i18n.t('Edit event and ticket tiers')} className="organizer-event-view-icon-button organizer-event-view-action-button is-primary" style={{ background: 'var(--primary)', color: '#111' }}><EditIcon size={17} /></button>
       </div>
     </div>
-
     <section className="organizer-event-view-hero relative min-h-[260px] overflow-hidden rounded-3xl border" style={{ borderColor: 'var(--border)', background: event.cover_image ? `linear-gradient(90deg, rgba(7,8,8,.94) 0%, rgba(7,8,8,.72) 54%, rgba(7,8,8,.2) 100%), url(${event.cover_image}) center/cover` : 'linear-gradient(130deg, #262018, #121414 70%)' }}>
       <div className="flex min-h-[260px] flex-col justify-end p-6 sm:p-9">
         <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -237,10 +237,10 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
 
     <section className="organizer-event-view-stats grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {[
-        { label: 'Net In-App Sales', value: formatPrice(netInAppSales), note: 'After fees, agent commissions, and processed refunds', Icon: DollarSignIcon, color: 'var(--primary)' },
-        { label: 'Net Cash Sales', value: formatPrice(cashSales), note: 'After fees, agent commissions, and processed refunds', Icon: DollarSignIcon, color: '#86efac' },
-        { label: 'Platform Commissions', value: formatPrice(platformCommission), note: 'Deducted from organizer proceeds', Icon: DollarSignIcon, color: '#c4a7ff' },
-        { label: 'Agent Commissions', value: formatPrice(agentCommission), note: 'Earned by ticket agents', Icon: UsersIcon, color: '#7dd3fc' },
+        { label: i18n.t('Net In-App Sales'), value: formatPrice(netInAppSales), note: i18n.t('After fees, agent commissions, and processed refunds'), Icon: DollarSignIcon, color: 'var(--primary)' },
+        { label: i18n.t('Net Cash Sales'), value: formatPrice(cashSales), note: i18n.t('After fees, agent commissions, and processed refunds'), Icon: DollarSignIcon, color: '#86efac' },
+        { label: i18n.t('Platform Commissions'), value: formatPrice(platformCommission), note: i18n.t('Deducted from organizer proceeds'), Icon: DollarSignIcon, color: '#c4a7ff' },
+        { label: i18n.t('Agent Commissions'), value: formatPrice(agentCommission), note: i18n.t('Earned by ticket agents'), Icon: UsersIcon, color: '#7dd3fc' },
       ].map(({ label, value, note, Icon }) => <article key={label} className="organizer-event-view-stat organizer-overview-stat">
         <span className="organizer-overview-stat-icon"><Icon size={17} strokeWidth={1.8} /></span>
         <small>{label}</small><strong>{value}</strong><span>{note}</span>
@@ -249,62 +249,62 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
 
     <div className="grid gap-5 lg:grid-cols-2">
     <section className="organizer-event-view-panel rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-      <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Traffic</p><h2 className="mt-1 text-lg font-bold">Ticket activity</h2></div><span className="rounded-lg px-2.5 py-1 text-[10px] font-bold" style={{ background: 'rgba(249,112,21,.1)', color: 'var(--primary)' }}>Last 7 days</span></div>
+      <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>{i18n.t('Traffic')}</p><h2 className="mt-1 text-lg font-bold">{i18n.t('Ticket activity')}</h2></div><span className="rounded-lg px-2.5 py-1 text-[10px] font-bold" style={{ background: 'rgba(249,112,21,.1)', color: 'var(--primary)' }}>{i18n.t('Last 7 days')}</span></div>
       <TrafficChart orders={trafficOrders} />
-      <p className="mt-3 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Orders per day. Public page visit tracking is not currently collected.</p>
+      <p className="mt-3 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{i18n.t('Orders per day. Public page visit tracking is not currently collected.')}</p>
     </section>
 
     <section className="organizer-event-view-panel rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Attendance and inventory</p><h2 className="mt-1 text-lg font-bold">Tickets summary</h2></div>
+        <div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>{i18n.t('Attendance and inventory')}</p><h2 className="mt-1 text-lg font-bold">{i18n.t('Tickets summary')}</h2></div>
       </div>
       <div className="mt-4"><TicketCircle capacity={maxTickets} reserved={ticketsReserved} scanned={checkedIn} /></div>
-      <div className="mt-5 flex items-center justify-between border-t pt-4 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}><span>Max tickets</span><b style={{ color: 'var(--foreground)' }}>{maxTickets.toLocaleString()}</b></div>
-      <p className="mt-4 border-t pt-4 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>{eventTickets.length.toLocaleString()} issued tickets · {remaining.toLocaleString()} remaining · {checkedIn.toLocaleString()} scanned</p>
+      <div className="mt-5 flex items-center justify-between border-t pt-4 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}><span>{i18n.t('Max tickets')}</span><b style={{ color: 'var(--foreground)' }}>{maxTickets.toLocaleString()}</b></div>
+      <p className="mt-4 border-t pt-4 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>{eventTickets.length.toLocaleString()} {i18n.t('issued tickets')} · {remaining.toLocaleString()} {i18n.t('remaining')} · {checkedIn.toLocaleString()} {i18n.t('scanned')}</p>
     </section>
     </div>
 
     <section className="organizer-event-view-panel organizer-event-view-customers overflow-hidden rounded-2xl border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
       <div className="flex flex-col gap-4 border-b p-5 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: 'var(--border)' }}>
-        <div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Audience</p><h2 className="mt-1 text-lg font-bold">Event customers <span className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>({filteredCustomers.length})</span></h2></div>
-        <button type="button" onClick={exportCustomers} disabled={!filteredCustomers.length} className="organizer-orders-export inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40"><DownloadIcon size={14} /> Export CSV</button>
+        <div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>{i18n.t('Audience')}</p><h2 className="mt-1 text-lg font-bold">{i18n.t('Event customers')} <span className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>({filteredCustomers.length})</span></h2></div>
+        <button type="button" onClick={exportCustomers} disabled={!filteredCustomers.length} className="organizer-orders-export inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2.5 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40"><DownloadIcon size={14} /> {i18n.t('Export CSV')}</button>
       </div>
       <div className="flex flex-col gap-3 p-4 sm:flex-row">
-        <label className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border px-3" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.025)' }}><SearchIcon size={15} /><input value={customerSearch} onChange={input => setCustomerSearch(input.target.value)} placeholder="Search name, email, or phone" className="min-w-0 flex-1 bg-transparent py-2.5 text-xs outline-none" /></label>
-        <select value={customerStatus} onChange={input => setCustomerStatus(input.target.value)} aria-label="Filter customers by ticket status" className="rounded-xl border px-3 py-2.5 text-xs" style={{ background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--foreground)' }}><option value="all">All ticket status</option><option value="valid">Valid</option><option value="scanned">Scanned</option><option value="cancelled">Cancelled</option></select>
+        <label className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border px-3" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.025)' }}><SearchIcon size={15} /><input value={customerSearch} onChange={input => setCustomerSearch(input.target.value)} placeholder={i18n.t('Search name, email, or phone')} className="min-w-0 flex-1 bg-transparent py-2.5 text-xs outline-none" /></label>
+        <select value={customerStatus} onChange={input => setCustomerStatus(input.target.value)} aria-label={i18n.t('Filter customers by ticket status')} className="rounded-xl border px-3 py-2.5 text-xs" style={{ background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--foreground)' }}><option value="all">{i18n.t('All ticket status')}</option><option value="valid">{i18n.t('Valid')}</option><option value="scanned">{i18n.t('Scanned')}</option><option value="cancelled">{i18n.t('Cancelled')}</option></select>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-xs">
-          <thead><tr>{['Customer', 'Email', 'Phone', 'Tickets', 'Amount', 'Status', 'Purchased'].map(label => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr></thead>
+          <thead><tr>{[i18n.t('Customer'), i18n.t('Email'), i18n.t('Phone'), i18n.t('Tickets'), i18n.t('Amount'), i18n.t('Status'), i18n.t('Purchased')].map(label => <th key={label} className="px-4 py-3 font-semibold">{label}</th>)}</tr></thead>
           <tbody>{filteredCustomers.map(customer => <tr key={customer.key} className="border-t" style={{ borderColor: 'var(--border)' }}><td className="px-4 py-3 font-semibold">{customer.name}</td><td className="px-4 py-3" style={{ color: 'var(--muted-foreground)' }}>{customer.email || '—'}</td><td className="px-4 py-3" style={{ color: 'var(--muted-foreground)' }}>{customer.phone || '—'}</td><td className="px-4 py-3">{customer.ticketCount}</td><td className="px-4 py-3 font-bold" style={{ color: 'var(--primary)' }}>{formatPrice(customer.amount)}</td><td className="px-4 py-3 capitalize">{customer.status}</td><td className="px-4 py-3" style={{ color: 'var(--muted-foreground)' }}>{new Date(customer.createdAt).toLocaleDateString()}</td></tr>)}
-            {filteredCustomers.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center" style={{ color: 'var(--muted-foreground)' }}>{customers.length ? 'No customers match these filters.' : 'No ticket holders for this event yet.'}</td></tr>}
+            {filteredCustomers.length === 0 && <tr><td colSpan={7} className="px-4 py-12 text-center" style={{ color: 'var(--muted-foreground)' }}>{customers.length ? i18n.t('No customers match these filters.') : i18n.t('No ticket holders for this event yet.')}</td></tr>}
           </tbody>
         </table>
       </div>
     </section>
 
     {canRecordTransaction && <section className="organizer-event-view-panel organizer-event-view-manual-sale rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-      <div className="mb-5"><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Manual sale</p><h2 className="mt-1 text-lg font-bold">Record Transaction</h2><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>Record a completed payment and issue tickets to the customer.</p></div>
+      <div className="mb-5"><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>{i18n.t('Manual sale')}</p><h2 className="mt-1 text-lg font-bold">{i18n.t('Record Transaction')}</h2><p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>{i18n.t('Record a completed payment and issue tickets to the customer.')}</p></div>
       {saleError && <p role="alert" className="mb-4 rounded-xl border px-4 py-3 text-xs" style={{ borderColor: 'rgba(239,68,68,.3)', background: 'rgba(239,68,68,.08)', color: '#fca5a5' }}>{saleError}</p>}
       {saleMessage && <p role="status" className="mb-4 rounded-xl border px-4 py-3 text-xs" style={{ borderColor: 'rgba(34,197,94,.3)', background: 'rgba(34,197,94,.08)', color: '#86efac' }}>{saleMessage}</p>}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <label className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Ticket<select value={selectedTier?.id ?? ''} onChange={input => setSelectedTierId(input.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm" style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}><option value="">Select ticket</option>{tiers.map(tier => <option key={tier.id} value={tier.id}>{tier.name} · {formatPrice(tier.price)}</option>)}</select></label>
-        <label className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>How Many Bought?<input type="number" min="1" max={selectedTier ? Math.max(1, selectedTier.quantity - selectedTier.sold) : undefined} value={quantity} onChange={input => setQuantity(input.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm" style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
-        <label className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Method used<select value={paymentMethod} onChange={input => setPaymentMethod(input.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm" style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}><option value="">Select method</option><option value="cash">Cash</option><option value="mobile_money">Mobile Money</option><option value="card">Card</option></select></label>
-        <label className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Send ticket to (email)<input type="email" value={recipientEmail} onChange={input => setRecipientEmail(input.target.value)} placeholder="customer@example.com" className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm" style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
-        <label className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Customer name<input value={recipientName} onChange={input => setRecipientName(input.target.value)} placeholder="Customer name (optional)" className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm" style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
-        <div className="rounded-xl border px-3 py-3" style={{ background: 'var(--background)', borderColor: 'var(--border)' }}><p className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>Amount</p><p className="mt-1 text-lg font-black" style={{ color: 'var(--primary)' }}>{formatPrice(saleAmount)}</p><p className="mt-0.5 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>Calculated from ticket price × quantity</p></div>
+        <label className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{i18n.t('Ticket')}<select value={selectedTier?.id ?? ''} onChange={input => setSelectedTierId(input.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm" style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}><option value="">{i18n.t('Select ticket')}</option>{tiers.map(tier => <option key={tier.id} value={tier.id}>{tier.name} · {formatPrice(tier.price)}</option>)}</select></label>
+        <label className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{i18n.t('How many bought?')}<input type="number" min="1" max={selectedTier ? Math.max(1, selectedTier.quantity - selectedTier.sold) : undefined} value={quantity} onChange={input => setQuantity(input.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm" style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
+        <label className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{i18n.t('Method used')}<select value={paymentMethod} onChange={input => setPaymentMethod(input.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm" style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }}><option value="">{i18n.t('Select method')}</option><option value="cash">{i18n.t('Cash')}</option><option value="mobile_money">{i18n.t('Mobile Money')}</option><option value="card">{i18n.t('Card')}</option></select></label>
+        <label className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{i18n.t('Send ticket to (email)')}<input type="email" value={recipientEmail} onChange={input => setRecipientEmail(input.target.value)} placeholder="customer@example.com" className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm" style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
+        <label className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{i18n.t('Customer name')}<input value={recipientName} onChange={input => setRecipientName(input.target.value)} placeholder={i18n.t('Customer name (optional)')} className="mt-1.5 w-full rounded-xl border px-3 py-3 text-sm" style={{ background: 'var(--background)', borderColor: 'var(--border)', color: 'var(--foreground)' }} /></label>
+        <div className="rounded-xl border px-3 py-3" style={{ background: 'var(--background)', borderColor: 'var(--border)' }}><p className="text-xs font-semibold" style={{ color: 'var(--muted-foreground)' }}>{i18n.t('Amount')}</p><p className="mt-1 text-lg font-black" style={{ color: 'var(--primary)' }}>{formatPrice(saleAmount)}</p><p className="mt-0.5 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{i18n.t('Calculated from ticket price × quantity')}</p></div>
       </div>
-      <button type="button" onClick={() => void recordTransaction()} disabled={savingSale || !selectedTier || !paymentMethod || !recipientEmail.trim() || saleAmount <= 0} className="mt-5 rounded-xl px-5 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50" style={{ background: 'var(--primary)', color: '#111' }}>{savingSale ? 'Recording…' : 'Record transaction & issue ticket'}</button>
+      <button type="button" onClick={() => void recordTransaction()} disabled={savingSale || !selectedTier || !paymentMethod || !recipientEmail.trim() || saleAmount <= 0} className="mt-5 rounded-xl px-5 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50" style={{ background: 'var(--primary)', color: '#111' }}>{savingSale ? i18n.t('Recording…') : i18n.t('Record transaction & issue ticket')}</button>
     </section>}
 
     <div className="grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
       <div className="space-y-5">
         <section className="organizer-event-view-panel rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-          <div className="organizer-wallet-panel-heading organizer-event-view-section-heading mb-4"><div><p className="organizer-finance-eyebrow">Event overview</p><h2>Details</h2></div><TrendingUpIcon size={18} /></div>
+          <div className="organizer-wallet-panel-heading organizer-event-view-section-heading mb-4"><div><p className="organizer-finance-eyebrow">{i18n.t('Event overview')}</p><h2>{i18n.t('Details')}</h2></div><TrendingUpIcon size={18} /></div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Detail Icon={CalendarIcon} label="Date" value={event.end_date && event.end_date !== event.date ? `${formatDate(event.date)} – ${formatDate(event.end_date)}` : formatDate(event.date)} />
-            <Detail Icon={ClockIcon} label="Time" value={(() => {
+            <Detail Icon={CalendarIcon} label={i18n.t('Date')} value={event.end_date && event.end_date !== event.date ? `${formatDate(event.date)} – ${formatDate(event.end_date)}` : formatDate(event.date)} />
+            <Detail Icon={ClockIcon} label={i18n.t('Time')} value={(() => {
               const start = event.time ? String(event.time).trim() : ''
               const end = event.end_time ? String(event.end_time).trim() : ''
               const formatTime = (value: string) => {
@@ -315,23 +315,23 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
               const endLabel = formatTime(end)
               return startLabel === 'TBA' && endLabel === 'TBA' ? 'TBA' : `${startLabel}${endLabel && endLabel !== 'TBA' ? ` – ${endLabel}` : ''}`
             })()} />
-            <Detail Icon={MapPinIcon} label="Venue" value={`${event.venue}${event.city ? `, ${event.city}` : ''}`} />
-            <Detail Icon={UsersIcon} label="Capacity" value={`${event.capacity.toLocaleString()} guests`} />
+            <Detail Icon={MapPinIcon} label={i18n.t('Venue')} value={`${event.venue}${event.city ? `, ${event.city}` : ''}`} />
+            <Detail Icon={UsersIcon} label={i18n.t('Capacity')} value={`${event.capacity.toLocaleString()} ${i18n.t('guests')}`} />
           </div>
-          {event.description && <div className="mt-5 border-t pt-5" style={{ borderColor: 'var(--border)' }}><h3 className="text-sm font-bold">About this event</h3><RichTextContent value={event.description} className="mt-2 text-sm leading-6" /></div>}
+          {event.description && <div className="mt-5 border-t pt-5" style={{ borderColor: 'var(--border)' }}><h3 className="text-sm font-bold">{i18n.t('About this event')}</h3><RichTextContent value={event.description} className="mt-2 text-sm leading-6" /></div>}
           {!!eventTags.length && <div className="mt-5 flex flex-wrap gap-2">{eventTags.map(tag => <span key={tag} className="rounded-full border px-3 py-1 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>#{tag}</span>)}</div>}
         </section>
 
         <section className="organizer-event-view-panel organizer-event-view-tiers rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-          <div className="organizer-wallet-panel-heading organizer-event-view-section-heading mb-4"><div><p className="organizer-finance-eyebrow">Inventory</p><h2>Ticket tiers</h2></div><span className="organizer-event-view-section-meta">{ticketsReserved.toLocaleString()} reserved</span></div>
-          {tiers.length === 0 ? <p className="rounded-xl border p-5 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>No ticket tiers have been added.</p> : <div className="space-y-3">{tiers.map(tier => {
+          <div className="organizer-wallet-panel-heading organizer-event-view-section-heading mb-4"><div><p className="organizer-finance-eyebrow">{i18n.t('Inventory')}</p><h2>{i18n.t('Ticket tiers')}</h2></div><span className="organizer-event-view-section-meta">{ticketsReserved.toLocaleString()} {i18n.t('reserved')}</span></div>
+          {tiers.length === 0 ? <p className="rounded-xl border p-5 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>{i18n.t('No ticket tiers have been added.')}</p> : <div className="space-y-3">{tiers.map(tier => {
             const tierRemaining = Math.max(0, tier.quantity - tier.sold)
             const tierPercent = tier.quantity ? Math.min(100, Math.round(tier.sold / tier.quantity * 100)) : 0
             return <div key={tier.id} className="organizer-event-view-tier rounded-xl border p-4" style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,.02)' }}>
-              <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="text-sm font-bold">{tier.name}</h3><p className="mt-1 text-lg font-black tracking-tight" style={{ color: 'var(--primary)' }}>{tier.price === 0 ? 'Free' : formatPrice(tier.price)}</p><p className="mt-0.5 text-[11px]" style={{ color: 'var(--muted-foreground)' }}>{tier.ticket_type === 'consumable' ? 'Consumable' : 'Non-consumable'}</p></div><div className="flex items-center gap-2"><span className="rounded-full px-3 py-1 text-[10px] font-bold" style={{ color: 'var(--primary)', background: 'color-mix(in srgb, var(--primary) 12%, transparent)' }}>{tier.sold.toLocaleString()} sold</span><button type="button" onClick={() => onEdit(event)} aria-label={`Edit ${tier.name} ticket tier`} title={`Edit ${tier.name} ticket tier`} className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[10px] font-bold transition hover:brightness-110" style={{ background: 'var(--card)', color: 'var(--foreground)' }}><EditIcon size={12} /> Edit tier</button></div></div>
+              <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="text-sm font-bold">{tier.name}</h3><p className="mt-1 text-lg font-black tracking-tight" style={{ color: 'var(--primary)' }}>{tier.price === 0 ? i18n.t('Free') : formatPrice(tier.price)}</p><p className="mt-0.5 text-[11px]" style={{ color: 'var(--muted-foreground)' }}>{tier.ticket_type === 'consumable' ? i18n.t('Consumable') : i18n.t('Non-consumable')}</p></div><div className="flex items-center gap-2"><span className="rounded-full px-3 py-1 text-[10px] font-bold" style={{ color: 'var(--primary)', background: 'color-mix(in srgb, var(--primary) 12%, transparent)' }}>{tier.sold.toLocaleString()} {i18n.t('sold')}</span><button type="button" onClick={() => onEdit(event)} aria-label={i18n.t('Edit {{name}} ticket tier', { name: tier.name })} title={i18n.t('Edit {{name}} ticket tier', { name: tier.name })} className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[10px] font-bold transition hover:brightness-110" style={{ background: 'var(--card)', color: 'var(--foreground)' }}><EditIcon size={12} /> {i18n.t('Edit tier')}</button></div></div>
               {tier.description && <p className="mt-2 text-xs leading-5" style={{ color: 'var(--muted-foreground)' }}>{tier.description}</p>}
-              {(tier.extra_info || (tier.group_size ?? 1) > 1 || tier.expires_at || tier.ticket_type === 'consumable') && <p className="mt-2 text-[11px]" style={{ color: 'var(--muted-foreground)' }}>{[tier.extra_info, tier.consumable_amount ? `Includes ${tier.consumable_amount} consumable(s)` : null, (tier.group_size ?? 1) > 1 ? `${tier.group_size} tickets per purchase` : null, tier.expires_at ? `Expires ${formatDate(tier.expires_at)}` : null].filter(Boolean).join(' · ')}</p>}
-              <div className="mt-3 flex items-center gap-3"><div className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}><div className="h-full rounded-full" style={{ width: `${tierPercent}%`, background: 'var(--primary)' }} /></div><span className="shrink-0 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{tierRemaining.toLocaleString()} left / {tier.quantity.toLocaleString()}</span></div>
+              {(tier.extra_info || (tier.group_size ?? 1) > 1 || tier.expires_at || tier.ticket_type === 'consumable') && <p className="mt-2 text-[11px]" style={{ color: 'var(--muted-foreground)' }}>{[tier.extra_info, tier.consumable_amount ? i18n.t('Includes {{count}} consumable(s)', { count: tier.consumable_amount }) : null, (tier.group_size ?? 1) > 1 ? i18n.t('{{count}} tickets per purchase', { count: tier.group_size ?? 1 }) : null, tier.expires_at ? i18n.t('Expires {{date}}', { date: formatDate(tier.expires_at) }) : null].filter(Boolean).join(' · ')}</p>}
+              <div className="mt-3 flex items-center gap-3"><div className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}><div className="h-full rounded-full" style={{ width: `${tierPercent}%`, background: 'var(--primary)' }} /></div><span className="shrink-0 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{tierRemaining.toLocaleString()} {i18n.t('left')} / {tier.quantity.toLocaleString()}</span></div>
             </div>
           })}</div>}
         </section>
@@ -339,22 +339,22 @@ export default function OrganizerEventViewPage({ event, orders, netRevenueByOrde
 
       <div className="space-y-5">
         <section className="organizer-event-view-panel rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-          <div className="mb-4"><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Location</p><h2 className="mt-1 text-lg font-bold">Venue</h2></div>
+          <div className="mb-4"><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>{i18n.t('Location')}</p><h2 className="mt-1 text-lg font-bold">{i18n.t('Venue')}</h2></div>
           <div className="mb-4 flex items-start gap-3"><MapPinIcon size={17} /><div><p className="text-sm font-semibold">{event.venue}</p><p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{event.city}</p></div></div>
           <div className="overflow-hidden rounded-xl border" style={{ borderColor: 'var(--border)' }}><iframe title={`${event.venue} location map`} src={`https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed`} className="h-56 w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" /></div>
-          <a href={mapUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block text-xs font-bold" style={{ color: 'var(--primary)' }}>Open in Google Maps ↗</a>
+          <a href={mapUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block text-xs font-bold" style={{ color: 'var(--primary)' }}>{i18n.t('Open in Google Maps ↗')}</a>
         </section>
 
         <section className="organizer-event-view-panel organizer-event-view-policies rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-          <p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Entry information</p><h2 className="mt-1 text-lg font-bold">Policies</h2>
-          <div className="mt-4 space-y-3"><div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,.03)' }}><p className="text-xs font-bold">Refund policy</p><RichTextContent value={event.refund_policy || 'Tickets are non-refundable'} className="mt-1 text-sm" /></div><div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,.03)' }}><p className="text-xs font-bold">Entry policy</p><RichTextContent value={event.entry_policy || 'Valid ID required at entry'} className="mt-1 text-sm" /></div>{event.terms_and_conditions && <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,.03)' }}><p className="text-xs font-bold">Terms &amp; conditions</p><RichTextContent value={event.terms_and_conditions} className="mt-1 text-sm" /></div>}</div>
+          <p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>{i18n.t('Entry information')}</p><h2 className="mt-1 text-lg font-bold">{i18n.t('Policies')}</h2>
+          <div className="mt-4 space-y-3"><div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,.03)' }}><p className="text-xs font-bold">{i18n.t('Refund policy')}</p><RichTextContent value={event.refund_policy || i18n.t('Tickets are non-refundable')} className="mt-1 text-sm" /></div><div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,.03)' }}><p className="text-xs font-bold">{i18n.t('Entry policy')}</p><RichTextContent value={event.entry_policy || i18n.t('Valid ID required at entry')} className="mt-1 text-sm" /></div>{event.terms_and_conditions && <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,.03)' }}><p className="text-xs font-bold">{i18n.t('Terms & conditions')}</p><RichTextContent value={event.terms_and_conditions} className="mt-1 text-sm" /></div>}</div>
         </section>
 
         <section className="organizer-event-view-panel rounded-2xl border p-5 sm:p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-          <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>Sales progress</p><h2 className="mt-1 text-lg font-bold">Capacity</h2></div><span className="text-sm font-black">{salesProgress}%</span></div>
+          <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.2em]" style={{ color: 'var(--primary)' }}>{i18n.t('Sales progress')}</p><h2 className="mt-1 text-lg font-bold">{i18n.t('Capacity')}</h2></div><span className="text-sm font-black">{salesProgress}%</span></div>
           <div className="mt-4 h-2.5 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}><div className="h-full rounded-full" style={{ width: `${salesProgress}%`, background: 'linear-gradient(90deg, var(--primary), #ffc176)' }} /></div>
-          <div className="mt-2 flex justify-between text-xs" style={{ color: 'var(--muted-foreground)' }}><span>{ticketsReserved.toLocaleString()} reserved</span><span>{maxTickets.toLocaleString()} total tickets</span></div>
-          <p className="mt-4 border-t pt-4 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>{eventOrders.length.toLocaleString()} total orders · {checkedIn.toLocaleString()} checked in</p>
+          <div className="mt-2 flex justify-between text-xs" style={{ color: 'var(--muted-foreground)' }}><span>{ticketsReserved.toLocaleString()} {i18n.t('reserved')}</span><span>{maxTickets.toLocaleString()} {i18n.t('total tickets')}</span></div>
+          <p className="mt-4 border-t pt-4 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>{eventOrders.length.toLocaleString()} {i18n.t('total orders')} · {checkedIn.toLocaleString()} {i18n.t('checked in')}</p>
         </section>
       </div>
     </div>
