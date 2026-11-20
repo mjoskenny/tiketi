@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { CalendarIcon, CheckIcon, FacebookIcon, HeartIcon, InstagramIcon, LinkIcon, MapPinIcon, ShareNodesIcon, TwitterXIcon, WhatsAppIcon, XIcon } from './Icon'
+import { CalendarIcon, CheckIcon, FacebookIcon, HeartIcon, InstagramIcon, LinkIcon, MapPinIcon, ShareNodesIcon, TagIcon, TwitterXIcon, WhatsAppIcon, XIcon } from './Icon'
 import type { Event } from '../lib/types'
 import { getEventPhase, getEventStartTimestamp } from '../lib/eventTime'
 import { isFavoriteEvent, toggleFavoriteEvent } from '../lib/favorites'
@@ -34,8 +34,7 @@ type Props = {
 
 function fmtPrice(n: number, listing: boolean) {
   if (n === 0) return 'Free'
-  const price = `${n.toLocaleString()} BIF`
-  return listing ? price : `From ${price}`
+  return `${n.toLocaleString()} BIF`
 }
 
 function eventShareUrl(event: Event) {
@@ -138,31 +137,24 @@ export default function EventCard({ event, onClick, size = 'md', compact = false
     return <article className={`qpassa-agenda-card group${ended ? ' is-ended' : ''}`}>
       <button type="button" className="qpassa-agenda-card-main" onClick={onClick} aria-label={`View ${event.title}`}>
         <span className="qpassa-agenda-media" aria-hidden="true">
-          <span className="qpassa-agenda-date"><span>{dateMonthName}</span><strong>{dateDayNumber}</strong><span>{dateDayName}</span></span>
           <span className="qpassa-agenda-image"><img src={img} alt="" loading="lazy" /></span>
         </span>
         <span className="qpassa-agenda-copy">
+          <span className="qpassa-agenda-venue"><MapPinIcon size={13} />{event.venue}</span>
           <strong data-locale-ignore>{event.title}</strong>
-          <span className="qpassa-agenda-venue"><MapPinIcon size={13} />{event.venue}{event.city ? ` · ${event.city}` : ''}</span>
+          <span className="qpassa-agenda-meta"><span className="qpassa-agenda-price"><TagIcon size={12} className="qpassa-agenda-price-icon" />{fmtPrice(minPrice, true)}</span><span className="qpassa-agenda-meta-separator" aria-hidden="true">|</span><span className="qpassa-agenda-datetime"><CalendarIcon size={13} />{formattedDateTime}</span></span>
         </span>
       </button>
-      <span className="qpassa-agenda-actions">
-        <span className="qpassa-agenda-price">{fmtPrice(minPrice, false)}</span>
-        <button type="button" className="qpassa-agenda-cta" onClick={onClick} disabled={ended} aria-label={ended ? `${event.title} has ended` : `Get tickets for ${event.title}`}>
-          {ended ? 'Ended' : 'Get tickets'}
-        </button>
-      </span>
     </article>
   }
 
-  const width = trending ? 240 : poster ? 327 : size === 'lg' ? 360 : size === 'sm' ? 250 : 300
-  const cardWidth = trending ? 'min(100%, 240px)' : compact || fullWidthMobile ? '100%' : `min(100%, ${width}px)`
+  const width = trending ? 250 : poster ? 327 : size === 'lg' ? 360 : size === 'sm' ? 250 : 300
+  const cardWidth = trending ? '250px' : compact || fullWidthMobile ? '100%' : `min(100%, ${width}px)`
   return <>
-  <article onClick={onClick} className={`tixian-event-card group relative isolate flex aspect-[4/5] shrink-0 cursor-pointer flex-col overflow-hidden rounded-[2rem] border bg-[#111] transition-all duration-500 ${trending ? 'tixian-event-card-trending' : ''} ${poster && !trending ? 'tixian-event-card-poster' : ''} ${ended ? 'tixian-event-card-ended border-white/15 hover:-translate-y-0 hover:border-white/25 hover:shadow-[0_20px_45px_-24px_rgba(255,255,255,0.2)]' : 'border-white/5 hover:-translate-y-1 hover:border-white/15 hover:shadow-[0_24px_55px_-20px_rgba(255,120,40,0.28)]'} ${listing ? 'tixian-event-card-listing' : ''} ${fullWidthMobile ? 'event-card-full-mobile' : ''}`} style={{ width: cardWidth }}>
+  <article onClick={onClick} className={`tixian-event-card group relative isolate flex ${trending ? 'aspect-[4/5]' : 'aspect-[7/10]'} shrink-0 cursor-pointer flex-col overflow-hidden rounded-[2rem] border bg-[#111] transition-all duration-500 ${trending ? 'tixian-event-card-trending' : ''} ${poster && !trending ? 'tixian-event-card-poster' : ''} ${ended ? 'tixian-event-card-ended border-white/15 hover:-translate-y-0 hover:border-white/25 hover:shadow-[0_20px_45px_-24px_rgba(255,255,255,0.2)]' : 'border-white/5 hover:-translate-y-1 hover:border-white/15 hover:shadow-[0_24px_55px_-20px_rgba(255,120,40,0.28)]'} ${listing ? 'tixian-event-card-listing' : ''} ${fullWidthMobile ? 'event-card-full-mobile' : ''}`} style={{ width: cardWidth }}>
     <div className="absolute inset-0 overflow-hidden">
-      <img src={img} alt={event.title} className={`h-full w-full object-cover transition-all duration-700 ease-out ${ended ? 'grayscale opacity-45' : 'opacity-100 group-hover:scale-110'}`} loading="lazy" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/10 to-transparent opacity-80" />
-      <div className={`absolute inset-0 ${poster && !trending ? 'bg-gradient-to-b from-black/80 via-black/25 to-transparent' : 'bg-gradient-to-b from-black/65 via-black/20 to-transparent'}`} />
+      <img src={img} alt={event.title} className={`h-full w-full object-cover ${ended ? 'grayscale opacity-45' : 'opacity-100'}`} loading="lazy" />
+      <div className="absolute inset-0 pointer-events-none" />
     </div>
 
     {!trending && <div className="absolute left-4 right-4 top-4 z-20 flex items-center justify-between gap-3 sm:left-5 sm:right-5 sm:top-5">
@@ -188,15 +180,8 @@ export default function EventCard({ event, onClick, size = 'md', compact = false
       </>}
     </div>}
 
-    {trending && <div className="absolute left-4 top-4 z-20 flex items-center gap-3">
-      <div className="trending-date-badge flex flex-col items-center rounded-[1.1rem] border border-white/10 bg-black/20 px-2 py-1.5 text-center shadow-[0_12px_30px_rgba(0,0,0,0.28)] backdrop-blur-md">
-        <span className="trending-date-label text-[7px] font-black uppercase tracking-[0.22em] text-white/60">{dateDayName}</span>
-        <span className="trending-date-day mt-0.5 text-[1.2rem] font-black leading-none tracking-[-0.08em] text-white">{dateDayNumber}</span>
-        <span className="trending-date-month mt-0.5 text-[6px] font-semibold uppercase tracking-[0.18em] text-white/55">{dateMonthName}</span>
-      </div>
-      <div className="relative isolate max-w-[calc(100%-78px)]">
-        <h4 data-locale-ignore className="trending-card-title-inline line-clamp-2 text-sm font-medium uppercase leading-[1.02] tracking-[-0.05em] text-white">{event.title}</h4>
-      </div>
+    {trending && <div className="absolute left-3 right-3 top-3 z-20 flex items-start justify-end gap-2">
+      <span className="event-card-price max-w-[55%] truncate rounded-xl border border-white/10 bg-black/45 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider text-[#ffdbb6] shadow-2xl backdrop-blur-xl">{fmtPrice(minPrice, listing)}</span>
     </div>}
 
     {!trending && !poster && <button onClick={e => { e.stopPropagation(); if (!user) { window.dispatchEvent(new CustomEvent('tiketi:require-auth', { detail: { title: 'Sign in to save events', message: 'Create an account to bookmark events you love.' } })); return; } void toggleFavoriteEvent(event.id).then(setLiked) }} aria-label={liked ? 'Remove from favorites' : 'Save event'} aria-pressed={liked} className="event-card-action absolute right-4 top-[3.75rem] z-20 flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-black/45 text-white backdrop-blur-xl transition-all duration-300 hover:bg-white/15 active:scale-95 sm:right-5 sm:top-[4rem]" style={{ color: liked && !ended ? '#ff9d70' : undefined }}>
@@ -205,30 +190,16 @@ export default function EventCard({ event, onClick, size = 'md', compact = false
 
     {!trending && !poster && highDemand && <span className="absolute right-5 top-[4.25rem] z-10 rounded-full border border-[#ffdbb6]/20 bg-black/60 px-3 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-[#ffdbb6] backdrop-blur-xl">High demand</span>}
 
-    {trending ? <div className="event-card-details event-card-details-trending absolute inset-x-3 bottom-3 z-10 rounded-[1.2rem] border border-white/10 bg-black/25 p-2.5 shadow-[0_16px_32px_rgba(0,0,0,0.28)] backdrop-blur-xl transition-all duration-500 sm:inset-x-3.5 sm:bottom-3.5">
-      <div className="space-y-2.5">
-        <div className="flex min-w-0 items-center justify-between gap-2 text-[8px] font-black uppercase tracking-[0.14em] text-white/70">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <MapPinIcon size={11} className="shrink-0 text-white/45" />
-            <span className="truncate">{event.venue}</span>
-          </span>
-          <span className="shrink-0 text-[#ffb77c]">{fmtPrice(minPrice, true)}</span>
-        </div>
-
-        <div className="flex min-w-0 items-center justify-between gap-2 border-t border-white/10 pt-1.5">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <span className="relative grid h-7 w-7 shrink-0 place-items-center overflow-visible rounded-full border border-white/10 bg-white/10 text-[7px] font-black text-white">
-              {organizerAvatar ? <img src={organizerAvatar} alt="" className="h-full w-full rounded-full object-cover" loading="lazy" /> : organizerName.slice(0, 1).toUpperCase()}
-              {organizerVerified && <span className="absolute -bottom-1 -right-1 flex h-[15px] w-[15px] items-center justify-center rounded-full border-2 border-[#161412] bg-[#1689ff] text-white shadow-md" aria-label="Verified organizer"><CheckIcon size={8} /></span>}
-            </span>
-            <span data-locale-ignore className="truncate text-[8px] font-black uppercase tracking-[0.12em] text-white/85">{organizerName}</span>
-          </div>
-        </div>
+    {trending ? <div className="event-card-details event-card-details-trending absolute inset-x-3 bottom-3 z-10 rounded-[1.2rem] border border-white/10 bg-black/25 p-3 shadow-[0_16px_32px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:inset-x-3.5 sm:bottom-3.5">
+      <div className="space-y-2">
+        <h4 data-locale-ignore className="truncate text-[0.725rem] font-medium uppercase leading-snug tracking-tight text-white" title={event.title}>{event.title}</h4>
+        <div className="flex min-w-0 items-center gap-2 whitespace-nowrap text-[9px] font-bold uppercase tracking-[0.04em] text-white/65"><CalendarIcon size={12} className="shrink-0 text-white/55" /><span className="truncate">{formattedDateTime}</span></div>
+        <div className="flex min-w-0 items-center gap-2 border-t border-white/10 pt-2 text-[9px] font-bold uppercase tracking-[0.04em] text-white/65"><MapPinIcon size={12} className="shrink-0 text-white/55" /><span className="truncate">{event.venue}</span></div>
       </div>
-    </div> : <div className={`event-card-details absolute inset-x-3 bottom-3 z-10 rounded-[2rem] border p-4 shadow-2xl backdrop-blur-xl transition-all duration-500 sm:inset-x-3.5 sm:bottom-3.5 sm:p-4 ${ended ? 'border-white/15 bg-black/75 group-hover:-translate-y-0 group-hover:border-white/20' : `border-white/5 group-hover:-translate-y-1 ${listing ? 'bg-black/35 group-hover:border-white/20 group-hover:bg-black/45' : 'bg-[#111]/85 group-hover:border-white/20 group-hover:bg-[#111]/95'}`}`} style={listing ? { paddingBottom: '1.5rem' } : undefined}>
-      <div className={listing ? 'space-y-2.5' : 'space-y-3'}>
-        <div className={listing ? 'space-y-2' : 'space-y-1'}>
-          <h4 data-locale-ignore className={`event-card-title line-clamp-2 text-sm font-medium uppercase italic leading-snug tracking-tighter text-white transition-colors ${ended ? 'group-hover:text-white' : listing ? 'group-hover:text-[var(--primary-light)]' : 'group-hover:text-[#ffdbb6]'}`}>{event.title}</h4>
+    </div> : <div className={`event-card-details absolute inset-x-3 bottom-3 z-10 rounded-[2rem] border ${listing ? 'p-3 sm:p-3.5' : 'p-4 sm:p-4'} shadow-2xl backdrop-blur-xl transition-all duration-500 sm:inset-x-3.5 sm:bottom-3.5 ${ended ? 'border-white/15 bg-black/75 group-hover:-translate-y-0 group-hover:border-white/20' : `border-white/5 group-hover:-translate-y-1 ${listing ? 'bg-black/35 group-hover:border-white/20 group-hover:bg-black/45' : 'bg-[#111]/85 group-hover:border-white/20 group-hover:bg-[#111]/95'}`}`} style={listing ? { paddingBottom: '1rem' } : undefined}>
+      <div className={listing ? 'space-y-2' : 'space-y-3'}>
+        <div className={listing ? 'space-y-1.5' : 'space-y-1'}>
+          <h4 data-locale-ignore className={`event-card-title truncate text-sm font-medium uppercase italic leading-snug tracking-tighter text-white transition-colors ${ended ? 'group-hover:text-white' : listing ? 'group-hover:text-[var(--primary-light)]' : 'group-hover:text-[#ffdbb6]'}`} title={event.title}>{event.title}</h4>
           {listing ? <div className="event-card-meta flex min-w-0 items-center gap-3 whitespace-nowrap text-[9px] font-black uppercase tracking-[0.04em] text-white/65 sm:gap-3 sm:text-[10px]">
             {!poster && <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap"><CalendarIcon size={13} className="shrink-0 text-white/55" /><span>{formattedDateTime}</span></span>}
             <span className="flex min-w-0 items-center gap-1.5"><MapPinIcon size={14} className={`shrink-0 ${ended ? 'text-white/60' : 'text-[var(--primary-light)]'}`} /><span className="truncate">{event.venue}</span></span>
@@ -241,7 +212,7 @@ export default function EventCard({ event, onClick, size = 'md', compact = false
           <MapPinIcon size={16} className={`shrink-0 ${ended ? 'text-white/60' : 'text-[#ffdbb6]'}`} />
           <span className="truncate">{event.venue}</span>
         </div>}
-        {listing && <div className="flex min-w-0 items-center gap-2 border-t border-white/5 pt-2.5 text-[10px] font-black uppercase tracking-[0.1em] text-white/70">
+        {listing && <div className="flex min-w-0 items-center gap-2 border-t border-white/5 pt-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-white/70">
           <span className="relative grid h-7 w-7 shrink-0 place-items-center overflow-visible rounded-full border border-white/10 bg-white/10 text-[10px] text-white">
             {organizerAvatar ? <img src={organizerAvatar} alt="" className={`h-full w-full rounded-full object-cover ${ended ? 'grayscale' : ''}`} loading="lazy" /> : organizerName.slice(0, 1).toUpperCase()}
             {organizerVerified && <span className={`absolute -bottom-1 -right-1 flex h-[15px] w-[15px] items-center justify-center rounded-full border-2 border-[#161412] text-white shadow-md ${ended ? 'bg-white text-black' : 'bg-[#1689ff]'}`} aria-label="Verified organizer"><CheckIcon size={8} /></span>}

@@ -487,7 +487,7 @@ export default function EventsPage({ navigate }: Props) {
                 <span className="text-xs font-medium" style={{ color: 'var(--muted-foreground)' }}>{eventsOnDate.length} event{eventsOnDate.length === 1 ? '' : 's'}</span>
               </header>
               <div className="qpassa-agenda-grid grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                {eventsOnDate.map(event => <EventCard key={event.id} event={event} agenda fullWidthMobile listing onClick={() => navigate('event-detail', event)} />)}
+                {eventsOnDate.map(event => <EventCard key={event.id} event={event} compact listing onClick={() => navigate('event-detail', event)} />)}
               </div>
             </section>)}
           </div>

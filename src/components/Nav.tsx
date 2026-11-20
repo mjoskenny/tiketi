@@ -274,13 +274,17 @@ export default function Nav({ current, navigate, profile, user }: NavProps) {
                 ...(!isOrganizer && isLoggedIn ? [{ label: 'My Tickets', page: 'my-tickets' }] : []),
                 ...(shouldShowOrganizerDashboard ? [{ label: 'Dashboard', page: 'dashboard' }] : []),
                 ...(agentAssignments.length > 0 ? [{ label: 'Agent Dashboard', page: 'agent-dashboard' }] : []),
-              ].map(({ label, page }) => (
-                <button key={page} onClick={() => { navigate(page); setMenuOpen(false) }}
-                  className="nav-mobile-link text-left py-3 px-3 rounded-xl text-sm font-medium"
-                  style={{ color: current === page ? 'var(--foreground)' : 'var(--muted-foreground)', background: current === page ? 'var(--muted)' : 'transparent' }}>
-                  {label}
-                </button>
-              ))}
+              ].map(({ label, page }) => {
+                const active = current === page || (page === 'discover' && current === 'home')
+                return (
+                  <button key={page} onClick={() => { navigate(page); setMenuOpen(false) }}
+                    className={`nav-mobile-link text-left py-3 px-3 rounded-xl text-sm font-medium ${active ? 'is-active' : ''}`}
+                    aria-current={active ? 'page' : undefined}
+                    style={{ color: active ? 'var(--foreground)' : 'var(--muted-foreground)', background: active ? 'var(--muted)' : 'transparent' }}>
+                    {label}
+                  </button>
+                )
+              })}
               <button onClick={() => { navigate('auth-organizer'); setMenuOpen(false) }}
                 className="nav-create-event gradient-action mt-2 rounded-xl px-4 py-3 text-sm font-bold text-center transition-all active:scale-[0.98]">
                 Create Event

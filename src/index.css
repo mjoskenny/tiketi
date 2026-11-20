@@ -13,25 +13,25 @@
   --brand-orange-highlight: #ff8533;
   --brand-orange-ink: #b83b00;
   --brand-orange-soft: rgba(255, 106, 0, .14);
-  --background: #111318;
-  --background-secondary: #171a20;
-  --foreground: #f5f7fb;
-  --card: #1a1d24;
-  --card-foreground: #f5f7fb;
-  --elevated: #22262e;
+  --background: #151513;
+  --background-secondary: #1d1c19;
+  --foreground: #f5f3ee;
+  --card: #24231f;
+  --card-foreground: #f5f3ee;
+  --elevated: #2b2a25;
   --primary: var(--brand-blue);
   --primary-light: #60a5fa;
   --primary-hover: var(--brand-blue-hover);
   --primary-pressed: var(--brand-blue-pressed);
   --primary-foreground: #ffffff;
-  --secondary: #1d2027;
-  --secondary-foreground: #c2cad7;
-  --muted: #22262e;
-  --muted-foreground: #a3adbd;
+  --secondary: #24231f;
+  --secondary-foreground: #c9c6bd;
+  --muted: #2b2a25;
+  --muted-foreground: #aaa69c;
   --accent: var(--brand-orange);
   --accent-lime: var(--brand-orange);
   --accent-foreground: #17100a;
-  --border: #343942;
+  --border: #3a3832;
   --border-hover: rgba(96, 165, 250, .62);
   --ring: var(--brand-blue-focus);
   --success: #4ade80;
@@ -53,9 +53,9 @@
   --ticket-invalid: #fb7185;
   --qr-surface: #ffffff;
   --qr-ink: #101318;
-  --control-bg: #171a20;
-  --navigation-surface: rgba(17, 19, 24, .94);
-  --modal-surface: #1a1d24;
+  --control-bg: #201f1b;
+  --navigation-surface: rgba(21, 21, 19, .94);
+  --modal-surface: #24231f;
   --hover: rgba(148, 163, 184, .10);
   --selected: rgba(37, 99, 235, .18);
   --disabled: #394352;
@@ -90,19 +90,19 @@
 
 :root[data-theme='light'] {
   color-scheme: light;
-  --background: #f0f1f3;
-  --background-secondary: #e7e9ed;
-  --foreground: #111827;
-  --card: #f8f9fa;
-  --card-foreground: #111827;
+  --background: #e1ded8;
+  --background-secondary: #d7d4ce;
+  --foreground: #171614;
+  --card: #f7f5f0;
+  --card-foreground: #171614;
   --elevated: #ffffff;
   --primary-light: #1d4ed8;
-  --secondary: #e7e9ed;
-  --secondary-foreground: #374151;
-  --muted: #e7e9ed;
-  --muted-foreground: #526071;
+  --secondary: #d7d4ce;
+  --secondary-foreground: #45433e;
+  --muted: #d7d4ce;
+  --muted-foreground: #68655e;
   --accent-foreground: #ffffff;
-  --border: #d5d8de;
+  --border: #cbc7bf;
   --border-hover: rgba(37, 99, 235, .55);
   --ring: #2563eb;
   --type-primary: #111827;
@@ -111,9 +111,9 @@
   --type-disabled: #7b8796;
   --glass: rgba(255, 255, 255, .78);
   --glass-border: rgba(17, 24, 39, .12);
-  --control-bg: #ffffff;
-  --navigation-surface: rgba(240, 241, 243, .96);
-  --modal-surface: #ffffff;
+  --control-bg: #f7f5f0;
+  --navigation-surface: rgba(225, 222, 216, .96);
+  --modal-surface: #f7f5f0;
   --hover: rgba(17, 24, 39, .055);
   --selected: rgba(37, 99, 235, .10);
   --disabled: #e5eaf1;
@@ -232,6 +232,7 @@ html, body, #root {
 }
 
 body {
+  color: var(--foreground);
   font-family: var(--font-satoshi);
   font-size: 16px;
   line-height: var(--line-body);
@@ -754,33 +755,31 @@ button[style*="124,58,237"],
 .tixian-event-card:not(.tixian-event-card-ended):hover > div:first-child > img { filter: brightness(1.22) saturate(1.1); }
 .trending-events-marquee {
   position: relative;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: x mandatory;
   padding: .85rem .85rem 1.2rem;
   margin-inline: -.85rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
+.trending-events-marquee::-webkit-scrollbar { height: 5px; }
+.trending-events-marquee::-webkit-scrollbar-thumb { border-radius: 9999px; background: var(--border); }
+.trending-events-marquee::-webkit-scrollbar-track { background: transparent; }
 .trending-events-track {
   position: relative;
   display: flex;
-  min-width: max-content;
+  width: max-content;
+  min-width: 0;
   gap: 1.25rem;
-  will-change: transform;
-  animation: trending-events-marquee-scroll 18s linear infinite;
-}
-.trending-events-marquee:hover .trending-events-track,
-.trending-events-marquee:focus-within .trending-events-track {
-  animation-play-state: paused;
-}
-.trending-events-group { backface-visibility: hidden; }
-@keyframes trending-events-marquee-scroll {
-  from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(calc(0px - var(--trending-cycle-width, 0px)), 0, 0); }
-}
-.trending-events-marquee::-webkit-scrollbar {
-  display: none;
+  padding-block: .1rem;
 }
 .tixian-event-card-trending {
+  flex: 0 0 clamp(210px, 22vw, 280px);
   width: clamp(210px, 22vw, 280px);
   min-width: 210px;
   max-width: 280px;
+  scroll-snap-align: start;
   border: 1px solid rgba(255,255,255,.16);
   border-radius: 1.5rem;
   box-shadow: 0 8px 20px rgba(0,0,0,.14);
@@ -859,7 +858,7 @@ button[style*="124,58,237"],
   text-shadow: 0 8px 18px rgba(0,0,0,0.35);
 }
 .tixian-event-card-trending .event-card-details-trending {
-  background: rgba(9,9,9,.38);
+  background: rgba(24,24,24,.42);
   border: 1px solid rgba(255,255,255,.15);
   box-shadow: 0 4px 12px rgba(0,0,0,.12);
 }
@@ -3434,7 +3433,44 @@ button[style*="var(--brand-blue)"],
   margin-inline: 0;
   padding: .25rem .5rem .75rem;
 }
-.home-trending-section .trending-events-track { padding-block: 0 !important; }
+.home-trending-section .trending-events-track { gap: 1rem; padding-block: 0 !important; }
+@media (max-width: 767px) {
+  .home-trending-section .trending-events-marquee { scrollbar-width: none; }
+  .home-trending-section .trending-events-marquee::-webkit-scrollbar { display: none; }
+}
+
+/* Minimal category cards sit directly beneath the active-events rail. */
+.home-categories-section .home-section-heading { margin-bottom: .75rem !important; }
+.home-category-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .55rem;
+}
+.home-category-card {
+  display: inline-flex;
+  min-height: 2.45rem;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem .85rem;
+  border: 0 !important;
+  border-radius: 9999px !important;
+  background: var(--card) !important;
+  color: var(--muted-foreground) !important;
+  box-shadow: none !important;
+  font-size: .78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color .18s ease, color .18s ease;
+}
+.home-category-card:hover { background: var(--elevated) !important; color: var(--foreground) !important; }
+:root[data-theme='dark'] .home-category-card[data-active='true'] { background: #ffffff !important; color: #111318 !important; }
+:root[data-theme='light'] .home-category-card[data-active='true'] { background: #111318 !important; color: #ffffff !important; }
+.home-category-icon { display: inline-flex; width: 1rem; height: 1rem; align-items: center; justify-content: center; line-height: 1; }
+@media (max-width: 639px) {
+  .home-category-rail { flex-wrap: nowrap; overflow-x: auto; padding: 0 .1rem .25rem; scrollbar-width: none; }
+  .home-category-rail::-webkit-scrollbar { display: none; }
+  .home-category-card { flex: 0 0 auto; }
+}
 
 /* This row sits directly below the home search input; keep its selected filter black in either theme. */
 :root[data-theme='light'] .attendee-theme .home-filter-row .home-time-filter[data-active='true'],
@@ -3569,17 +3605,17 @@ button[style*="var(--brand-blue)"],
 .digital-ticket-page .digital-ticket-primary-action,
 .qpassa-tickets-page button[style*="var(--primary)"] { border: 0 !important; }
 
-/* Event-card metadata: one strong orange price treatment with matching location text and icon. */
+/* Event-card prices use the palette's red tertiary for a distinct badge. */
 .event-card-price,
 .tixian-event-card .event-card-price,
-.tixian-event-card-listing .event-card-price,
-.qpassa-agenda-price {
+.tixian-event-card-listing .event-card-price {
   border: 0 !important;
-  background: transparent !important;
+  background: var(--q-red, #f0445d) !important;
   box-shadow: none !important;
-  color: var(--brand-orange) !important;
+  color: #ffffff !important;
   font-weight: 900 !important;
 }
+.qpassa-agenda-price { border: 0 !important; background: transparent !important; box-shadow: none !important; color: var(--brand-orange) !important; font-weight: 900 !important; }
 .qpassa-agenda-venue svg { color: currentColor; }
 
 /* Light-mode refinements for profile actions and public organizer discovery.
@@ -7119,11 +7155,12 @@ button[style*="var(--brand-blue)"],
 .home-events-view-toggle { border: 1px solid var(--border); background: var(--card); }
 .home-events-view-button {
   display: inline-flex;
-  width: 2rem;
-  height: 2rem;
+  width: fit-content;
+  height: 2.5rem;
   align-items: center;
   justify-content: center;
-  padding: 0;
+  gap: .35rem;
+  padding: 0 .65rem;
   border: 0 !important;
   border-radius: 999px !important;
   background: transparent !important;
@@ -7133,7 +7170,7 @@ button[style*="var(--brand-blue)"],
   line-height: 1.2;
 }
 .home-events-view-toggle .home-events-view-button { border-radius: 9999px !important; }
-.home-events-view-toggle .home-events-view-button[data-active='true'] { background: var(--brand-blue) !important; color: #fff !important; }
+.home-events-view-toggle .home-events-view-button[data-active='true'] { background: #111318 !important; color: #fff !important; }
 .home-all-events-grid,
 .home-event-card-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
 .home-all-events-grid > article,
@@ -7220,7 +7257,7 @@ button[style*="var(--brand-blue)"],
   .attendee-theme .hero-title { font-size: clamp(2.15rem, 9vw, 3rem) !important; }
   .home-all-events-heading { align-items: center; gap: .5rem; }
   .home-all-events-heading > div { gap: .35rem; }
-  .home-events-view-button { width: 1.9rem; height: 1.9rem; }
+  .home-events-view-button { width: fit-content; height: 2.5rem; }
   .attendee-bottom-nav-label { font-size: .7rem; }
 }
 .attendee-theme .qpassa-agenda-time { color: #4b5563; }
@@ -11682,4 +11719,731 @@ button[style*="var(--brand-blue)"],
   #root .organizer-dashboard-shell .organizer-dashboard-main .organizer-analytics-header-ranges { flex: 1 1 100%; }
   #root .organizer-dashboard-shell .organizer-dashboard-main .organizer-analytics-header-ranges button { min-height: 2.4rem; padding-inline: .35rem; font-size: .65rem; }
   #root .organizer-dashboard-shell .organizer-dashboard-main .organizer-analytics-date-trigger { flex: 1 1 auto; justify-content: center; }
+}
+
+/* Mookh-inspired marketplace surfaces: a warm neutral canvas, bright cards,
+   rounded event photography, and simple editorial color accents. */
+.attendee-theme {
+  --q-bg: #151513;
+  --q-surface: #24231f;
+  --q-surface-2: #2b2a25;
+  --q-surface-3: #34332d;
+  --q-edge: #3a3832;
+  --q-quiet: #aaa69c;
+  --q-subtle: #c9c6bd;
+  --q-text: #f5f3ee;
+  --background: #151513;
+  --background-secondary: #1d1c19;
+  --foreground: #f5f3ee;
+  --card: #24231f;
+  --card-foreground: #f5f3ee;
+  --elevated: #2b2a25;
+  --secondary: #24231f;
+  --secondary-foreground: #c9c6bd;
+  --muted: #2b2a25;
+  --muted-foreground: #aaa69c;
+  --border: #3a3832;
+  --control-bg: #201f1b;
+  --navigation-surface: rgba(21, 21, 19, .94);
+  --modal-surface: #24231f;
+  background: var(--background) !important;
+}
+:root[data-theme='light'] .attendee-theme {
+  --q-bg: #e1ded8;
+  --q-surface: #f7f5f0;
+  --q-surface-2: #edeae4;
+  --q-surface-3: #e5e1da;
+  --q-edge: #cbc7bf;
+  --q-quiet: #68655e;
+  --q-subtle: #45433e;
+  --q-text: #171614;
+  --background: #e1ded8;
+  --background-secondary: #d7d4ce;
+  --foreground: #171614;
+  --card: #f7f5f0;
+  --card-foreground: #171614;
+  --elevated: #ffffff;
+  --secondary: #d7d4ce;
+  --secondary-foreground: #45433e;
+  --muted: #d7d4ce;
+  --muted-foreground: #68655e;
+  --border: #cbc7bf;
+  --control-bg: #f7f5f0;
+  --navigation-surface: rgba(225, 222, 216, .96);
+  --modal-surface: #f7f5f0;
+  --hover: rgba(23, 22, 20, .06);
+  background: var(--background) !important;
+}
+
+.attendee-theme .hero-shell {
+  padding-top: 2.8rem !important;
+  background: var(--background) !important;
+}
+.attendee-theme .hero-shell::before {
+  background: radial-gradient(ellipse at 60% 48%, rgba(255, 213, 82, .13), transparent 34%),
+    radial-gradient(ellipse at 94% 28%, rgba(191, 142, 255, .1), transparent 27%),
+    var(--background) !important;
+  opacity: 1 !important;
+}
+.attendee-theme .home-hero-content { max-width: 76rem !important; }
+.attendee-theme .home-hero-content > .text-center {
+  max-width: 74rem;
+  padding-top: clamp(1.3rem, 3vw, 2.6rem) !important;
+  margin: 0 0 1.8rem !important;
+  text-align: left !important;
+}
+.attendee-theme .hero-title {
+  max-width: 13ch;
+  margin: 0 !important;
+  color: var(--foreground) !important;
+  font-size: clamp(3.35rem, 8.4vw, 7.2rem) !important;
+  font-weight: 500 !important;
+  line-height: .96 !important;
+  letter-spacing: -.075em !important;
+}
+.attendee-theme .hero-gradient-text {
+  position: relative;
+  z-index: 0;
+  display: inline-block;
+  padding-inline: .035em;
+  background: none !important;
+  color: var(--foreground) !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+.attendee-theme .hero-gradient-text::before {
+  position: absolute;
+  z-index: -1;
+  inset: 48% -.035em 4%;
+  border-radius: 999px;
+  background: #f6df78;
+  content: '';
+  transform: rotate(-1.5deg);
+}
+.attendee-theme .hero-copy {
+  max-width: 38rem;
+  margin: 1.1rem 0 0 !important;
+  color: var(--muted-foreground) !important;
+  font-size: clamp(.95rem, 1.45vw, 1.1rem) !important;
+  line-height: 1.55 !important;
+}
+:root[data-theme='dark'] .attendee-theme .hero-gradient-text::before { background: #f6df78; }
+:root[data-theme='dark'] .attendee-theme .hero-shell::before {
+  background: radial-gradient(ellipse at 60% 48%, rgba(119, 215, 170, .1), transparent 34%),
+    radial-gradient(ellipse at 94% 28%, rgba(191, 142, 255, .09), transparent 27%),
+    var(--background) !important;
+}
+@media (min-width: 768px) {
+  .attendee-theme .home-hero-content > .text-center {
+    margin-inline: auto !important;
+    text-align: center !important;
+  }
+  .attendee-theme .hero-title {
+    margin-inline: auto !important;
+  }
+  .attendee-theme .hero-copy {
+    margin-inline: auto !important;
+  }
+}
+
+.attendee-theme .home-section-heading h2 { color: var(--foreground); font-weight: 650 !important; }
+.attendee-theme .qpassa-agenda-card {
+  border: 1px solid color-mix(in srgb, var(--border) 68%, transparent) !important;
+  border-radius: 1rem !important;
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+  box-shadow: 0 4px 14px rgba(30, 27, 21, .055) !important;
+}
+.attendee-theme .qpassa-agenda-card:hover {
+  border-color: var(--border) !important;
+  background: var(--elevated) !important;
+  box-shadow: 0 8px 20px rgba(30, 27, 21, .09) !important;
+}
+.attendee-theme .qpassa-agenda-date { border-radius: .75rem !important; background: var(--background-secondary) !important; }
+.attendee-theme .qpassa-agenda-image { border-radius: .75rem !important; }
+.attendee-theme .tixian-event-card {
+  border: 1px solid color-mix(in srgb, var(--border) 42%, transparent) !important;
+  border-radius: 1.15rem !important;
+  box-shadow: 0 8px 24px rgba(20, 18, 14, .12) !important;
+}
+.attendee-theme .tixian-event-card .event-card-details { border-radius: 1rem !important; }
+.attendee-theme .tixian-event-card:not(.tixian-event-card-trending) .event-card-details {
+  box-sizing: border-box;
+  height: 9.5rem;
+}
+.attendee-theme .tixian-event-card:not(.tixian-event-card-trending) .event-card-details > div {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+.attendee-theme .tixian-event-card-listing:not(.tixian-event-card-trending) .event-card-details,
+.attendee-theme .tixian-event-card-listing:not(.tixian-event-card-trending) .event-card-details > div {
+  height: auto;
+}
+.attendee-theme .organizer-card,
+.attendee-theme .home-organizer-card,
+.attendee-theme .organizer-directory-card,
+.attendee-theme .profile-panel,
+.attendee-theme .notification-card {
+  border-color: var(--border) !important;
+  border-radius: 1rem !important;
+  background-color: var(--card) !important;
+  color: var(--foreground) !important;
+  box-shadow: 0 5px 16px rgba(30, 27, 21, .06) !important;
+}
+
+@media (max-width: 640px) {
+  .attendee-theme .hero-shell { padding-top: 2.2rem !important; }
+  .attendee-theme .home-hero-content > .text-center { padding-top: .5rem !important; margin-bottom: 1.2rem !important; }
+  .attendee-theme .hero-title { max-width: 11ch; font-size: clamp(3rem, 14vw, 5rem) !important; }
+  .attendee-theme .hero-copy { margin-top: .8rem !important; }
+}
+
+/* Keep large event cards consistent with the related-events grid. */
+.sinc-event-page .sinc-related-grid,
+.home-all-events-grid,
+.favorites-grid,
+.sinc-organizer-event-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 1rem;
+}
+.home-all-events-grid > article,
+.favorites-grid > article,
+.sinc-organizer-event-grid > article,
+.sinc-event-page .sinc-related-grid > article {
+  width: 100% !important;
+}
+.tixian-event-card:not(.tixian-event-card-ended) > div:first-child > img,
+.tixian-event-card:not(.tixian-event-card-ended):hover > div:first-child > img {
+  filter: none !important;
+  transform: none !important;
+  transition: none !important;
+}
+.attendee-theme .tixian-event-card {
+  border: 0 !important;
+}
+.tixian-event-card > div:first-child > img,
+.tixian-event-card:hover > div:first-child > img {
+  opacity: 1 !important;
+  filter: none !important;
+  transform: none !important;
+  transition: none !important;
+}
+@media (min-width: 641px) {
+  .attendee-theme .tixian-event-card > div:first-child > img,
+  .attendee-theme .tixian-event-card:hover > div:first-child > img {
+    opacity: 1 !important;
+    filter: brightness(1.15) saturate(1.1) !important;
+    transform: none !important;
+  }
+}
+.tixian-event-card .event-card-details svg,
+.tixian-event-card .event-card-meta svg,
+.tixian-event-card .event-card-action,
+.tixian-event-card .event-card-action svg,
+.tixian-event-card .share-action-button {
+  color: rgba(255, 255, 255, .78) !important;
+}
+
+/* Home list cards follow the compact two-column event layout. */
+.attendee-theme .home-agenda-list {
+  --home-agenda-card-bg: #0c0c0c;
+  --home-agenda-icon: #a4a4a4;
+  --home-agenda-price: #87b9ff;
+  --home-agenda-price-bg: rgba(37, 99, 169, .16);
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+.attendee-theme .home-agenda-list .qpassa-agenda-card {
+  position: relative;
+  min-height: 7.5rem;
+  height: 7.5rem;
+  padding: .75rem;
+  border-radius: .9rem !important;
+  background: var(--home-agenda-card-bg) !important;
+}
+.attendee-theme .home-agenda-list .qpassa-agenda-card-main {
+  align-items: center;
+  gap: 1rem;
+}
+.attendee-theme .home-agenda-list .qpassa-agenda-media {
+  width: 6rem;
+  min-width: 6rem;
+  flex-basis: 6rem;
+}
+.attendee-theme .home-agenda-list .qpassa-agenda-image {
+  width: 6rem;
+  height: 6rem;
+  flex-basis: 6rem;
+  border-radius: .8rem;
+}
+.attendee-theme .home-agenda-list .qpassa-agenda-copy {
+  justify-content: space-between;
+  gap: .25rem;
+  padding: .1rem 0;
+}
+.attendee-theme .home-agenda-list .qpassa-agenda-copy > strong {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 1.05rem;
+  font-weight: 650;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  text-transform: none;
+}
+.attendee-theme .home-agenda-list .qpassa-agenda-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: .55rem;
+}
+.attendee-theme .home-agenda-list .qpassa-agenda-datetime,
+.attendee-theme .home-agenda-list .qpassa-agenda-venue {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: .45rem;
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted-foreground) !important;
+  font-size: .82rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+}
+.attendee-theme .home-agenda-list .qpassa-agenda-venue,
+.attendee-theme .home-agenda-list .qpassa-agenda-datetime { white-space: nowrap; }
+.attendee-theme .home-agenda-list .qpassa-agenda-datetime { flex: 1; }
+.attendee-theme .home-agenda-list .qpassa-agenda-price {
+  flex: 0 0 auto;
+  color: var(--home-agenda-price) !important;
+  font-size: .82rem;
+  font-weight: 600;
+}
+.attendee-theme .home-agenda-list .qpassa-agenda-price-badge {
+  position: absolute;
+  right: .75rem;
+  bottom: .7rem;
+  z-index: 1;
+  max-width: 45%;
+  overflow: hidden;
+  padding: .35rem .55rem;
+  border: 1px solid color-mix(in srgb, var(--home-agenda-price) 22%, transparent);
+  border-radius: .55rem;
+  background: var(--home-agenda-price-bg);
+  color: var(--home-agenda-price);
+  font-size: .82rem;
+  font-weight: 650;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.attendee-theme .home-agenda-list .qpassa-agenda-datetime svg,
+.attendee-theme .home-agenda-list .qpassa-agenda-venue svg {
+  flex: 0 0 auto;
+  color: var(--home-agenda-icon);
+}
+@media (max-width: 639px) {
+  .attendee-theme .home-agenda-list { gap: .5rem; }
+  .attendee-theme .home-agenda-list .qpassa-agenda-card {
+    min-height: 6.55rem;
+    height: 6.55rem;
+    padding: .45rem;
+    border-radius: .8rem !important;
+  }
+  .attendee-theme .home-agenda-list .qpassa-agenda-card-main { gap: .55rem; }
+  .attendee-theme .home-agenda-list .qpassa-agenda-media,
+  .attendee-theme .home-agenda-list .qpassa-agenda-image {
+    width: 5.65rem;
+    min-width: 5.65rem;
+    height: 5.65rem;
+    flex-basis: 5.65rem;
+  }
+  .attendee-theme .home-agenda-list .qpassa-agenda-image { border-radius: .55rem; }
+  .attendee-theme .home-agenda-list .qpassa-agenda-copy { gap: .12rem; padding: 0; }
+  .attendee-theme .home-agenda-list .qpassa-agenda-copy > strong {
+    font-size: 1.02rem;
+    line-height: 2;
+  }
+  .attendee-theme .home-agenda-list .qpassa-agenda-venue,
+  .attendee-theme .home-agenda-list .qpassa-agenda-datetime {
+    gap: .25rem;
+    font-size: .83rem;
+    font-weight: 400;
+    line-height: 1.15;
+  }
+  .attendee-theme .home-agenda-list .qpassa-agenda-venue svg,
+  .attendee-theme .home-agenda-list .qpassa-agenda-datetime svg {
+    width: .65rem;
+    height: .65rem;
+  }
+  .attendee-theme .home-agenda-list .qpassa-agenda-meta { gap: .35rem; }
+  .attendee-theme .home-agenda-list .qpassa-agenda-price { font-size: .83rem; font-weight: 400; }
+}
+@media (min-width: 720px) {
+  .attendee-theme .home-agenda-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: .75rem;
+  }
+}
+:root[data-theme='light'] .attendee-theme .home-agenda-list {
+  --home-agenda-card-bg: var(--card);
+  --home-agenda-icon: #77746e;
+  --home-agenda-price: #d9364f;
+  --home-agenda-price-bg: rgba(217, 54, 79, .1);
+}
+
+/* Final home-page polish: simple nav pills, clear date tabs, and balanced borderless event rows. */
+.attendee-theme .site-navbar > div > div:nth-child(2) { gap: .45rem !important; }
+.attendee-theme .site-navbar .nav-link {
+  min-height: 2.55rem;
+  display: inline-flex;
+  align-items: center;
+  padding: .55rem .95rem;
+  border: 0 !important;
+  border-radius: 9999px !important;
+  background: transparent !important;
+  color: var(--muted-foreground) !important;
+  font-size: .88rem;
+  font-weight: 600;
+  transform: none !important;
+}
+.attendee-theme .site-navbar .nav-link::after { display: none !important; }
+.attendee-theme .site-navbar .nav-link:hover {
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+}
+.attendee-theme .site-navbar .nav-link.is-active {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+}
+
+.attendee-theme .home-all-events-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin: 0 0 1rem;
+}
+.attendee-theme .home-all-events-tab-options {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: .25rem;
+  padding: .25rem;
+  border: 0 !important;
+  border-radius: 9999px;
+  background: var(--card);
+  box-shadow: none !important;
+}
+.attendee-theme .home-all-events-tab {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  padding: .5rem .9rem;
+  border: 0 !important;
+  border-radius: 9999px !important;
+  background: transparent !important;
+  color: var(--muted-foreground) !important;
+  font-size: .82rem;
+  font-weight: 650;
+  white-space: nowrap;
+  box-shadow: none !important;
+  transition: background-color .18s ease, color .18s ease;
+}
+.attendee-theme .home-all-events-tab > span {
+  min-width: 1.25rem;
+  padding: .1rem .35rem;
+  border-radius: 9999px;
+  background: var(--elevated);
+  color: inherit;
+  font-size: .68rem;
+  line-height: 1.2;
+  text-align: center;
+}
+.attendee-theme .home-all-events-tab:hover { color: var(--foreground) !important; }
+.attendee-theme .home-all-events-tab[data-active='true'] {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+}
+.attendee-theme .home-all-events-tab[data-active='true'] > span {
+  background: rgba(0, 0, 0, .12);
+}
+
+/* Carry the hero's hand-drawn marker highlight through active navigation. */
+.attendee-theme .site-navbar .nav-link.is-active {
+  isolation: isolate;
+  background: transparent !important;
+  color: var(--foreground) !important;
+}
+.attendee-theme .site-navbar .nav-link.is-active::before {
+  position: absolute;
+  z-index: -1;
+  inset: 48% .9rem 5%;
+  border-radius: 9999px;
+  background: #77d7aa;
+  content: '';
+  pointer-events: none;
+  transform: rotate(-1.5deg);
+}
+:root[data-theme='dark'] .attendee-theme .site-navbar .nav-link.is-active::before {
+  background: #77d7aa;
+}
+.attendee-theme .nav-mobile-link.is-active {
+  position: relative;
+  isolation: isolate;
+  background: transparent !important;
+  color: var(--foreground) !important;
+}
+.attendee-theme .nav-mobile-link.is-active::before {
+  position: absolute;
+  z-index: -1;
+  inset: 48% .75rem 5%;
+  border-radius: 9999px;
+  background: #77d7aa;
+  content: '';
+  pointer-events: none;
+  transform: rotate(-1.5deg);
+}
+:root[data-theme='dark'] .attendee-theme .nav-mobile-link.is-active::before {
+  background: #77d7aa;
+}
+.attendee-theme .attendee-bottom-nav-item.is-active {
+  background: transparent !important;
+  color: var(--foreground) !important;
+}
+#root .attendee-theme button.attendee-bottom-nav-item.is-active {
+  background: transparent !important;
+  color: var(--foreground) !important;
+}
+.attendee-theme .attendee-bottom-nav-item.is-active .attendee-bottom-nav-content {
+  isolation: isolate;
+}
+.attendee-theme .attendee-bottom-nav-item.is-active .attendee-bottom-nav-content::before {
+  position: absolute;
+  z-index: -1;
+  inset: 48% -.2rem 0;
+  border-radius: 9999px;
+  background: #77d7aa;
+  content: '';
+  pointer-events: none;
+  transform: rotate(-1.5deg);
+}
+:root[data-theme='dark'] .attendee-theme .attendee-bottom-nav-item.is-active .attendee-bottom-nav-content::before {
+  background: #77d7aa;
+}
+.attendee-theme .attendee-bottom-nav-item.is-active .attendee-bottom-nav-label {
+  color: var(--foreground) !important;
+}
+
+.attendee-theme .home-agenda-list {
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: .75rem !important;
+}
+.attendee-theme .home-agenda-list .qpassa-agenda-card {
+  min-width: 0;
+  min-height: 7.5rem;
+  height: auto;
+  padding: .7rem .9rem;
+  border: 0 !important;
+  border-radius: 1rem !important;
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+  box-shadow: none !important;
+  transition: background-color .18s ease;
+}
+.attendee-theme .home-agenda-list .qpassa-agenda-card:hover,
+.attendee-theme .home-agenda-list .qpassa-agenda-card:focus-within {
+  border: 0 !important;
+  background: var(--card) !important;
+  box-shadow: none !important;
+}
+:root[data-theme='dark'] .attendee-theme .home-agenda-list .qpassa-agenda-card,
+:root[data-theme='dark'] .attendee-theme .home-agenda-list .qpassa-agenda-card:hover,
+:root[data-theme='light'] .attendee-theme .home-agenda-list .qpassa-agenda-card,
+:root[data-theme='light'] .attendee-theme .home-agenda-list .qpassa-agenda-card:hover {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.attendee-theme .home-agenda-list .qpassa-agenda-card-main { min-height: 6rem; gap: .9rem; }
+.attendee-theme .home-agenda-list .qpassa-agenda-copy { gap: .35rem; padding: 0; }
+.attendee-theme .home-agenda-list .qpassa-agenda-copy > strong { line-height: 1.25; }
+.attendee-theme .home-agenda-list .qpassa-agenda-meta { flex-wrap: wrap; row-gap: .3rem; }
+.attendee-theme .home-agenda-list .qpassa-agenda-price { color: #f0445d !important; font-weight: 650; }
+.attendee-theme .home-agenda-list .qpassa-agenda-price-badge {
+  border: 0;
+  background: rgba(240, 68, 93, .12);
+  color: #f0445d;
+}
+@media (min-width: 720px) {
+  .attendee-theme .home-agenda-list { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+@media (min-width: 1100px) {
+  .attendee-theme .home-agenda-list { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 639px) {
+  .attendee-theme .home-all-events-tabs { align-items: stretch; }
+  .attendee-theme .home-all-events-tab-options { flex: 1 1 auto; }
+  .attendee-theme .home-all-events-tab { padding-inline: .55rem; }
+  .attendee-theme .home-all-events-tab[data-active='true'] { flex: 1 1 auto; }
+  .attendee-theme .home-all-events-tab:not([data-active='true']) { flex: 0 0 fit-content; width: fit-content; }
+  .attendee-theme .home-events-view-button { width: fit-content; height: 2.5rem; padding-inline: .55rem; }
+  .attendee-theme .home-agenda-list .qpassa-agenda-card { min-height: 6.9rem; padding: .6rem; }
+  .attendee-theme .home-agenda-list .qpassa-agenda-card-main { min-height: 5.65rem; gap: .6rem; }
+  .attendee-theme .home-agenda-list .qpassa-agenda-media,
+  .attendee-theme .home-agenda-list .qpassa-agenda-image { width: 5.4rem; min-width: 5.4rem; height: 5.4rem; flex-basis: 5.4rem; }
+}
+
+/* Final cascade overrides for Home discovery controls and cards. */
+:root[data-theme='dark'] .attendee-theme .home-filter-row .home-time-filter:not([data-active='true']),
+:root[data-theme='dark'] .attendee-theme .home-search-filter-row .attendee-filter-button:not([data-active='true']) {
+  border: 0 !important;
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+  box-shadow: none !important;
+}
+:root[data-theme='dark'] .attendee-theme .home-filter-row .home-time-filter:not([data-active='true']):hover,
+:root[data-theme='dark'] .attendee-theme .home-search-filter-row .attendee-filter-button:not([data-active='true']):hover {
+  background: var(--elevated) !important;
+}
+:root[data-theme='dark'] .attendee-theme .home-filter-row .home-time-filter[data-active='true'],
+:root[data-theme='dark'] .attendee-theme .home-search-filter-row .attendee-filter-button[data-active='true'] {
+  border: 0 !important;
+  background: #ffffff !important;
+  color: #111318 !important;
+  box-shadow: none !important;
+}
+:root[data-theme='dark'] .attendee-theme .home-filter-row .home-time-filter[data-active='true']:hover,
+:root[data-theme='dark'] .attendee-theme .home-search-filter-row .attendee-filter-button[data-active='true']:hover { background: #e5e7eb !important; }
+
+/* Reset the generic attendee input border for the Home hero search, including focus states. */
+:root .attendee-theme .home-search-filter-row input.attendee-search-input:not([type='checkbox']):not([type='radio']):not([type='submit']):not([type='file']),
+:root .attendee-theme .home-search-filter-row input.attendee-search-input:focus:not([type='checkbox']):not([type='radio']):not([type='submit']):not([type='file']),
+:root .attendee-theme .home-search-filter-row input.attendee-search-input:focus-visible:not([type='checkbox']):not([type='radio']):not([type='submit']):not([type='file']) {
+  border: 0 !important;
+  border-width: 0 !important;
+  border-color: transparent !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme='light'] .attendee-theme .home-all-events-tab[data-active='true'] {
+  background: #111318 !important;
+  color: #ffffff !important;
+}
+:root[data-theme='dark'] .attendee-theme .home-all-events-tab[data-active='true'] {
+  background: #ffffff !important;
+  color: #111318 !important;
+}
+:root[data-theme='light'] .attendee-theme .home-all-events-tab[data-active='true'] > span,
+:root[data-theme='dark'] .attendee-theme .home-all-events-tab[data-active='true'] > span { background: rgba(128, 128, 128, .18); }
+
+.attendee-theme .home-organizer-card,
+.attendee-theme .home-organizer-card:hover,
+.attendee-theme .organizer-directory-card,
+.attendee-theme .organizer-directory-card:hover {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.attendee-theme .home-organizer-card > button.organizer-card-main,
+.attendee-theme .home-organizer-card .organizer-card-details { border: 0 !important; box-shadow: none !important; }
+
+.attendee-theme .home-agenda-list .qpassa-agenda-card {
+  border: 0 !important;
+  background: var(--card) !important;
+  box-shadow: none !important;
+}
+.attendee-theme .home-agenda-list .qpassa-agenda-card:hover,
+.attendee-theme .home-agenda-list .qpassa-agenda-card:focus-within {
+  border: 0 !important;
+  background: var(--elevated) !important;
+  box-shadow: none !important;
+}
+.attendee-theme .home-agenda-list .qpassa-agenda-copy > strong { color: var(--foreground) !important; }
+.attendee-theme .home-agenda-list .qpassa-agenda-meta { align-items: center; gap: .45rem .65rem; }
+.attendee-theme .home-agenda-list .qpassa-agenda-venue,
+.attendee-theme .home-agenda-list .qpassa-agenda-datetime { color: var(--muted-foreground) !important; }
+.attendee-theme .home-agenda-list .qpassa-agenda-price { color: #f0445d !important; }
+
+/* Final home search and metadata alignment. */
+.attendee-theme .home-search-filter-row input.attendee-search-input,
+.attendee-theme .home-search-filter-row input.attendee-search-input:focus,
+.attendee-theme .home-search-filter-row input.attendee-search-input:focus-visible {
+  border: 0 !important;
+  border-width: 0 !important;
+  border-color: transparent !important;
+  outline: 0 !important;
+  background: #ffffff !important;
+  color: #17191e !important;
+  box-shadow: none !important;
+}
+.attendee-theme .home-search-filter-row input.attendee-search-input::placeholder { color: #737782 !important; }
+.attendee-theme .home-search-filter-row .attendee-control-icon { color: #737782 !important; }
+.attendee-theme .home-agenda-list .qpassa-agenda-price {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  white-space: nowrap;
+}
+.attendee-theme .home-agenda-list .qpassa-agenda-price-icon { flex: 0 0 auto; }
+.attendee-theme .home-agenda-list { row-gap: 1.15rem !important; }
+.attendee-theme .home-section-see-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .35rem;
+  color: #ef4444 !important;
+  font-weight: 650;
+  white-space: nowrap;
+  transition: color .18s ease;
+}
+.attendee-theme .home-section-see-all:hover { color: #dc2626 !important; }
+
+/* Final discovery-control theme colors. These override earlier legacy control colors. */
+:root[data-theme='light'] .attendee-theme .home-search-filter-row input.attendee-search-input,
+:root[data-theme='light'] .attendee-theme .attendee-events-page input.attendee-search-input {
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+:root[data-theme='light'] .attendee-theme .home-search-filter-row input.attendee-search-input::placeholder,
+:root[data-theme='light'] .attendee-theme .attendee-events-page input.attendee-search-input::placeholder {
+  color: #526071 !important;
+}
+:root[data-theme='dark'] .attendee-theme .home-search-filter-row input.attendee-search-input,
+:root[data-theme='dark'] .attendee-theme .attendee-events-page input.attendee-search-input {
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+}
+:root[data-theme='dark'] .attendee-theme .home-search-filter-row input.attendee-search-input::placeholder,
+:root[data-theme='dark'] .attendee-theme .attendee-events-page input.attendee-search-input::placeholder {
+  color: var(--muted-foreground) !important;
+}
+:root[data-theme='dark'] .attendee-theme .home-events-view-toggle .home-events-view-button[data-active='true'] {
+  background: #ffffff !important;
+  color: #111318 !important;
+}
+:root[data-theme='dark'] .attendee-theme .home-events-view-toggle .home-events-view-button[data-active='true']:hover {
+  background: #e5e7eb !important;
+}
+:root[data-theme='dark'] .attendee-theme .attendee-filter-button[data-active='true'],
+:root[data-theme='dark'] .attendee-theme .attendee-filter-chip[data-active='true'],
+:root[data-theme='dark'] .attendee-theme .attendee-filter-select[data-active='true'] {
+  background: #ffffff !important;
+  color: #111318 !important;
+}
+:root[data-theme='dark'] .attendee-theme .attendee-filter-button:not([data-active='true']),
+:root[data-theme='dark'] .attendee-theme .attendee-filter-chip:not([data-active='true']),
+:root[data-theme='dark'] .attendee-theme .attendee-filter-select:not([data-active='true']),
+:root[data-theme='dark'] .attendee-theme .attendee-events-page .attendee-filter-button:not([data-active='true']),
+:root[data-theme='dark'] .attendee-theme .attendee-events-page .attendee-filter-chip:not([data-active='true']),
+:root[data-theme='dark'] .attendee-theme .attendee-events-page .attendee-filter-select:not([data-active='true']) {
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+}
+:root[data-theme='dark'] .attendee-theme .attendee-filter-button[data-active='true'] .attendee-control-icon,
+:root[data-theme='dark'] .attendee-theme .attendee-filter-chip[data-active='true'] .attendee-control-icon {
+  color: currentColor !important;
 }

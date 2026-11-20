@@ -1,0 +1,260 @@
+/* QPassa attendee design system. Scoped to attendee routes so organizer/admin UI remains unchanged. */
+.attendee-theme,
+.attendee-auth-theme {
+  color-scheme: dark;
+  --q-bg: #050506;
+  --q-surface: #0d0e11;
+  --q-surface-2: #141519;
+  --q-surface-3: #1c1d22;
+  --q-surface-4: #25262c;
+  --q-edge: #292a30;
+  --q-quiet: #777982;
+  --q-subtle: #a5a6ae;
+  --q-text: #f5f5f6;
+  --q-white: #fff;
+  --q-green: #00c99a;
+  --q-green-light: #52e9b2;
+  --q-green-deep: #087a62;
+  --q-green-soft: #092d26;
+  --q-purple: #6029e8;
+  --q-purple-light: #9270f5;
+  --q-red: #f0445d;
+  --q-blue: #2858f5;
+  --q-yellow: #ffc52f;
+  --background: var(--q-bg);
+  --background-secondary: var(--q-surface);
+  --foreground: var(--q-text);
+  --card: var(--q-surface);
+  --card-foreground: var(--q-text);
+  --elevated: var(--q-surface-2);
+  --primary: var(--q-green);
+  --primary-light: var(--q-green-light);
+  --primary-hover: #00ad83;
+  --primary-pressed: #087a62;
+  --primary-foreground: #04120e;
+  --secondary: var(--q-surface-2);
+  --secondary-foreground: var(--q-subtle);
+  --muted: var(--q-surface-2);
+  --muted-foreground: var(--q-subtle);
+  --accent: var(--q-green);
+  --accent-lime: var(--q-green-light);
+  --accent-foreground: #04120e;
+  --border: var(--q-edge);
+  --border-hover: rgba(0, 201, 154, .48);
+  --ring: var(--q-green-light);
+  --success: var(--q-green-light);
+  --warning: var(--q-yellow);
+  --error: var(--q-red);
+  --info: #6084f8;
+  --pending: var(--q-yellow);
+  --sold-out: var(--q-quiet);
+  --live: var(--q-green-light);
+  --cancelled: var(--q-red);
+  --ticket-available: var(--q-green-light);
+  --ticket-vip: var(--q-purple-light);
+  --ticket-discount: var(--q-yellow);
+  --payment-paid: var(--q-green-light);
+  --payment-pending: var(--q-yellow);
+  --payment-failed: var(--q-red);
+  --ticket-valid: var(--q-green-light);
+  --ticket-used: #6084f8;
+  --ticket-invalid: var(--q-red);
+  --control-bg: var(--q-surface-2);
+  --navigation-surface: rgba(5, 5, 6, .9);
+  --modal-surface: var(--q-surface-2);
+  --hover: rgba(255,255,255,.07);
+  --selected: rgba(0,201,154,.13);
+  --disabled: var(--q-surface-3);
+  --disabled-text: var(--q-quiet);
+  --attendee-icon-color: var(--q-subtle);
+  --attendee-icon-active: var(--q-green);
+  --font-display: 'Telegraf', 'Avenir Next', Avenir, ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --page-gutter: clamp(1rem, 4vw, 3.25rem);
+  --radius: 1.25rem;
+  background: var(--q-bg) !important;
+  color: var(--q-text);
+  font-family: var(--font-body) !important;
+}
+
+.attendee-theme *, .attendee-auth-theme * {
+  font-family: var(--font-body) !important;
+  border-color: var(--border);
+}
+.attendee-theme :is(h1,h2,h3,h4,h5,h6),
+.attendee-auth-theme :is(h1,h2,h3,h4,h5,h6),
+.attendee-theme [data-display], .attendee-auth-theme [data-display] {
+  font-family: var(--font-display) !important;
+  letter-spacing: -.045em;
+}
+.attendee-theme button, .attendee-auth-theme button { border-radius: 12px !important; }
+.attendee-theme :is(button,a,input,select,textarea):focus-visible,
+.attendee-auth-theme :is(button,a,input,select,textarea):focus-visible { outline-color: var(--q-green-light) !important; }
+.attendee-theme :is(button,a), .attendee-auth-theme :is(button,a) { -webkit-tap-highlight-color: transparent; }
+.attendee-theme button:active, .attendee-auth-theme button:active { transform: scale(.985); }
+.attendee-theme .gradient-action, .attendee-auth-theme .qpassa-auth-primary-button,
+.attendee-theme .checkout-primary-action, .attendee-theme .digital-ticket-primary-action {
+  border: 0 !important;
+  background: var(--q-green) !important;
+  color: #04120e !important;
+  box-shadow: none !important;
+  font-weight: 700;
+}
+.attendee-theme .gradient-action:hover:not(:disabled),
+.attendee-auth-theme .qpassa-auth-primary-button:hover:not(:disabled),
+.attendee-theme .checkout-primary-action:hover:not(:disabled),
+.attendee-theme .digital-ticket-primary-action:hover:not(:disabled) { background: #00ad83 !important; color: #04120e !important; }
+.attendee-theme .site-navbar { border-bottom: 1px solid rgba(255,255,255,.055); }
+.attendee-theme nav.fixed.top-0 { background: rgba(5,5,6,.82) !important; backdrop-filter: blur(20px) saturate(140%) !important; -webkit-backdrop-filter: blur(20px) saturate(140%) !important; }
+.attendee-theme .site-navbar button:first-child > span:first-child { background: var(--q-green) !important; color: #04120e !important; box-shadow: none !important; }
+.attendee-theme .nav-link { color: var(--q-subtle) !important; }
+.attendee-theme .nav-link.is-active, .attendee-theme .nav-link:hover { color: var(--q-text) !important; }
+.attendee-theme .nav-link.is-active::after { background: var(--q-green) !important; }
+.attendee-theme .nav-create-event, .attendee-theme .nav-account-action.is-current { background: var(--q-green) !important; color: #04120e !important; }
+.attendee-theme .nav-mobile-drawer { border: 1px solid var(--q-edge); border-radius: 0 0 20px 20px; }
+.attendee-theme .attendee-bottom-nav-frame { filter: drop-shadow(0 10px 24px rgba(0,0,0,.38)); }
+.attendee-theme .attendee-bottom-nav-surface { border: 1px solid rgba(255,255,255,.1) !important; border-radius: 18px !important; background: rgba(13,14,17,.94) !important; backdrop-filter: blur(20px) !important; }
+.attendee-theme .attendee-bottom-nav-items { justify-content: space-around; }
+.attendee-theme .attendee-bottom-nav-item { min-height: 3.8rem; flex: 1 1 0 !important; min-width: 0 !important; border-radius: 14px !important; color: var(--q-quiet) !important; }
+.attendee-theme .attendee-bottom-nav-item.is-active,
+.attendee-theme .attendee-bottom-nav-item.is-active span { color: var(--q-green) !important; }
+.attendee-theme .attendee-bottom-nav-center { display: none !important; }
+.attendee-theme .attendee-bottom-nav-label { font-size: 10px; }
+
+/* Discover: editorial campaign artwork plus compact category navigation. */
+.attendee-theme .hero-shell { padding-top: 5.2rem !important; background: var(--q-bg) !important; }
+.attendee-theme .hero-shell::before, .attendee-theme .hero-shell::after,
+.attendee-theme .hero-blur { display: none !important; }
+.attendee-theme .home-hero-content { max-width: 100% !important; }
+.attendee-theme .home-hero-content > .text-center { margin: 1.35rem auto 1.75rem !important; text-align: left !important; }
+.attendee-theme .hero-title { max-width: 850px; margin: 0 auto .65rem 0 !important; color: var(--q-text) !important; font-size: clamp(2.35rem, 5.7vw, 4.5rem) !important; font-weight: 650 !important; line-height: 1.02 !important; letter-spacing: -.065em !important; }
+.attendee-theme .hero-gradient-text { background: none !important; color: var(--q-green) !important; -webkit-text-fill-color: currentColor !important; }
+.attendee-theme .hero-copy { max-width: 580px; margin: 0 !important; color: var(--q-subtle) !important; font-size: clamp(.94rem, 1.5vw, 1.08rem) !important; line-height: 1.6 !important; }
+.attendee-theme .home-discovery-content { display: flex; flex-direction: column; gap: clamp(2.4rem, 5vw, 4.5rem) !important; padding-bottom: 5.75rem !important; }
+.attendee-theme .home-discovery-content section { min-width: 0; }
+.attendee-theme .home-section-heading { margin-bottom: 1rem !important; }
+.attendee-theme .home-section-heading h2 { font-size: clamp(1.25rem, 2.4vw, 1.65rem) !important; font-weight: 600 !important; letter-spacing: -.035em !important; }
+.attendee-theme .attendee-search-input { min-height: 3.25rem; border: 1px solid var(--q-edge) !important; border-radius: 13px !important; background: var(--q-surface-2) !important; color: var(--q-text) !important; }
+.attendee-theme .attendee-search-input:focus { border-color: rgba(0,201,154,.7) !important; box-shadow: 0 0 0 3px rgba(0,201,154,.12) !important; }
+.attendee-theme .attendee-filter-button, .attendee-theme .attendee-filter-select,
+.attendee-theme .attendee-filter-chip { border: 1px solid var(--q-edge) !important; border-radius: 11px !important; background: var(--q-surface-2) !important; color: var(--q-subtle) !important; }
+.attendee-theme .attendee-filter-button:hover, .attendee-theme .attendee-filter-select:hover,
+.attendee-theme .attendee-filter-chip:hover { background: var(--q-surface-3) !important; color: var(--q-text) !important; }
+.attendee-theme .attendee-filter-button[data-active='true'], .attendee-theme .attendee-filter-select[data-active='true'],
+.attendee-theme .attendee-filter-chip[data-active='true'] { border-color: rgba(0,201,154,.34) !important; background: rgba(0,201,154,.12) !important; color: var(--q-green-light) !important; }
+.attendee-theme .attendee-filter-count { background: var(--q-green) !important; color: #04120e !important; }
+.attendee-theme .attendee-filter-panel { border: 1px solid var(--q-edge) !important; border-radius: 16px !important; background: var(--q-surface) !important; }
+.attendee-theme .home-filter-row { justify-content: flex-start !important; gap: .55rem !important; }
+.attendee-theme .home-time-filter { padding: .6rem .9rem !important; }
+.attendee-theme .home-active-events-rail, .attendee-theme .trending-events-marquee { margin-inline: calc(var(--page-gutter) * -1); padding-inline: var(--page-gutter) !important; }
+.attendee-theme .qpassa-event-card, .attendee-theme .qpassa-poster-card { border: 1px solid rgba(255,255,255,.07) !important; border-radius: 19px !important; background: var(--q-surface) !important; box-shadow: none !important; }
+.attendee-theme .qpassa-event-card:hover, .attendee-theme .qpassa-poster-card:hover { border-color: rgba(0,201,154,.26) !important; box-shadow: 0 16px 42px rgba(0,0,0,.28) !important; transform: translateY(-3px); }
+.attendee-theme .qpassa-event-card-media, .attendee-theme .qpassa-poster-card { border-radius: 19px !important; }
+.attendee-theme .qpassa-event-card-content { padding: 1rem !important; }
+.attendee-theme .qpassa-event-card-title, .attendee-theme .qpassa-poster-card-title { color: var(--q-text) !important; font-family: var(--font-display) !important; font-size: 1.1rem !important; font-weight: 600 !important; letter-spacing: -.035em !important; }
+.attendee-theme .qpassa-event-card-date-line, .attendee-theme .qpassa-event-card-location,
+.attendee-theme .qpassa-poster-card-profile-name, .attendee-theme .qpassa-poster-card-location-row { color: var(--q-subtle) !important; }
+.attendee-theme .qpassa-event-card-date-line svg, .attendee-theme .qpassa-event-card-location-icon,
+.attendee-theme .qpassa-poster-card-price svg { color: var(--q-green-light) !important; }
+.attendee-theme .qpassa-event-card-price-badge { border-radius: 9px !important; background: rgba(5,5,6,.76) !important; color: var(--q-text) !important; }
+.attendee-theme .qpassa-poster-card-cta { min-height: 2.5rem; border: 0 !important; border-radius: 11px !important; background: var(--q-green) !important; color: #04120e !important; backdrop-filter: none !important; }
+.attendee-theme .qpassa-agenda-card { border: 1px solid rgba(255,255,255,.055); border-radius: 16px; background: var(--q-surface); }
+.attendee-theme .qpassa-agenda-card:hover { background: var(--q-surface-2); }
+.attendee-theme .qpassa-agenda-cta { width: auto; min-width: 7rem; flex-basis: auto; min-height: 2.45rem; border-radius: 10px !important; background: var(--q-green) !important; color: #04120e !important; }
+.attendee-theme .qpassa-agenda-time { color: var(--q-green-light); }
+.attendee-theme .home-organizer-banner { border: 0 !important; border-radius: 24px !important; background: linear-gradient(110deg, #464950 0%, #0c5b50 100%) !important; }
+.attendee-theme .home-organizer-banner-glow { display: none; }
+.attendee-theme .home-organizer-banner :is(h2,p,span,svg) { color: #f5f5f6 !important; }
+.attendee-theme .home-organizer-banner-primary { background: var(--q-green) !important; color: #04120e !important; }
+.attendee-theme .home-organizer-banner-secondary { border: 1px solid rgba(255,255,255,.23) !important; background: rgba(5,5,6,.18) !important; color: #fff !important; }
+.attendee-theme .home-events-view-toggle { background: var(--q-surface-2) !important; }
+.attendee-theme .home-events-view-button[data-active='true'] { background: #111318 !important; color: #fff !important; }
+.attendee-theme .home-events-pagination button { border-radius: 10px !important; background: var(--q-surface-2) !important; color: var(--q-text) !important; }
+.attendee-theme .home-all-events-carousel { width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.attendee-theme .home-all-events-carousel::-webkit-scrollbar { display: none; }
+.attendee-theme .home-all-events-carousel-track { display: flex; width: 100%; }
+.attendee-theme .home-all-events-slide { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; }
+.attendee-theme .home-all-events-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; align-items: start; }
+.attendee-theme .home-all-events-grid > .tixian-event-card { width: min(100%, 360px) !important; min-width: 0; justify-self: center; }
+.attendee-theme .home-agenda-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+.attendee-theme .home-all-events-indicators { display: flex; justify-content: center; align-items: center; gap: .55rem; padding-top: 1.5rem; }
+.attendee-theme .home-all-events-indicators button { width: .5rem; height: .5rem; padding: 0; border: 0; border-radius: 999px !important; background: var(--q-surface-4); transition: width .2s ease, background-color .2s ease; }
+.attendee-theme .home-all-events-indicators button[data-active='true'] { width: 1.5rem; background: var(--q-green); }
+
+/* Search, event details, ticket wallet, and checkout share a calm surface hierarchy. */
+.attendee-theme .attendee-events-page, .attendee-theme .qpassa-checkout-page,
+.attendee-theme .qpassa-tickets-page, .attendee-theme .qpassa-profile-page,
+.attendee-theme .qpassa-notifications-page, .attendee-theme .digital-ticket-page,
+.attendee-theme .favorites-page { background: var(--q-bg) !important; color: var(--q-text) !important; }
+.attendee-theme .attendee-events-page h1, .attendee-theme .qpassa-checkout-page h1,
+.attendee-theme .qpassa-tickets-page h1, .attendee-theme .qpassa-profile-page h1,
+.attendee-theme .qpassa-notifications-page h1, .attendee-theme .favorites-page h1 { font-family: var(--font-display) !important; font-weight: 600 !important; letter-spacing: -.05em !important; }
+.attendee-theme .sinc-event-page { background: var(--q-bg) !important; }
+.attendee-theme .sinc-event-page .sinc-event-cover { border: 0 !important; border-radius: 24px !important; }
+.attendee-theme .sinc-event-page .sinc-event-identity,
+.attendee-theme .sinc-event-page .sinc-event-description,
+.attendee-theme .sinc-event-page .sinc-ticket-section,
+.attendee-theme .sinc-event-page .sinc-location-section,
+.attendee-theme .sinc-event-page .sinc-related-section { border: 0 !important; border-radius: 20px !important; background: var(--q-surface) !important; }
+.attendee-theme .sinc-event-page .sinc-event-identity h1 { font-family: var(--font-display) !important; font-size: clamp(2rem,4vw,3.8rem) !important; }
+.attendee-theme .sinc-event-page .sinc-profile-actions button:last-child:not(.is-following),
+.attendee-theme .sinc-event-page .sinc-ticket-buy-button { border: 0 !important; background: var(--q-green) !important; color: #04120e !important; }
+.attendee-theme .sinc-event-page .sinc-countdown, .attendee-theme .sinc-event-page .sinc-detail-grid > div,
+.attendee-theme .sinc-event-page .sinc-ticket-row { border-color: var(--q-edge) !important; background: var(--q-surface-2) !important; }
+.attendee-theme .sinc-event-page .sinc-detail-grid > div > svg,
+.attendee-theme .sinc-event-page .sinc-ticket-price { color: var(--q-green-light) !important; }
+.attendee-theme .sinc-event-page .sinc-ticket-row::before,
+.attendee-theme .sinc-event-page .sinc-ticket-row::after { background: var(--q-bg) !important; }
+.attendee-theme .qpassa-checkout-page .checkout-step-card,
+.attendee-theme .qpassa-checkout-page .checkout-order-summary,
+.attendee-theme .qpassa-tickets-page .ticket-card,
+.attendee-theme .qpassa-profile-page .profile-panel,
+.attendee-theme .qpassa-notifications-page .notification-card { border: 1px solid rgba(255,255,255,.07) !important; border-radius: 18px !important; background: var(--q-surface) !important; box-shadow: none !important; }
+.attendee-theme .checkout-primary-action, .attendee-theme .digital-ticket-primary-action { border-radius: 12px !important; }
+.attendee-theme .checkout-secondary-action, .attendee-theme .digital-ticket-secondary-action,
+.attendee-theme .digital-ticket-back, .attendee-theme .ticket-card-action { border: 1px solid var(--q-edge) !important; background: var(--q-surface-2) !important; color: var(--q-text) !important; }
+.attendee-theme .checkout-payment-method { border: 1px solid var(--q-edge) !important; background: var(--q-surface) !important; color: var(--q-text) !important; }
+.attendee-theme .checkout-payment-method[data-selected='true'], .attendee-theme .checkout-payment-method[aria-checked='true'] { border-color: rgba(0,201,154,.62) !important; background: rgba(0,201,154,.08) !important; }
+.attendee-theme .qpassa-checkout-page input, .attendee-theme .qpassa-profile-page input,
+.attendee-theme .qpassa-profile-page textarea, .attendee-theme .qpassa-profile-page select { border-color: var(--q-edge) !important; border-radius: 11px !important; background: var(--q-surface-2) !important; color: var(--q-text) !important; }
+.attendee-theme .notification-card { border-color: rgba(255,255,255,.07) !important; }
+.attendee-theme .notification-card:not([style*="0,201,154"]) { background: var(--q-surface) !important; }
+.attendee-theme .notification-card .w-10.h-10 { background: var(--q-surface-3) !important; color: var(--q-green-light) !important; }
+.attendee-theme .digital-ticket-page .digital-ticket-card { border: 1px solid rgba(255,255,255,.08) !important; border-radius: 24px !important; background: var(--q-surface) !important; }
+.attendee-theme .digital-ticket-status-valid { color: var(--q-green-light) !important; }
+.attendee-theme .favorites-page { padding: 6rem var(--page-gutter) 5rem; }
+.attendee-theme .favorites-header, .attendee-theme .favorites-content { width: min(100%, 1152px); margin-inline: auto; }
+.attendee-theme .favorites-title-row h1 { font-family: var(--font-display) !important; }
+.attendee-theme .favorites-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(min(100%,260px),1fr)); gap: 1rem; }
+
+/* Authentication remains a focused attendee journey; organizer auth is not affected. */
+.attendee-auth-theme .qpassa-auth-brand-overlay { background: linear-gradient(145deg, rgba(5,5,6,.98), rgba(8,91,80,.72) 58%, rgba(5,5,6,.96)) !important; }
+.attendee-auth-theme .qpassa-auth-brand-panel { background: var(--q-bg); }
+.attendee-auth-theme .qpassa-auth-card { border: 1px solid rgba(255,255,255,.08) !important; border-radius: 22px !important; background: var(--q-surface) !important; box-shadow: 0 28px 80px rgba(0,0,0,.35) !important; }
+.attendee-auth-theme .qpassa-auth-primary-button { min-height: 3.2rem; border-radius: 12px !important; }
+.attendee-auth-theme :is(input,textarea,select) { border-color: var(--q-edge) !important; border-radius: 11px !important; background: var(--q-surface-2) !important; color: var(--q-text) !important; }
+.attendee-auth-theme .qpassa-auth-view-tab[data-active='true'], .attendee-auth-theme .qpassa-auth-role-option[data-active='true'] { background: var(--q-green) !important; color: #04120e !important; }
+
+@media (min-width: 768px) {
+  .attendee-theme .home-discovery-content { gap: 3.6rem !important; }
+  .attendee-theme .attendee-events-page .events-filter-row { max-width: 900px; }
+  .attendee-theme .sinc-event-page .sinc-event-body { gap: 1.5rem !important; }
+}
+@media (max-width: 767px) {
+  .attendee-theme .hero-shell { padding-top: 4.7rem !important; }
+  .attendee-theme .home-hero-content > .text-center { margin-top: .75rem !important; }
+  .attendee-theme .hero-title { font-size: clamp(2.2rem, 11vw, 3.4rem) !important; }
+  .attendee-theme .home-discovery-content { gap: 2.4rem !important; }
+  .attendee-theme .home-all-events-grid { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+  .attendee-theme .home-all-events-grid > .tixian-event-card { width: min(100%, 360px) !important; }
+  .attendee-theme .home-all-events-slide { display: flex; justify-content: center; }
+  .attendee-theme .qpassa-event-card, .attendee-theme .qpassa-poster-card { border-radius: 16px !important; }
+  .attendee-theme .sinc-event-page { padding: 5rem 1rem 6rem !important; }
+  .attendee-theme .sinc-event-page .sinc-event-identity { grid-template-columns: minmax(0,1fr) !important; }
+  .attendee-theme .sinc-event-page .sinc-countdown { grid-column: 1; grid-row: auto; }
+  .attendee-theme .sinc-event-page .sinc-event-body { grid-template-columns: minmax(0,1fr) !important; grid-template-areas: 'ticket' 'description' 'location' 'related' !important; }
+  .attendee-theme .qpassa-checkout-page, .attendee-theme .qpassa-tickets-page,
+  .attendee-theme .qpassa-profile-page, .attendee-theme .qpassa-notifications-page { padding-bottom: 6rem !important; }
+  .attendee-theme .digital-ticket-page { padding-top: 5.5rem !important; padding-bottom: 6rem !important; }
+  .attendee-theme .home-organizer-banner { padding: 1.35rem !important; }
+}
