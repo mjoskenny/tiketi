@@ -50,7 +50,7 @@ function EventCardFan({ events, navigate }: { events: Event[]; navigate: Props['
       <span className="sr-only">Choose an event card to view its details.</span>
       {fanEvents.map((event, index) => (
         <div className="about-event-card-fan-card" data-card={index} key={`${event.id}-${index}`}>
-          <EventCard event={event} poster trending imagePriority onClick={() => navigate('event-detail', event)} />
+          <EventCard event={event} compact listing onClick={() => navigate('event-detail', event)} />
         </div>
       ))}
     </div>

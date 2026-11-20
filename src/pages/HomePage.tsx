@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { Briefcase, Flame, GraduationCap, Mic, Music, Palette, PartyPopper, Trophy, type LucideIcon } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { categories } from '../data/events'
 import { SearchIcon, XIcon, FilterIcon, TagIcon, SparkleIcon, ArrowRightIcon, GridIcon, ListIcon } from '../components/Icon'
@@ -6,12 +7,22 @@ import EventCard from '../components/EventCard'
 import OrganizerCard from '../components/OrganizerCard'
 import type { Event, Organizer } from '../lib/types'
 import { ORGANIZER_COVER_PLACEHOLDER } from '../lib/profileMedia'
-import { hasEventEnded, getEventEndTimestamp, getEventPhase } from '../lib/eventTime'
+import { hasEventEnded, getEventEndTimestamp, getEventPhase, getEventStartTimestamp } from '../lib/eventTime'
 
 type Props = { navigate: (p: string, extra?: unknown) => void }
 type QuickFilter = 'all' | 'today' | 'tomorrow' | 'weekend'
 
 const HOME_EVENT_SELECT = '*, tags, ticket_tiers(id, event_id, name, price, description, quantity, sold, created_at), organizers(id, user_id, name, description, logo_url, website, phone, city, verified, subscription_tier, created_at, profiles!organizers_user_id_fkey(id, full_name, username, profile_image, avatar_url, cover_image, email))'
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  Music,
+  Parties: PartyPopper,
+  Sports: Trophy,
+  Comedy: Mic,
+  Conferences: GraduationCap,
+  Culture: Palette,
+  Business: Briefcase,
+  Festivals: Flame,
+}
 
 function isToday(d: string) {
   const today = new Date(); const ed = new Date(d)
@@ -56,9 +67,10 @@ function Pill({ active, onClick, children }: { active: boolean; onClick: () => v
   )
 }
 
-function SectionHeading({ title }: { title: string }) {
+function SectionHeading({ title, onSeeAll }: { title: string; onSeeAll?: () => void }) {
   return <div className="home-section-heading flex items-end justify-between mb-2.5">
     <h2 className="text-base font-bold">{title}</h2>
+    {onSeeAll && <button type="button" className="home-section-see-all" onClick={onSeeAll}>See all <ArrowRightIcon size={15} /></button>}
   </div>
 }
 
@@ -67,10 +79,6 @@ function EmptySection({ message = 'No events available' }: { message?: string })
 }
 
 export default function HomePage({ navigate }: Props) {
-  const trendingScrollerRef = useRef<HTMLDivElement>(null)
-  const trendingTrackRef = useRef<HTMLDivElement>(null)
-  const [trendingCopyCount, setTrendingCopyCount] = useState(5)
-  const [trendingCycleWidth, setTrendingCycleWidth] = useState(0)
   const [events, setEvents] = useState<Event[]>([])
   const [trendingEvents, setTrendingEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
@@ -82,61 +90,13 @@ export default function HomePage({ navigate }: Props) {
   const [currentTime, setCurrentTime] = useState(() => Date.now())
   const [allEventsView, setAllEventsView] = useState<'list' | 'grid'>('list')
   const [allEventsPage, setAllEventsPage] = useState(1)
+  const [allEventsTab, setAllEventsTab] = useState<'upcoming' | 'past'>('upcoming')
+  const [activeEventsSlide, setActiveEventsSlide] = useState(0)
+  const allEventsCarouselRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setAllEventsPage(1)
   }, [search, timeFilter, activeCategory, priceFilter])
-
-  useEffect(() => {
-    const scroller = trendingScrollerRef.current
-    const track = trendingTrackRef.current
-    if (!scroller || !track) return
-
-    const groups = track.querySelectorAll<HTMLElement>('.trending-events-group')
-    if (groups.length < 2) return
-
-    const updateCopies = () => {
-      const cycleWidth = groups[1].offsetLeft - groups[0].offsetLeft
-      if (!cycleWidth) return
-      setTrendingCycleWidth(current => current === cycleWidth ? current : cycleWidth)
-      const copies = Math.max(5, Math.ceil(scroller.clientWidth / cycleWidth) * 2 + 3)
-      setTrendingCopyCount(current => current === copies ? current : copies)
-    }
-
-    updateCopies()
-    const measurementFrame = window.requestAnimationFrame(updateCopies)
-    const observer = new ResizeObserver(updateCopies)
-    observer.observe(scroller)
-    observer.observe(track)
-    return () => {
-      window.cancelAnimationFrame(measurementFrame)
-      observer.disconnect()
-    }
-  }, [trendingEvents.length, loading])
-
-  useEffect(() => {
-    const scroller = trendingScrollerRef.current
-    const track = trendingTrackRef.current
-    if (!scroller || !track || !trendingEvents.length) return
-
-    const groups = track.querySelectorAll<HTMLElement>('.trending-events-group')
-    const middleGroup = groups[Math.floor(groups.length / 2)]
-    if (middleGroup) scroller.scrollLeft = middleGroup.offsetLeft
-  }, [trendingEvents.length, trendingCopyCount, loading])
-
-  const handleTrendingScroll = () => {
-    const scroller = trendingScrollerRef.current
-    const track = trendingTrackRef.current
-    if (!scroller || !track) return
-
-    const groups = track.querySelectorAll<HTMLElement>('.trending-events-group')
-    if (groups.length < 3) return
-    const cycleWidth = groups[1].offsetLeft - groups[0].offsetLeft
-    if (!cycleWidth) return
-
-    if (scroller.scrollLeft < cycleWidth) scroller.scrollLeft += cycleWidth
-    else if (scroller.scrollLeft > track.scrollWidth - scroller.clientWidth - cycleWidth) scroller.scrollLeft -= cycleWidth
-  }
 
   useEffect(() => {
     const timer = window.setInterval(() => setCurrentTime(Date.now()), 15000)
@@ -226,12 +186,29 @@ export default function HomePage({ navigate }: Props) {
   const liveEvents = filtered.filter(e => !hasEventEnded(e.date, e.time, e.end_time))
   const freeEvents = upcomingBeforePast(filtered.filter(e => !e.ticket_tiers?.length || Math.min(...e.ticket_tiers.map(t => t.price)) === 0), currentTime).slice(0, 4)
   const activeEvents = liveEvents.slice(0, 6)
-  const homeAllEvents = upcomingBeforePast(filtered, currentTime)
-  const homePageCount = Math.max(1, Math.ceil(homeAllEvents.length / 8))
-  const visibleHomeEvents = homeAllEvents.slice((allEventsPage - 1) * 8, allEventsPage * 8)
+  const upcomingHomeEvents = filtered
+    .filter(event => getEventEndTimestamp(event.date, event.time, event.end_time) >= currentTime)
+    .sort((a, b) => getEventStartTimestamp(a.date, a.time) - getEventStartTimestamp(b.date, b.time))
+  const pastHomeEvents = filtered
+    .filter(event => getEventEndTimestamp(event.date, event.time, event.end_time) < currentTime)
+    .sort((a, b) => getEventStartTimestamp(b.date, b.time) - getEventStartTimestamp(a.date, a.time))
+  const homeEvents = allEventsTab === 'upcoming' ? upcomingHomeEvents : pastHomeEvents
+  const homeEventSlides = Array.from({ length: Math.min(4, Math.ceil(homeEvents.length / 4)) }, (_, slideIndex) => homeEvents.slice(slideIndex * 4, slideIndex * 4 + 4))
+  const scrollToEventsSlide = (slideIndex: number) => {
+    const carousel = allEventsCarouselRef.current
+    if (!carousel) return
+    carousel.scrollTo({ left: slideIndex * carousel.clientWidth, behavior: 'smooth' })
+    setActiveEventsSlide(slideIndex)
+  }
+  const handleEventsCarouselScroll = () => {
+    const carousel = allEventsCarouselRef.current
+    if (!carousel) return
+    setActiveEventsSlide(Math.min(homeEventSlides.length - 1, Math.round(carousel.scrollLeft / carousel.clientWidth)))
+  }
   useEffect(() => {
-    setAllEventsPage(page => Math.min(page, homePageCount))
-  }, [homePageCount])
+    setActiveEventsSlide(0)
+    allEventsCarouselRef.current?.scrollTo({ left: 0, behavior: 'instant' })
+  }, [allEventsTab, search, timeFilter, activeCategory, priceFilter])
   const organizers = Array.from(
     events.reduce((groups, event) => {
       if (!event.organizers || !(event.organizers.verified || event.organizers.verification_status === 'verified')) return groups
@@ -295,25 +272,71 @@ export default function HomePage({ navigate }: Props) {
     </div>
     <div className="home-discovery-content max-w-7xl mx-auto px-4 sm:px-6  pb-8 space-y-6">
       {!anyActive && <>
-        {loading ? <section><SectionHeading title="Trending events" /><div className="flex gap-4 overflow-x-auto px-1 pb-4 pt-2" style={{ scrollbarWidth: 'none' }}>{[1, 2, 3].map(i => <div key={i} className="aspect-[4/5] rounded-[2rem] animate-pulse flex-shrink-0" style={{ width: 220, background: 'var(--muted)' }} />)}</div></section> : trendingEvents.length > 0 ? <section className="home-trending-section"><SectionHeading title="Trending events" /><div ref={trendingScrollerRef} onScroll={handleTrendingScroll} className="trending-events-marquee overflow-x-auto overscroll-x-contain px-1 pb-4 pt-2" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' }}><div ref={trendingTrackRef} className="trending-events-track flex min-w-max py-2" style={{ width: 'max-content', '--trending-cycle-width': `${trendingCycleWidth}px` } as React.CSSProperties}>{Array.from({ length: trendingCopyCount }, (_, copy) => <div key={`trending-group-${copy}`} className="trending-events-group flex shrink-0 gap-5" aria-hidden={copy !== Math.floor(trendingCopyCount / 2)}>{trendingEvents.map(ev => <div key={`${copy}-${ev.id}`} className="shrink-0"><EventCard event={ev} poster listing timerBadge trending onClick={() => navigate('event-detail', ev)} /></div>)}</div>)}</div></div></section> : null}
-        {loading ? <section className="home-active-events-section"><SectionHeading title="Active events" /><div className="home-active-events-rail flex gap-5 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{[1, 2, 3, 4].map(i => <div key={i} className="aspect-[4/5] w-[min(327px,84vw)] shrink-0 rounded-[2rem] animate-pulse" style={{ background: 'var(--muted)' }} />)}</div></section> : <section className="home-active-events-section"><SectionHeading title="Active events" />{activeEvents.length > 0 ? <div className="home-active-events-rail flex gap-5 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{activeEvents.map(ev => <EventCard key={ev.id} event={ev} poster onClick={() => navigate('event-detail', ev)} />)}</div> : <EmptySection />}</section>}
+        {!loading && trendingEvents.length > 0 && <section className="home-trending-section"><SectionHeading title="Trending right now" /><div className="trending-events-marquee" aria-label="Trending events" tabIndex={0}><div className="trending-events-track">{trendingEvents.map(ev => <EventCard key={ev.id} event={ev} trending compact listing onClick={() => navigate('event-detail', ev)} />)}</div></div></section>}
+        <section className="home-categories-section">
+          <SectionHeading title="Explore by category" onSeeAll={() => navigate('events')} />
+          <div className="home-category-rail">
+            {categories.map(category => {
+              const Icon = CATEGORY_ICONS[category.label]
+              return <button
+                key={category.label}
+                type="button"
+                className="home-category-card"
+                data-active={activeCategory === category.label}
+                aria-pressed={activeCategory === category.label}
+                onClick={() => setActiveCategory(current => current === category.label ? 'All' : category.label)}
+              >
+                <span aria-hidden="true" className="home-category-icon">{Icon && <Icon size={16} strokeWidth={1.8} />}</span>
+                <span>{category.label}</span>
+              </button>
+            })}
+          </div>
+        </section>
+        {loading ? <section className="home-active-events-section"><SectionHeading title="Active events" /><div className="home-active-events-rail flex gap-5 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{[1, 2, 3, 4].map(i => <div key={i} className="aspect-[4/5] w-[min(327px,84vw)] shrink-0 rounded-[2rem] animate-pulse" style={{ background: 'var(--muted)' }} />)}</div></section> : <section className="home-active-events-section"><SectionHeading title="Active events" />{activeEvents.length > 0 ? <div className="home-active-events-rail flex gap-5 overflow-x-auto pb-3" style={{ scrollbarWidth: 'none' }}>{activeEvents.map(ev => <EventCard key={ev.id} event={ev} compact listing onClick={() => navigate('event-detail', ev)} />)}</div> : <EmptySection />}</section>}
       </>}
       <section>
         <div className="home-section-heading home-all-events-heading flex items-center justify-between gap-4 mb-1">
           <h2 className="text-base font-bold">{anyActive ? 'Search results' : 'All events'}</h2>
           <div className="flex items-center gap-2">
-            <div className="home-events-view-toggle flex items-center rounded-full p-1" role="group" aria-label="All events layout">
-              <button type="button" onClick={() => setAllEventsView('list')} aria-label="List view" title="List view" aria-pressed={allEventsView === 'list'} className="home-events-view-button" data-active={allEventsView === 'list'}><ListIcon size={16} /></button>
-              <button type="button" onClick={() => setAllEventsView('grid')} aria-label="Card grid view" title="Card grid view" aria-pressed={allEventsView === 'grid'} className="home-events-view-button" data-active={allEventsView === 'grid'}><GridIcon size={16} /></button>
-            </div>
             {anyActive && !loading && <button onClick={() => { setSearch(''); setActiveCategory('All'); setTimeFilter('all'); setPriceFilter('all') }} className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full" style={{ color: 'var(--accent)', background: 'rgba(199,243,107,0.1)', border: '0' }}><XIcon size={11} />Clear all</button>}
+            <button type="button" className="home-section-see-all" onClick={() => navigate('events')}>See all <ArrowRightIcon size={15} /></button>
           </div>
         </div>
-        {loading ? <div className="grid grid-cols-1 gap-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-[124px] rounded-2xl animate-pulse" style={{ background: 'var(--muted)' }} />)}</div> : filtered.length > 0 ? <div className={allEventsView === 'list' ? 'home-agenda-list grid grid-cols-1 gap-3' : 'home-all-events-grid grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4'}>{visibleHomeEvents.map(ev => <EventCard key={ev.id} event={ev} {...(allEventsView === 'list' ? { agenda: true, listing: true } : { poster: true })} onClick={() => navigate('event-detail', ev)} />)}</div> : <div className="flex flex-col items-center justify-center py-24 gap-4"><div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}><SearchIcon size={22} style={{ color: 'var(--muted-foreground)' }} /></div><p className="font-semibold text-lg" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>No events found</p><p className="text-sm text-center max-w-xs" style={{ color: 'var(--muted-foreground)' }}>{events.length === 0 ? 'No published events yet. Check back soon or create your own.' : 'Try different filters or search terms.'}</p>{events.length > 0 && <button onClick={() => { setSearch(''); setActiveCategory('All'); setTimeFilter('all'); setPriceFilter('all') }} className="gradient-action px-5 py-2.5 rounded-xl text-sm font-semibold transition-all">Clear filters</button>}</div>}
-        {!loading && homePageCount > 1 && <nav className="home-events-pagination" aria-label="Events pagination"><button type="button" onClick={() => setAllEventsPage(page => Math.max(1, page - 1))} disabled={allEventsPage === 1}>Previous</button><span>Page {allEventsPage} of {homePageCount}</span><button type="button" onClick={() => setAllEventsPage(page => Math.min(homePageCount, page + 1))} disabled={allEventsPage === homePageCount}>Next</button></nav>}
-        <div className="mt-6 flex justify-center"><button onClick={() => navigate('events')} className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--primary-light)' }}>{filtered.length > 8 ? 'View all events' : 'Explore all events'}<ArrowRightIcon size={15} /></button></div>
+        <div className="home-all-events-tabs">
+          <div className="home-all-events-tab-options" role="tablist" aria-label="All events date range">
+            {([['upcoming', 'Upcoming', upcomingHomeEvents.length], ['past', 'Past', pastHomeEvents.length]] as const).map(([tab, label, count]) => <button
+              key={tab}
+              type="button"
+              role="tab"
+              id={`home-events-tab-${tab}`}
+              aria-selected={allEventsTab === tab}
+              aria-controls="home-events-tabpanel"
+              className="home-all-events-tab"
+              data-active={allEventsTab === tab}
+              onClick={() => setAllEventsTab(tab)}
+            >{label}<span>{count}</span></button>)}
+          </div>
+          <div className="home-events-view-toggle flex items-center rounded-full p-1" role="group" aria-label="All events layout">
+            <button type="button" onClick={() => setAllEventsView('list')} aria-label="List view" title="List view" aria-pressed={allEventsView === 'list'} className="home-events-view-button" data-active={allEventsView === 'list'}><ListIcon size={16} />{allEventsView === 'list' && <span>List</span>}</button>
+            <button type="button" onClick={() => setAllEventsView('grid')} aria-label="Card grid view" title="Card grid view" aria-pressed={allEventsView === 'grid'} className="home-events-view-button" data-active={allEventsView === 'grid'}><GridIcon size={16} />{allEventsView === 'grid' && <span>Grid</span>}</button>
+          </div>
+        </div>
+        {loading ? <div className="grid grid-cols-1 gap-3">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-[124px] rounded-2xl animate-pulse" style={{ background: 'var(--muted)' }} />)}</div> : homeEvents.length > 0 ? <div id="home-events-tabpanel" role="tabpanel" aria-labelledby={`home-events-tab-${allEventsTab}`}>
+          <div ref={allEventsCarouselRef} className="home-all-events-carousel" onScroll={handleEventsCarouselScroll} aria-label={`${allEventsTab === 'upcoming' ? 'Upcoming' : 'Past'} events carousel`}>
+            <div className="home-all-events-carousel-track">
+              {homeEventSlides.map((slideEvents, slideIndex) => <div className="home-all-events-slide" key={`${allEventsTab}-slide-${slideIndex}`} aria-label={`Slide ${slideIndex + 1} of ${homeEventSlides.length}`}>
+                <div className={`home-events-slide-content ${allEventsView === 'list' ? 'home-agenda-list' : 'home-all-events-grid'}`}>
+                  {slideEvents.map(event => <EventCard key={event.id} event={event} {...(allEventsView === 'list' ? { agenda: true, listing: true } : { compact: true, listing: true })} onClick={() => navigate('event-detail', event)} />)}
+                </div>
+              </div>)}
+            </div>
+          </div>
+          {homeEventSlides.length > 1 && <nav className="home-all-events-indicators" aria-label="Choose events slide">
+            {homeEventSlides.map((_, slideIndex) => <button key={slideIndex} type="button" aria-label={`Go to events slide ${slideIndex + 1}`} aria-current={activeEventsSlide === slideIndex ? 'true' : undefined} data-active={activeEventsSlide === slideIndex} onClick={() => scrollToEventsSlide(slideIndex)} />)}
+          </nav>}
+        </div> : <div id="home-events-tabpanel" role="tabpanel" aria-labelledby={`home-events-tab-${allEventsTab}`} className="py-10"><EmptySection message={allEventsTab === 'upcoming' ? 'No upcoming events found.' : 'No past events found.'} /></div>}
       </section>
-      {!loading && organizers.length > 0 && <section><SectionHeading title="Meet the organizers" /><div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>{organizers.map(([id, item]) => <OrganizerCard key={id} organizer={item.organizer} eventCount={item.eventCount} coverImage={item.coverImage ?? null} onClick={() => navigate('organizer-profile', item.organizer)} />)}</div><div className="mt-6 flex justify-center"><button onClick={() => navigate('explore-organizers')} className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--primary-light)' }}>View all organizers<ArrowRightIcon size={15} /></button></div></section>}
+      {!loading && organizers.length > 0 && <section><SectionHeading title="Meet the organizers" onSeeAll={() => navigate('explore-organizers')} /><div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>{organizers.map(([id, item]) => <OrganizerCard key={id} organizer={item.organizer} eventCount={item.eventCount} coverImage={item.coverImage ?? null} onClick={() => navigate('organizer-profile', item.organizer)} />)}</div></section>}
       {!loading && <section className="home-organizer-banner relative overflow-hidden rounded-3xl border p-8 md:p-10"><div className="home-organizer-banner-glow absolute inset-0" aria-hidden /><div className="relative z-10 flex flex-col items-start justify-between gap-6 md:flex-row md:items-center"><div className="max-w-lg"><div className="mb-3 flex items-center gap-2"><SparkleIcon size={16} className="home-organizer-banner-kicker" /><span className="home-organizer-banner-kicker text-xs font-semibold uppercase tracking-widest">For Organizers</span></div><h2 className="mb-2 text-2xl font-bold md:text-3xl" style={{ letterSpacing: '-0.02em' }}>Have an event?</h2><p className="home-organizer-banner-copy text-sm leading-relaxed">Create, sell and manage your tickets in one place. Reach thousands of people across Burundi and beyond.</p></div><div className="flex flex-shrink-0 flex-col gap-3 sm:flex-row"><button onClick={() => navigate('auth-organizer')} className="home-organizer-banner-primary rounded-xl px-6 py-3 text-sm font-bold transition-all">Start for free</button><button onClick={() => navigate('organizers')} className="home-organizer-banner-secondary rounded-xl px-6 py-3 text-sm font-semibold transition-all">Learn more</button></div></div></section>}
     </div>
   </div>

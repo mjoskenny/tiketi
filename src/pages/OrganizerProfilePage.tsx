@@ -259,14 +259,14 @@ export default function OrganizerProfilePage({ organizer: initialOrganizer, navi
           {activeEvents.length > 0 && (
             <div className="sinc-organizer-group">
               <p className="sinc-organizer-group-label">{i18n.t('Active events')}</p>
-              <div className="sinc-organizer-event-grid">{activeEvents.map((event) => <EventCard key={event.id} event={event} poster fullWidthMobile onClick={() => navigate('event-detail', event)} />)}</div>
+              <div className="sinc-organizer-event-grid">{activeEvents.map((event) => <EventCard key={event.id} event={event} compact listing onClick={() => navigate('event-detail', event)} />)}</div>
             </div>
           )}
 
           {pastEvents.length > 0 && (
             <div className="sinc-organizer-group">
               <p className="sinc-organizer-group-label">{i18n.t('Past events')}</p>
-              <div className="sinc-organizer-event-grid">{pastEvents.map((event) => <EventCard key={event.id} event={event} poster fullWidthMobile onClick={() => navigate('event-detail', event)} />)}</div>
+              <div className="sinc-organizer-event-grid">{pastEvents.map((event) => <EventCard key={event.id} event={event} compact listing onClick={() => navigate('event-detail', event)} />)}</div>
             </div>
           )}
 
